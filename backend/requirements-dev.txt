@@ -1,0 +1,8 @@
+# ---------------------------------------------------------------------------
+# GICORP / PluriActas - Dependencias de desarrollo y pruebas
+# Instalación:  pip install -r requirements-dev.txt
+# ---------------------------------------------------------------------------
+-r requirements.txt
+
+pytest>=8.3,<10.0
+pypdf>=5.0,<7.0          # Verificación de los PDF generados en las pruebas

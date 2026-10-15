@@ -1,0 +1,36 @@
+# ===========================================================================
+#  GICORP / PluriActas - PostgreSQL para desarrollo y producción
+#
+#  Uso:
+#    1) docker compose up -d
+#    2) En backend/.env:
+#         DATABASE_URL=postgresql+psycopg://pluriactas:pluriactas@localhost:5432/pluriactas
+#    3) Instala el driver:  pip install -r requirements-postgres.txt
+#
+#  Nota: requiere Docker Desktop instalado. Si no lo tienes, la plataforma
+#  funciona igualmente con SQLite (DATABASE_URL=sqlite:///./pluriactas.db).
+# ===========================================================================
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pluriactas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pluriactas
+      POSTGRES_USER: pluriactas
+      POSTGRES_PASSWORD: pluriactas
+      TZ: America/Mexico_City
+      PGTZ: America/Mexico_City
+    ports:
+      - "5432:5432"
+    volumes:
+      - pluriactas-datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pluriactas -d pluriactas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pluriactas-datos:
+    name: pluriactas-datos

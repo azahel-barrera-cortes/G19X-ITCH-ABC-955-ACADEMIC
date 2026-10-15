@@ -1,0 +1,48 @@
+# ===========================================================================
+#  GICORP / PluriActas - Archivos ignorados por Git
+# ===========================================================================
+
+# --- Python (backend) ------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Bases de datos locales (SQLite de desarrollo)
+*.db
+*.sqlite3
+
+# --- Entorno ---------------------------------------------------------------
+.env
+.env.local
+*.env.local
+!.env.example
+
+# --- Node (frontend) -------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# --- Registros y temporales de trabajo ------------------------------------
+.tmp-*
+*.log
+.env-check.txt
+
+# --- Sistema operativo / IDE ----------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Nota: se conservan deliberadamente los PDF de `backend/ejemplos/`
+# (acta_ejemplo.pdf y acta_e2e.pdf) como evidencia del documento generado.

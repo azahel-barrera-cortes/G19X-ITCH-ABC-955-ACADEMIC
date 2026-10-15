@@ -1,0 +1,9 @@
+# ---------------------------------------------------------------------------
+# Driver de PostgreSQL (REQUERIDO en producción / cuando DATABASE_URL apunta a
+# PostgreSQL). Se mantiene aparte porque las ruedas binarias dependen de la
+# versión de Python; en algunos intérpretes muy nuevos no existen todavía y la
+# plataforma puede operar con SQLite sin instalar este archivo.
+#
+# Instalación:  pip install -r requirements.txt -r requirements-postgres.txt
+# ---------------------------------------------------------------------------
+psycopg[binary]>=3.2,<4.0

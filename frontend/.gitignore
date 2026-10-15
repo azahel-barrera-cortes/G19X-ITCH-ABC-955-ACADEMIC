@@ -1,0 +1,15 @@
+# Dependencias y artefactos de Node
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Variables de entorno locales
+.env
+.env.local
+.env.*.local
+
+# Registros y temporales
+*.log
+npm-debug.log*
+yarn-error.log*
