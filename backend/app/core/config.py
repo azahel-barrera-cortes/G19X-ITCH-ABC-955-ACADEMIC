@@ -1,4 +1,4 @@
-"""Configuración central de la plataforma GICORP / PluriActas.
+"""Configuración central de PGAC (Página de Gestión de Actas Corporativas)."""
 
 Todos los valores pueden sobrescribirse mediante variables de entorno o a través
 del archivo ``backend/.env`` (ver ``.env.example``). Se utiliza ``pydantic-settings``
