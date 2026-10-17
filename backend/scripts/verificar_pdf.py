@@ -43,7 +43,7 @@ def main() -> None:
         encontrada = seccion.split(".")[0] in texto or seccion in texto
         print(f"  [{'OK ' if encontrada else 'FALTA'}] {seccion}")
 
-    for dato in ("Grupo Industrial PluriActas", "María Fernanda Ortega Lima", "Página 1 de"):
+    for dato in ("Grupo Industrial PGAC", "María Fernanda Ortega Lima", "Página 1 de"):
         print(f"  [{'OK ' if dato in texto else 'FALTA'}] {dato}")
 
 

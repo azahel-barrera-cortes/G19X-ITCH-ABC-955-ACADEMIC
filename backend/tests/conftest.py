@@ -17,7 +17,7 @@ from typing import Any, Dict, Iterator, List
 # ---------------------------------------------------------------------------
 # Entorno de pruebas (debe fijarse ANTES de importar `app`)
 # ---------------------------------------------------------------------------
-DIRECTORIO_TEMPORAL = Path(tempfile.mkdtemp(prefix="pluriactas-tests-"))
+DIRECTORIO_TEMPORAL = Path(tempfile.mkdtemp(prefix="pgac-tests-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(DIRECTORIO_TEMPORAL / 'pruebas.db').as_posix()}"
 os.environ["AI_PROVIDER"] = "plantillas"
 os.environ["AUTO_CREATE_TABLES"] = "true"

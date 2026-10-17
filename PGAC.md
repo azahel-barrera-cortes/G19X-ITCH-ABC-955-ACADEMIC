@@ -1,6 +1,6 @@
 ### ROL Y CONTEXTO DEL PROYECTO
 Actúa como un Arquitecto de Software Full Stack y Desarrollador Senior en Python y React.js.
-Necesito que me ayudes a desarrollar la estructura base de código para una plataforma web LegalTech denominada **GICORP / PluriActas** ("Plataforma de Generación Inteligente de Actas Corporativas").
+Necesito que me ayudes a desarrollar la estructura base de código para una plataforma web LegalTech denominada **PGAC** ("Página de Gestión de Actas Corporativas").
 
 #### Objetivo de la Plataforma:
 Automatizar la redacción, estructuración y exportación en PDF de actas corporativas (asambleas ordinarias, extraordinarias, aumentos de capital, etc.) cumpliendo con la legislación mercantil (ej. Ley General de Sociedades Mercantiles en México). La plataforma utiliza Inteligencia Artificial para redactar contenido legal complejo y validar consistencia, mientras que el renderizado final a PDF se ejecuta de forma determinista y estricta usando ReportLab.

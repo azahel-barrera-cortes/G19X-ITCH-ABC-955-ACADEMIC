@@ -1,1 +1,1 @@
-"""Pruebas automatizadas de GICORP / PluriActas."""
+"""Pruebas automatizadas de PGAC."""

@@ -11,7 +11,7 @@ import GenerarActaConIA from './pages/GenerarActaConIA.jsx'
 import { obtenerCatalogos } from './api/client.js'
 
 /**
- * Aplicación de GICORP / PluriActas.
+ * Aplicación PGAC (Página de Gestión de Actas Corporativas).
  *
  * Mantiene la navegación entre secciones y el estado compartido mínimo: los
  * catálogos del dominio (cargados desde la API con respaldo local) y el acta que
@@ -115,7 +115,7 @@ export default function App() {
 
         <footer className="border-t border-slate-200 bg-white">
           <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-slate-500 md:px-6">
-            <span>GICORP / PluriActas · Generación Inteligente de Actas Corporativas</span>
+            <span>PGAC · Página de Gestión de Actas Corporativas</span>
             <span>
               La IA asiste la redacción; la revisión legal final corresponde al abogado responsable.
             </span>

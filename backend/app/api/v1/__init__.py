@@ -1,1 +1,1 @@
-"""API versión 1 de GICORP / PluriActas."""
+"""API versión 1 de PGAC."""

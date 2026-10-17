@@ -1,9 +1,9 @@
 {
-  "name": "pluriactas-frontend",
+  "name": "pgac-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "GICORP / PluriActas - Interfaz de generación inteligente de actas corporativas",
+  "description": "PGAC - Página de Gestión de Actas Corporativas",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

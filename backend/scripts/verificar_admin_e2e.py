@@ -77,7 +77,7 @@ def main() -> int:
             break
         except Exception:
             time.sleep(0.25)
-    print(f"API de PluriActas en {BASE_API}\n")
+    print(f"API de PGAC en {BASE_API}\n")
 
     cliente = httpx.Client(timeout=90.0)
     fallos: list[str] = []

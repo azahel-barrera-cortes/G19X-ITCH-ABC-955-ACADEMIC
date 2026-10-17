@@ -1,6 +1,6 @@
-# GICORP / PluriActas
+# PGAC
 
-**Plataforma de Generación Inteligente de Actas Corporativas (LegalTech).**
+**Página de Gestión de Actas Corporativas (LegalTech).**
 Automatiza la redacción, estructuración, validación y exportación a PDF de actas
 corporativas (asambleas ordinarias, extraordinarias, aumento de capital, fusión,
 disolución, etc.) conforme a la Ley General de Sociedades Mercantiles (México).
@@ -104,7 +104,7 @@ copy .env.example .env
 
 | Variable | Valor por defecto | Descripción |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./pluriactas.db` | Cadena SQLAlchemy. PostgreSQL: `postgresql+psycopg://usuario:clave@host:5432/pluriactas` |
+| `DATABASE_URL` | `sqlite:///./pgac.db` | Cadena SQLAlchemy. PostgreSQL: `postgresql+psycopg://usuario:clave@host:5432/pgac` |
 | `AUTO_CREATE_TABLES` | `true` | Crea las tablas al arrancar (en producción usa migraciones) |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Orígenes permitidos por CORS |
 | `AI_PROVIDER` | `auto` | `auto` \| `azure_openai` \| `gemini` \| `plantillas` |
@@ -315,7 +315,7 @@ Es la duda más común, así que conviene ser explícito. Hay **dos cosas distin
 | Qué | Dónde vive | Quién lo conserva |
 |---|---|---|
 | **El PDF** | Solo en memoria (`io.BytesIO`) y en la descarga del navegador | El usuario (carpeta `Descargas`) |
-| **Los datos del acta** | Base de datos: `backend/pluriactas.db` (SQLite) o PostgreSQL | El servidor, de forma permanente |
+| **Los datos del acta** | Base de datos: `backend/pgac.db` (SQLite) o PostgreSQL | El servidor, de forma permanente |
 
 Por diseño **el servidor no acumula archivos PDF en disco**: se arma, se envía y se
 descarta. Así no quedan documentos societarios confidenciales huérfanos en el equipo
@@ -387,14 +387,14 @@ Verificación E2E de la IA (LLM simulado, llamadas HTTP reales):
 
 ## 9. PostgreSQL
 
-Por defecto se usa SQLite (`backend/pluriactas.db`) para que el proyecto funcione
+Por defecto se usa SQLite (`backend/pgac.db`) para que el proyecto funcione
 sin infraestructura. Para PostgreSQL:
 
 ```powershell
 docker compose up -d                     # si tienes Docker Desktop
 pip install -r requirements-postgres.txt # driver psycopg 3
 # backend/.env
-DATABASE_URL=postgresql+psycopg://pluriactas:pluriactas@localhost:5432/pluriactas
+DATABASE_URL=postgresql+psycopg://pgac:pgac@localhost:5432/pgac
 ```
 
 > En esta máquina **Docker no está instalado**, por lo que `docker-compose.yml`

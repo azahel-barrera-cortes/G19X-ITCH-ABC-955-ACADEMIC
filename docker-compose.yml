@@ -1,36 +1,86 @@
 # ===========================================================================
-#  GICORP / PluriActas - PostgreSQL para desarrollo y producción
+#  PGAC - PostgreSQL + Backend + Frontend (Docker Compose)
 #
 #  Uso:
-#    1) docker compose up -d
-#    2) En backend/.env:
-#         DATABASE_URL=postgresql+psycopg://pluriactas:pluriactas@localhost:5432/pluriactas
-#    3) Instala el driver:  pip install -r requirements-postgres.txt
+#    docker compose up -d
 #
-#  Nota: requiere Docker Desktop instalado. Si no lo tienes, la plataforma
-#  funciona igualmente con SQLite (DATABASE_URL=sqlite:///./pluriactas.db).
+#  Luego accede a:
+#    - Frontend:  http://localhost
+#    - Backend:   http://localhost:8000 (docs en /docs)
+#    - PostgreSQL: localhost:5432
 # ===========================================================================
 services:
+  # ------------------------------------------------------------------------
+  #  Base de datos PostgreSQL (producción)
+  # ------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: pluriactas-postgres
+    container_name: pgac-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: pluriactas
-      POSTGRES_USER: pluriactas
-      POSTGRES_PASSWORD: pluriactas
+      POSTGRES_DB: pgac
+      POSTGRES_USER: pgac
+      POSTGRES_PASSWORD: pgac
       TZ: America/Mexico_City
       PGTZ: America/Mexico_City
     ports:
       - "5432:5432"
     volumes:
-      - pluriactas-datos:/var/lib/postgresql/data
+      - pgac-datos:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pluriactas -d pluriactas"]
+      test: ["CMD-SHELL", "pg_isready -U pgac -d pgac"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - pgac-red
+
+  # ------------------------------------------------------------------------
+  #  Backend FastAPI
+  # ------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: pgac-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - backend/.env
+    environment:
+      # Cuando se usa Docker Compose, apuntar a PostgreSQL por defecto.
+      # Sobreescribe con DATABASE_URL=sqlite:///./pgac.db para usar SQLite.
+      DATABASE_URL: postgresql+psycopg://pgac:pgac@postgres:5432/pgac
+    ports:
+      - "8000:8000"
+    networks:
+      - pgac-red
+
+  # ------------------------------------------------------------------------
+  #  Frontend React + Vite (servido por nginx)
+  # ------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: pgac-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - pgac-red
+
+# ------------------------------------------------------------------------
+#  Red y volúmenes compartidos
+# ------------------------------------------------------------------------
+networks:
+  pgac-red:
+    driver: bridge
 
 volumes:
-  pluriactas-datos:
-    name: pluriactas-datos
+  pgac-datos:
+    name: pgac-datos

@@ -23,7 +23,7 @@ from app.services import acta_service  # noqa: E402
 from app.services.pdf_generator import build_acta_pdf  # noqa: E402
 
 DATOS_ACTA = {
-    "sociedad": "Grupo Industrial PluriActas, S.A. de C.V.",
+    "sociedad": "Grupo Industrial PGAC, S.A. de C.V.",
     "rfc_sociedad": "GIP160101XYZ",
     "tipo_asamblea": "ordinaria",
     "titulo": "Aprobación de estados financieros y decreto de dividendos",

@@ -1,5 +1,5 @@
 /**
- * Cliente HTTP de GICORP / PluriActas.
+ * Cliente HTTP de PGAC (Página de Gestión de Actas Corporativas).
  *
  * Centraliza todas las llamadas al backend de FastAPI. Las respuestas binarias
  * (PDF) se solicitan con `responseType: 'blob'` para descargarlas directamente

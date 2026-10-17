@@ -125,7 +125,7 @@ class Acta(Base):
         """
         if self.fecha_caducidad is None:
             return None
-        return (self.fecha_caducidad - datetime.utcnow().date()).days
+        return (self.fecha_caducidad - date.today()).days
 
     @property
     def estado_caducidad(self) -> str:

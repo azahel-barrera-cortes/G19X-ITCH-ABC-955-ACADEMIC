@@ -2,7 +2,7 @@
 
 Levanta un servidor falso con la misma API de OpenAI que consume
 ``ProveedorOpenAICompatible`` y comprueba el flujo completo contra el backend real
-de GICORP / PluriActas:
+de PGAC:
 
 1. ``GET  /sistema/estado``        -> reconoce el proveedor configurable.
 2. ``POST /actas/redactar``        -> las cláusulas provienen del LLM.
@@ -145,7 +145,7 @@ def main() -> int:
             break
         except Exception:
             time.sleep(0.25)
-    print(f"API de PluriActas en {BASE_API}\n")
+    print(f"API de PGAC en {BASE_API}\n")
 
     cliente = httpx.Client(timeout=90.0)
     fallos: list[str] = []

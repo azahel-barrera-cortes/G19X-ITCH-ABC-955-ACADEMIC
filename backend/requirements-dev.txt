@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# GICORP / PluriActas - Dependencias de desarrollo y pruebas
+# PGAC - Dependencias de desarrollo y pruebas
 # Instalación:  pip install -r requirements-dev.txt
 # ---------------------------------------------------------------------------
 -r requirements.txt

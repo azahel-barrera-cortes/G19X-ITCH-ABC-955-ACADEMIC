@@ -283,7 +283,7 @@ def _cerrar_y_generar(db, sesion, autor):
 
 
 def texto_ayuda() -> str:
-    return ("Soy el Asistente de Actas de PluriActas. "
+    return ("Soy el Asistente de Actas de PGAC. "
             "Te acompano a CREAR el acta paso a paso: dime Quiero crear un acta. "
             "Si no sabes cual crear te muestro los tipos con su descripcion. "
             "Al terminar genero texto organizado + PDF y el control "

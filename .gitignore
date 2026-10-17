@@ -26,6 +26,9 @@ htmlcov/
 .env.local
 *.env.local
 !.env.example
+# Los archivos de entorno del frontend no contienen secretos: se entregan.
+!.env.development
+!.env.production
 
 # --- Node (frontend) -------------------------------------------------------
 node_modules/

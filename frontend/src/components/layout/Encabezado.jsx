@@ -35,10 +35,10 @@ export default function Encabezado({ seccion, onCambiarSeccion }) {
         {/* En escritorio la marca vive en la barra lateral; aquí solo aparece en móvil. */}
         <div className="flex items-center gap-2.5 md:hidden">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-corporativo-700 text-xs font-bold text-white">
-            GC
+            PG
           </span>
           <p className="text-sm font-semibold leading-tight text-corporativo-700">
-            GICORP <span className="text-slate-400">/</span> PluriActas
+            PGAC
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export default function Encabezado({ seccion, onCambiarSeccion }) {
 
         {/* En escritorio el encabezado muestra el contexto actual + estado. */}
         <p className="hidden text-sm font-semibold text-corporativo-700 md:block">
-          {SECCIONES.find((item) => item.id === seccion)?.titulo || 'GICORP / PluriActas'}
+          {SECCIONES.find((item) => item.id === seccion)?.titulo || 'PGAC'}
         </p>
 
         <div className="flex items-center gap-2">

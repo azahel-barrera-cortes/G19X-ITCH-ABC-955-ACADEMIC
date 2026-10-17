@@ -1,4 +1,4 @@
-"""Excepciones de dominio de GICORP / PluriActas.
+"""Excepciones de dominio de PGAC.
 
 Permiten que los servicios expresen errores de negocio con un código HTTP claro,
 traducidos a respuestas JSON uniformes en ``app.main``.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 
 class PluriActasError(Exception):
-    """Error base de la plataforma."""
+    """Error base de la plataforma PGAC (se conserva el nombre técnico)."""
 
     codigo_http: int = 400
 

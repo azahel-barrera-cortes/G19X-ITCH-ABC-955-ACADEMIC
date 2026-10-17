@@ -1,4 +1,4 @@
-"""Configuración central de PGAC (Página de Gestión de Actas Corporativas)."""
+"""Configuración central de PGAC (Página de Gestión de Actas Corporativas).
 
 Todos los valores pueden sobrescribirse mediante variables de entorno o a través
 del archivo ``backend/.env`` (ver ``.env.example``). Se utiliza ``pydantic-settings``
@@ -28,9 +28,9 @@ class Settings(BaseSettings):
     )
 
     # --- Aplicación ---------------------------------------------------------
-    app_name: str = "GICORP / PluriActas"
+    app_name: str = "PGAC"
     app_description: str = (
-        "Plataforma de Generación Inteligente de Actas Corporativas: redacción "
+        "PGAC - Página de Gestión de Actas Corporativas: redacción "
         "asistida por IA, validación de consistencia y exportación determinista a PDF."
     )
     app_version: str = "0.1.0"
@@ -40,9 +40,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Base de datos ------------------------------------------------------
-    # Producción: postgresql+psycopg://usuario:clave@host:5432/pluriactas
-    # Desarrollo: sqlite:///./pluriactas.db   (no requiere servidor)
-    database_url: str = "sqlite:///./pluriactas.db"
+    # Producción: postgresql+psycopg://usuario:clave@host:5432/pgac
+    # Desarrollo: sqlite:///./pgac.db   (no requiere servidor)
+    database_url: str = "sqlite:///./pgac.db"
     auto_create_tables: bool = True
     sql_echo: bool = False
 
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     margen_cm: float = 2.5
     incluir_numeracion_paginas: bool = True
     pie_confidencialidad: str = (
-        "Documento confidencial generado electrónicamente por GICORP / PluriActas. "
+        "Documento confidencial generado electrónicamente por PGAC. "
         "Su contenido es informativo y no sustituye la revisión de un abogado corporativo."
     )
 

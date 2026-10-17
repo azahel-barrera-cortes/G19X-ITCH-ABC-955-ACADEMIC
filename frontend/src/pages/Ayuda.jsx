@@ -161,7 +161,7 @@ export default function Ayuda({ catalogos }) {
         <TarjetaEncabezado titulo="Aviso legal" descripcion="Alcance del documento generado" />
         <TarjetaCuerpo>
           <p className="text-sm text-slate-700">
-            GICORP / PluriActas es una herramienta de apoyo documental: estructura y redacta el acta,
+            PGAC es una herramienta de apoyo documental: estructura y redacta el acta,
             pero no sustituye la revisión de un abogado corporativo. Antes de la firma y, en su caso, de
             la protocolización ante fedatario público, verifica los datos societarios contra el acta
             constitutiva, los estatutos vigentes y el libro de registro de acciones.

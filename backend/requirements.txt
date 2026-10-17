@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# GICORP / PluriActas - Dependencias del Backend (núcleo)
+# PGAC - Dependencias del Backend (núcleo)
 # Instalación:  pip install -r requirements.txt
 # ---------------------------------------------------------------------------
 fastapi>=0.115,<1.0

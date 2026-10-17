@@ -1,4 +1,4 @@
-"""Modelos ORM de GICORP / PluriActas."""
+"""Modelos ORM de PGAC."""
 
 from app.models.acta import DIAS_AVISO_CADUCIDAD, Acta, ActaVersion
 from app.models.enums import (

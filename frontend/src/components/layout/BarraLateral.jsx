@@ -69,14 +69,14 @@ export default function BarraLateral({ seccion, onCambiarSeccion }) {
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-corporativo-700 text-sm font-bold text-white">
-          GC
+          PG
         </span>
         <div>
           <p className="text-sm font-semibold leading-tight text-corporativo-700">
-            GICORP <span className="text-slate-400">/</span> PluriActas
+            PGAC
           </p>
           <p className="text-[11px] leading-tight text-slate-500">
-            Actas corporativas inteligentes
+            Página de Gestión de Actas Corporativas
           </p>
         </div>
       </div>

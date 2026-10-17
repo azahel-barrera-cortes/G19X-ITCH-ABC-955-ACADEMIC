@@ -53,8 +53,8 @@ from reportlab.platypus import (
 logger = logging.getLogger(__name__)
 
 # --- Identidad y tipografía del documento -----------------------------------
-TITULO_SISTEMA = "GICORP / PluriActas"
-SUBTITULO_SISTEMA = "Plataforma de Generación Inteligente de Actas Corporativas"
+TITULO_SISTEMA = "PGAC"
+SUBTITULO_SISTEMA = "Página de Gestión de Actas Corporativas"
 FUENTE_BASE = "Helvetica"
 FUENTE_NEGRITA = "Helvetica-Bold"
 FUENTE_CURSIVA = "Helvetica-Oblique"
