@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PGAC
 
 **Página de Gestión de Actas Corporativas (LegalTech).**
@@ -435,3 +436,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 
 
 
+=======
+# G19X-ITCH-ABC-955-ACADEMIC
+Proyecto académico TODO Academy
+>>>>>>> b202f4864c07a6e18fddf183387bb2bc7ee92533
