@@ -23,12 +23,19 @@ Genera el código modular y bien documentado para los siguientes módulos:
 #### 1. BACKEND (Python + FastAPI)
 - **Estructura de Modelos (Pydantic / SQLAlchemy)**:
   - Modelo `Acta` (ID, Tipo de Asamblea, Fecha, Sociedad/Empresa, Asistentes, Orden del Día, Acuerdos, Estatus, Versión).
+- **Plantillas legales parametrizadas (`plantillas_legales.py`)**:
+  - Clase `PlantillaLegal` con declaración de parámetros (`ParametroPlantilla`) que indica qué marcadores `{clave}` son requeridos y cuáles tienen valor por defecto.
+  - Función `redactar_con_plantilla(materia, contexto)` que valida parámetros requeridos, aplica valores por defecto y renderiza los párrafos sustituyendo marcadores.
+  - Funciones `obtener_parametros_plantilla(materia)` y `parametros_requeridos_por_materia()` para que el frontend descubra qué datos capturar por tipo de acuerdo.
+  - Excepción `DatosPlantillaIncompletosError` cuando faltan parámetros requeridos.
+  - 15 materias cubiertas con fundamentos de la Ley General de Sociedades Mercantiles.
 - **Endpoint Principal (`POST /api/v1/actas/generar-pdf`)**:
   - Endpoint que recibe los datos estructurados del formulario, solicita a la IA la redacción/validación del cuerpo legal, y ejecuta un script de **ReportLab** para compilar y retornar el archivo PDF binario.
 - **Módulo de ReportLab (`pdf_generator.py`)**:
   - Una función `build_acta_pdf(data: dict) -> bytes` utilizando `SimpleDocTemplate`, `Paragraph`, `Table` y `Spacer` de ReportLab para maquetar un documento legal formal con encabezados, márgenes profesionales, firmas y número de página.
 - **Módulo de Integración IA (`ai_service.py`)**:
   - Una función que reciba el resumen del acuerdo y genere la redacción legal adecuada usando un prompt estructurado.
+  - Degradación automática a plantillas legales deterministas parametrizadas cuando no hay proveedor de IA o éste falla.
 
 #### 2. FRONTEND (React.js + Tailwind CSS)
 - **Formulario Dinámico para Generación de Actas**:

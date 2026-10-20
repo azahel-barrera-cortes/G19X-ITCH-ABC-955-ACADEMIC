@@ -10,6 +10,7 @@ Referencias normativas: Ley General de Sociedades Mercantiles (LGSM).
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Tuple
@@ -30,16 +31,63 @@ ORDINALES: Tuple[str, ...] = (
     "DÉCIMO",
 )
 
+# Expresión regular para extraer marcadores {clave} de un texto de plantilla.
+_PATRON_MARCADOR = re.compile(r"\{(\w+)\}")
+
+
+@dataclass(frozen=True)
+class ParametroPlantilla:
+    """Declaración de un parámetro que una plantilla acepta o requiere.
+
+    ``requerido`` indica si el valor debe venir del contexto de entrada;
+    cuando es ``False`` y falta el valor, se usa ``valor_predeterminado``.
+    """
+
+    nombre: str
+    requerido: bool = True
+    valor_predeterminado: Optional[str] = None
+    descripcion: Optional[str] = None
+
 
 @dataclass(frozen=True)
 class PlantillaLegal:
-    """Estructura de la cláusula correspondiente a una materia determinada."""
+    """Estructura de la cláusula correspondiente a una materia determinada.
+
+    ``parametros`` declara los marcadores {clave} que la plantilla usa,
+    indicando cuáles son obligatorios y cuáles tienen valor por defecto.
+    Esto permite validar el contexto antes de renderizar y exponer al
+    frontend qué datos debe capturar para cada materia.
+    """
 
     materia: MateriaAcuerdo
     titulo: str
     accion: str
     articulos: Tuple[str, ...]
     parrafos: Tuple[str, ...] = field(default_factory=tuple)
+    parametros: Tuple[ParametroPlantilla, ...] = field(default_factory=tuple)
+
+    def parametros_requeridos(self) -> Tuple[str, ...]:
+        """Nombres de los parámetros obligatorios (sin valor por defecto o sin clave en el contexto)."""
+        return tuple(p.nombre for p in self.parametros if p.requerido)
+
+    def parametros_opcionales(self) -> Tuple[str, ...]:
+        """Nombres de los parámetros opcionales (con valor por defecto)."""
+        return tuple(p.nombre for p in self.parametros if not p.requerido)
+
+    def valores_por_defecto(self) -> Dict[str, str]:
+        """Diccionario de parámetros opcionales con su valor predeterminado."""
+        return {
+            p.nombre: p.valor_predeterminado or ""
+            for p in self.parametros
+            if not p.requerido and p.valor_predeterminado is not None
+        }
+
+    def marcador_nombres(self) -> Tuple[str, ...]:
+        """Todos los nombres de marcadores {clave} que aparecen en los párrafos."""
+        nombres: set[str] = set()
+        for parrafo in self.parrafos:
+            nombres.update(_PATRON_MARCADOR.findall(parrafo))
+        return tuple(sorted(nombres))
 
 
 _P_CAPITAL: Dict[MateriaAcuerdo, PlantillaLegal] = {
@@ -53,6 +101,9 @@ _P_CAPITAL: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se declara suscrito y pagado el capital social conforme al artículo 89 de la Ley General de Sociedades Mercantiles, quedando las acciones debidamente suscritas por los accionistas fundadores en la proporción que se hace constar en la tabla de suscripción.",
             "Se designan como administradores y comisario a las personas señaladas en el punto correspondiente del orden del día, quienes aceptan sus cargos en este acto.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.AUMENTO_CAPITAL: PlantillaLegal(
         materia=MateriaAcuerdo.AUMENTO_CAPITAL,
@@ -64,6 +115,11 @@ _P_CAPITAL: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Las acciones emitidas se ofrecerán a los accionistas en proporción a su tenencia accionaria, respetando el derecho de preferencia que concede el artículo 132 de la Ley General de Sociedades Mercantiles.",
             "Se aprueba la reforma del contrato social en la cláusula relativa al capital social y a las acciones representativas, en los términos del proyecto que se tiene a la vista.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+            ParametroPlantilla("monto", requerido=True, descripcion="Monto del aumento de capital"),
+            ParametroPlantilla("capital", requerido=True, descripcion="Capital social resultante tras el aumento"),
+        ),
     ),
     MateriaAcuerdo.REDUCCION_CAPITAL: PlantillaLegal(
         materia=MateriaAcuerdo.REDUCCION_CAPITAL,
@@ -74,6 +130,11 @@ _P_CAPITAL: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se aprueba la reducción del capital social de {sociedad} en la cantidad de {monto}, mediante reembolso a los accionistas o amortización de acciones, quedando el capital resultante en {capital}.",
             "Se hace constar que la reducción se realiza con la responsabilidad solidaria prevista por el artículo 135 de la Ley General de Sociedades Mercantiles a cargo de los accionistas beneficiados, por el término de cinco años.",
             "Se aprueba la reforma del contrato social en las cláusulas relativas al capital social y a las acciones en circulación.",
+        ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+            ParametroPlantilla("monto", requerido=True, descripcion="Monto de la reducción de capital"),
+            ParametroPlantilla("capital", requerido=True, descripcion="Capital social resultante tras la reducción"),
         ),
     ),
 }
@@ -89,6 +150,9 @@ _P_ADMIN_Y_FINANZAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Los nombramientos se realizan con base en el artículo 154 de la Ley General de Sociedades Mercantiles y con la aceptación expresa de los designados, cuyos datos se hacen constar en la presente acta.",
             "Se instruye a los administradores designados para que procedan a la aceptación y, en su caso, inscripción de sus nombramientos conforme a derecho.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.REMOCION_ADMINISTRADORES: PlantillaLegal(
         materia=MateriaAcuerdo.REMOCION_ADMINISTRADORES,
@@ -98,6 +162,9 @@ _P_ADMIN_Y_FINANZAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         parrafos=(
             "Se aprueba la revocación del nombramiento de los administradores de {sociedad} designados con anterioridad, dejando a salvo los derechos que pudieran corresponderles conforme a la ley o a los estatutos sociales.",
             "Se faculta a quien corresponda para realizar las anotaciones, avisos y publicaciones que la revocación requiera ante las autoridades y registros aplicables.",
+        ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
         ),
     ),
     MateriaAcuerdo.APROBACION_ESTADOS_FINANCIEROS: PlantillaLegal(
@@ -110,6 +177,9 @@ _P_ADMIN_Y_FINANZAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se aprueba la aplicación del resultado del ejercicio en los términos propuestos por el órgano de administración, previa integración de la reserva legal a que se refiere el artículo 20 de la Ley General de Sociedades Mercantiles.",
             "Se hace constar que el informe del comisario se dio a conocer a la asamblea y que el mismo no contiene salvedades que impidan la aprobación de los estados financieros.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.DISTRIBUCION_DIVIDENDOS: PlantillaLegal(
         materia=MateriaAcuerdo.DISTRIBUCION_DIVIDENDOS,
@@ -120,6 +190,9 @@ _P_ADMIN_Y_FINANZAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se decreta el pago de dividendos a cargo de las utilidades acumuladas de {sociedad}, una vez integrada la reserva legal prevista por el artículo 20 de la Ley General de Sociedades Mercantiles y el proyecto presentado por el órgano de administración.",
             "El pago se realizará a los accionistas con derecho, en proporción al número de acciones de que sean titulares, en la fecha, forma y medio de pago que se hacen constar en la presente acta.",
             "Se faculta al órgano de administración para ejecutar las medidas necesarias para el pago, incluyendo la retención y entero de las contribuciones que correspondan.",
+        ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
         ),
     ),
 }
@@ -135,6 +208,9 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "La reforma cumple con los requisitos de forma y contenido previstos por el artículo 182 de la Ley General de Sociedades Mercantiles y será publicada e inscrita conforme a las disposiciones aplicables.",
             "Se instruye a los delegados especiales designados para que otorguen la escritura pública correspondiente y realicen su inscripción en el Registro Público de Comercio.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.CAMBIO_DOMICILIO: PlantillaLegal(
         materia=MateriaAcuerdo.CAMBIO_DOMICILIO,
@@ -144,6 +220,9 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         parrafos=(
             "Se aprueba el cambio del domicilio social de {sociedad} al que se precisa en el proyecto de reforma estatutaria que forma parte de esta acta, considerándose por tanto reformada la cláusula relativa al domicilio.",
             "Se faculta a los delegados especiales para que realicen los avisos, publicaciones e inscripciones que el cambio de domicilio requiera ante las autoridades fiscales, registrales y de cualquier otra índole.",
+        ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
         ),
     ),
     MateriaAcuerdo.FUSION: PlantillaLegal(
@@ -156,6 +235,9 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se aprueban como bases de la fusión el balance general, el proyecto de estatutos y los demás documentos que se tienen a la vista; el acuerdo se publicará en el sistema electrónico previsto por el artículo 223 de la Ley General de Sociedades Mercantiles.",
             "Los accionistas disidentes podrán ejercer el derecho de separación que les concede el artículo 225 de la Ley General de Sociedades Mercantiles, dentro de los quince días siguientes a la fecha de la asamblea.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.ESCISION: PlantillaLegal(
         materia=MateriaAcuerdo.ESCISION,
@@ -167,6 +249,9 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "La asamblea de la sociedad escindente y los órganos de gobierno de la escindida aprueban los estados financieros y el proyecto de escisión que servirán de base para el acta de escisión, así como los estatutos sociales de la sociedad beneficiaria.",
             "Se designan representantes para formalizar la escisión mediante escritura pública e inscribirla en el Registro Público de Comercio.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.DISOLUCION_LIQUIDACION: PlantillaLegal(
         materia=MateriaAcuerdo.DISOLUCION_LIQUIDACION,
@@ -177,6 +262,9 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se aprueba la disolución anticipada de {sociedad} y, en su caso, la designación de los liquidadores por el periodo que la asamblea determine, de conformidad con el artículo 229 de la Ley General de Sociedades Mercantiles.",
             "Los liquidadores deberán protocolizar la disolución e inscribirla en el Registro Público de Comercio, practicar el balance final de liquidación y distribuir el haber social conforme a los artículos 242 a 247 de la Ley General de Sociedades Mercantiles.",
             "Se instruye a los liquidadores para que realicen la publicación del balance final y las demás publicaciones que la ley exige.",
+        ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
         ),
     ),
 }
@@ -192,6 +280,9 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se designa representante común de los tenedores de obligaciones en los términos del artículo 217 de la Ley General de Sociedades Mercantiles, con las facultades que se precisan en el acta de emisión.",
             "Se instruye a los delegados especiales para que formalicen la emisión ante fedatario público y realicen las inscripciones correspondientes.",
         ),
+        parametros=(
+            ParametroPlantilla("monto", requerido=True, descripcion="Monto de la emisión de obligaciones o títulos de crédito"),
+        ),
     ),
     MateriaAcuerdo.DESIGNACION_DELEGADOS: PlantillaLegal(
         materia=MateriaAcuerdo.DESIGNACION_DELEGADOS,
@@ -201,6 +292,9 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         parrafos=(
             "Se designan como delegados especiales de la asamblea a la o las personas que se identifican en el punto correspondiente del orden del día, para que en nombre y representación de {sociedad} soliciten y realicen todos los actos necesarios para dar cumplimiento a los acuerdos adoptados, incluyendo su protocolización e inscripción.",
             "Los delegados especiales comparecerán ante fedatario público y suscribirán los documentos que correspondan al cumplimiento total o parcial de los acuerdos adoptados por la asamblea.",
+        ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
         ),
     ),
     MateriaAcuerdo.INFORME_CONSEJO: PlantillaLegal(
@@ -212,6 +306,9 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se hace constar que el órgano de administración presentó a la asamblea su informe sobre la marcha de {sociedad} y que el comisario hizo constar las observaciones que estimó pertinentes sobre la política de la sociedad y los resultados obtenidos, en términos del artículo 166 de la Ley General de Sociedades Mercantiles.",
             "Los informes quedan a disposición de los accionistas y se tienen por conocidos por la asamblea, quien los hace constar en la presente acta sin que se requiera votación al respecto.",
         ),
+        parametros=(
+            ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
+        ),
     ),
     MateriaAcuerdo.GENERICA: PlantillaLegal(
         materia=MateriaAcuerdo.GENERICA,
@@ -222,6 +319,9 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
             "Se aprueba el asunto sometido a la consideración de la asamblea en los términos que a continuación se precisan: {resumen}",
             "El acuerdo se adopta con base en las facultades que la Ley General de Sociedades Mercantiles concede a la asamblea de accionistas y se hace constar con la finalidad de darle plena eficacia jurídica frente a terceros.",
             "Se facultan a los delegados especiales designados, o en su defecto al órgano de administración, para ejecutar y formalizar el presente acuerdo conforme a derecho.",
+        ),
+        parametros=(
+            ParametroPlantilla("resumen", requerido=True, descripcion="Resumen del asunto sometido a consideración de la asamblea"),
         ),
     ),
 }
@@ -380,26 +480,72 @@ def plantillas_para_prompt() -> List[str]:
 # ---------------------------------------------------------------------------
 # Redacción determinista de una cláusula
 # ---------------------------------------------------------------------------
+class DatosPlantillaIncompletosError(Exception):
+    """Se lanza cuando faltan parámetros requeridos para renderizar una plantilla."""
+
+
+def obtener_parametros_plantilla(materia: MateriaAcuerdo | str) -> List[Dict[str, Any]]:
+    """Devuelve la declaración de parámetros de una plantilla, útil para que el
+    frontend sepa qué campos debe capturar al usuario.
+
+    Cada entrada tiene: ``nombre``, ``requerido``, ``valor_predeterminado``,
+    ``descripcion``.
+    """
+    plantilla = obtener_plantilla(materia)
+    return [
+        {
+            "nombre": p.nombre,
+            "requerido": p.requerido,
+            "valor_predeterminado": p.valor_predeterminado,
+            "descripcion": p.descripcion,
+        }
+        for p in plantilla.parametros
+    ]
+
+
+def parametros_requeridos_por_materia() -> Dict[str, List[str]]:
+    """Devuelve, para cada materia, la lista de nombres de parámetros requeridos."""
+    return {
+        materia.value: list(plantilla.parametros_requeridos())
+        for materia, plantilla in PLANTILLAS.items()
+    }
+
+
 def redactar_con_plantilla(
     materia: Optional[MateriaAcuerdo | str],
     contexto: Mapping[str, str],
 ) -> Dict[str, str]:
     """Redacta la cláusula legal de un acuerdo usando la plantilla de su materia.
 
+    Valida que los parámetros requeridos estén presentes en el contexto,
+    aplica valores por defecto a los opcionales y sustituye los marcadores
+    ``{clave}`` de los párrafos.
+
     Devuelve un diccionario con ``clausula_legal``, ``fundamento_legal``,
     ``materia`` y ``titulo`` listo para poblar el modelo ``Acuerdo``.
     """
+
     plantilla = obtener_plantilla(materia)
-    valores = _ContextoSeguro(contexto)
 
-    intro = (
-        f"{plantilla.accion}. Con fundamento en {', '.join(plantilla.articulos)} de la Ley "
-        "General de Sociedades Mercantiles, la asamblea resuelve lo siguiente:"
-    )
+    # Validamos parámetros requeridos faltantes.
+    faltantes: List[str] = []
+    for nombre in plantilla.parametros_requeridos():
+        if nombre not in contexto or contexto[nombre] is None or str(contexto[nombre]).strip() == "":
+            faltantes.append(nombre)
+    if faltantes:
+        raise DatosPlantillaIncompletosError(
+            f"Faltan parámetros requeridos para la plantilla de {materia}: {', '.join(faltantes)}"
+        )
 
-    # El resumen capturado por el usuario encabeza los párrafos resolutivos.
+    # Construimos el contexto de valores: defaults primero, luego el contexto del usuario.
+    valores: Dict[str, str] = {}
+    valores.update(plantilla.valores_por_defecto())
+    for clave in plantilla.marcador_nombres():
+        if clave in contexto:
+            valores[clave] = str(contexto[clave])
+
     parrafos: List[str] = []
-    resumen = (valores.get("resumen") or "").strip()
+    resumen = (contexto.get("resumen") or "").strip()
     if resumen:
         parrafos.append(f"Se tiene por reproducido el asunto en los siguientes términos: {resumen}")
     parrafos.extend(parrafo.format_map(valores) for parrafo in plantilla.parrafos)
@@ -417,7 +563,7 @@ def redactar_con_plantilla(
     return {
         "materia": plantilla.materia.value,
         "titulo": plantilla.titulo,
-        "clausula_legal": f"{intro}\n{cuerpo}{votacion}",
+        "clausula_legal": f"{cuerpo}{votacion}",
         "fundamento_legal": ", ".join(plantilla.articulos)
         + " de la Ley General de Sociedades Mercantiles",
     }
@@ -458,6 +604,7 @@ TEXTOS_FIJOS: Dict[str, str] = {
         "publicaciones, avisos e inscripciones que conforme a derecho procedan."
     ),
 }
+
 
 def formatear(texto: str, contexto: Mapping[str, str]) -> str:
     """Aplica los valores del contexto a un texto con marcadores ``{clave}``.

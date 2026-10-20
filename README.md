@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # PGAC
 
 **Página de Gestión de Actas Corporativas (LegalTech).**
@@ -69,7 +68,56 @@ documento, solo redacta el cuerpo del acta.
 
 ---
 
-## 2. Requisitos
+## 4. Plantillas legales parametrizadas
+
+El módulo `backend/app/services/plantillas_legales.py` implementa **plantillas
+parametrizadas** para la redacción determinista de cláusulas cuando no hay
+proveedor de IA disponible (o como respaldo offline).
+
+### ¿Qué es una plantilla parametrizada?
+
+Cada materia de acuerdo (constitución, aumento de capital, reforma de estatutos,
+etc.) tiene una `PlantillaLegal` que declara:
+
+* **Párrafos con marcadores `{clave}`** — texto legal con lugares para insertar
+  datos del acta (ej. `{sociedad}`, `{monto}`, `{capital}`, `{resumen}`).
+* **Parámetros declarados** (`ParametroPlantilla`) — indican qué marcadores son
+  obligatorios (`requerido=True`) y cuáles son opcionales con valor por defecto.
+* **Validación automática** — `redactar_con_plantilla()` verifica que los
+  parámetros requeridos estén presentes antes de renderizar; si faltan, lanza
+  `DatosPlantillaIncompletosError`.
+
+### Flujo de renderizado
+
+1. El cliente envía los datos del acuerdo (sociedad, monto, capital, resumen, etc.).
+2. `detectar_materia()` infiere la materia del acuerdo a partir del resumen o del tipo de asamblea.
+3. `obtener_plantilla(materia)` recupera la `PlantillaLegal` correspondiente.
+4. `redactar_con_plantilla(materia, contexto)` valida parámetros requeridos,
+   aplica valores por defecto y sustituye los marcadores `{clave}`.
+5. El resultado incluye `clausula_legal`, `fundamento_legal`, `materia` y `titulo`.
+
+### Consultar parámetros desde el frontend
+
+```python
+from app.services import plantillas_legales as plantillas
+
+# Parámetros declarados para una materia
+params = plantillas.obtener_parametros_plantilla("aumento_capital")
+# [{'nombre': 'sociedad', 'requerido': True, ...},
+#  {'nombre': 'monto', 'requerido': True, ...},
+#  {'nombre': 'capital', 'requerido': True, ...}]
+
+# Parámetros requeridos por materia
+requeridos = plantillas.parametros_requeridos_por_materia()
+# {'aumento_capital': ['sociedad', 'monto', 'capital'], ...}
+```
+
+Esto permite al frontend saber exactamente qué campos debe solicitar al usuario
+para cada tipo de acuerdo.
+
+---
+
+## 5. Requisitos
 
 | Componente | Versión probada |
 |---|---|
@@ -436,7 +484,4 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 
 
 
-=======
-# G19X-ITCH-ABC-955-ACADEMIC
-Proyecto académico TODO Academy
->>>>>>> b202f4864c07a6e18fddf183387bb2bc7ee92533
+
