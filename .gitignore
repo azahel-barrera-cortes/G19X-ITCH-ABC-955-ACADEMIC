@@ -1,5 +1,5 @@
 # ===========================================================================
-#  GICORP / PluriActas - Archivos ignorados por Git
+#  PGAC (Paguina Gestora de Actas Corporativas) - Archivos ignorados por Git
 # ===========================================================================
 
 # --- Python (backend) ------------------------------------------------------
@@ -123,3 +123,10 @@ Thumbs.db
 
 # Nota: se conservan deliberadamente los PDF de `backend/ejemplos/`
 # (acta_ejemplo.pdf y acta_e2e.pdf) como evidencia del documento generado.
+
+# --- Salidas de consola y temporales de pruebas -----------------------------
+.b.txt
+pytest_*.txt
+test_*.txt
+*.out.txt
+*.err.txt
