@@ -52,7 +52,7 @@ PGAC/
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  GenerarActa, BibliotecaActas, Ayuda
+        └── pages/                  GenerarActa, BibliotecaActas, Ayuda, InformacionEmpresa
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -114,6 +114,23 @@ requeridos = plantillas.parametros_requeridos_por_materia()
 
 Esto permite al frontend saber exactamente qué campos debe solicitar al usuario
 para cada tipo de acuerdo.
+
+---
+
+## 6. Información de la empresa o sociedad
+
+El menú lateral incluye una sección **«Información de la empresa o sociedad»** donde el administrador captura los datos de la sociedad que comparece en las actas:
+
+| Campo | Descripción |
+|-------|-------------|
+| Razón social | Nombre legal de la sociedad (usado en el encabezado del acta) |
+| R.F.C. | Clave del Registro Federal de Contribuyentes (opcional) |
+| Tipo de sociedad | 7 opciones: Sociedad Anónima (S.A.), Sociedad de Responsabilidad Limitada (S. de R.L.), Sociedad en Comandita Simple (S. en C.), Sociedad por Acciones Simplificada (S.A.S.), Sociedad en Comandita por Acciones (S. en C. por A.), Sociedad Cooperativa (S.C.), Sociedad en Nombre Colectivo (S. en N.C.) |
+| Logo de la empresa | Imagen (PNG, JPG, SVG, WebP) que se muestra en el encabezado del acta |
+| Firma electrónica | Opcional: generar el PDF con indicación de firma electrónica |
+| Usar en generación de actas | Toggle: si se activa, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada |
+
+Esta información se persiste en `localStorage` del navegador y se puede usar al generar el acta: cuando está activa la opción «Usar esta información al generar el acta», el formulario de «Datos generales» muestra un aviso para aplicarla automáticamente, y la IA puede incorporar estos datos al redactar las cláusulas y el encabezado del PDF.
 
 ---
 
@@ -481,6 +498,12 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
 5. Exportación a expediente ZIP y API de integración para notarías.
+
+---
+
+### Declaración de uso de IA
+
+Este proyecto fue desarrollado con **asistencia de IA** para la generación de código, documentación y pruebas. El uso de IA se declara en este README y en los archivos `docs/PRD.md` y `docs/MVP.md`. No se penaliza su uso y permite revisar el proceso de desarrollo.
 
 
 

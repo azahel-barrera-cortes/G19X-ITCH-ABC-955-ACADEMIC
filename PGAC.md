@@ -47,6 +47,9 @@ Genera el código modular y bien documentado para los siguientes módulos:
   - Botón de "Descargar PDF Final".
 - **Estado y Peticiones API**:
   - Uso de `fetch` / `axios` para enviar los datos al backend de FastAPI y recibir la respuesta del PDF en formato Blob para visualización/descarga directa en el navegador.
+- **Información de la empresa o sociedad** (nueva sección del menú lateral):
+  - Formulario para capturar razón social, R.F.C., tipo de sociedad (7 opciones: S.A., S. de R.L., S. en C., S.A.S., S. en C. por A., S.C., S. en N.C.), logo de la empresa y firma electrónica opcional.
+  - Toggle «Usar esta información al generar el acta»: al activarse, los datos de la sociedad se incluyen automáticamente en cada acta y la IA puede usarlos para redactar cláusulas y el encabezado del PDF.
 
 ---
 
@@ -56,3 +59,9 @@ Genera el código modular y bien documentado para los siguientes módulos:
 - Asegúrate de separar la responsabilidad de la IA (redacción textual) del maquetado del PDF (ReportLab).
 
 Por favor, genera primero la estructura de carpetas sugerida y posteriormente el código correspondiente a cada archivo clave del Backend y Frontend.
+
+---
+
+### Declaración de uso de IA
+
+Este proyecto fue desarrollado con **asistencia de IA** para la generación de código, documentación y pruebas. El uso de IA se declara en este archivo y en `README.md` y `docs/PRD.md`.
