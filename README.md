@@ -1,6 +1,6 @@
 # PGAC
 
-**Página de Gestión de Actas Corporativas (LegalTech).**
+**Página de Gestión de Actas Corporativas (PGAC).**
 Automatiza la redacción, estructuración, validación y exportación a PDF de actas
 corporativas (asambleas ordinarias, extraordinarias, aumento de capital, fusión,
 disolución, etc.) conforme a la Ley General de Sociedades Mercantiles (México).
@@ -52,7 +52,7 @@ PGAC/
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  GenerarActa, BibliotecaActas, Ayuda, InformacionEmpresa
+        └── pages/                  GenerarActa, BibliotecaActas, Ayuda
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -68,80 +68,14 @@ documento, solo redacta el cuerpo del acta.
 
 ---
 
-## 4. Plantillas legales parametrizadas
+## 2. Requisitos
 
-El módulo `backend/app/services/plantillas_legales.py` implementa **plantillas
-parametrizadas** para la redacción determinista de cláusulas cuando no hay
-proveedor de IA disponible (o como respaldo offline).
-
-### ¿Qué es una plantilla parametrizada?
-
-Cada materia de acuerdo (constitución, aumento de capital, reforma de estatutos,
-etc.) tiene una `PlantillaLegal` que declara:
-
-* **Párrafos con marcadores `{clave}`** — texto legal con lugares para insertar
-  datos del acta (ej. `{sociedad}`, `{monto}`, `{capital}`, `{resumen}`).
-* **Parámetros declarados** (`ParametroPlantilla`) — indican qué marcadores son
-  obligatorios (`requerido=True`) y cuáles son opcionales con valor por defecto.
-* **Validación automática** — `redactar_con_plantilla()` verifica que los
-  parámetros requeridos estén presentes antes de renderizar; si faltan, lanza
-  `DatosPlantillaIncompletosError`.
-
-### Flujo de renderizado
-
-1. El cliente envía los datos del acuerdo (sociedad, monto, capital, resumen, etc.).
-2. `detectar_materia()` infiere la materia del acuerdo a partir del resumen o del tipo de asamblea.
-3. `obtener_plantilla(materia)` recupera la `PlantillaLegal` correspondiente.
-4. `redactar_con_plantilla(materia, contexto)` valida parámetros requeridos,
-   aplica valores por defecto y sustituye los marcadores `{clave}`.
-5. El resultado incluye `clausula_legal`, `fundamento_legal`, `materia` y `titulo`.
-
-### Consultar parámetros desde el frontend
-
-```python
-from app.services import plantillas_legales as plantillas
-
-# Parámetros declarados para una materia
-params = plantillas.obtener_parametros_plantilla("aumento_capital")
-# [{'nombre': 'sociedad', 'requerido': True, ...},
-#  {'nombre': 'monto', 'requerido': True, ...},
-#  {'nombre': 'capital', 'requerido': True, ...}]
-
-# Parámetros requeridos por materia
-requeridos = plantillas.parametros_requeridos_por_materia()
-# {'aumento_capital': ['sociedad', 'monto', 'capital'], ...}
-```
-
-Esto permite al frontend saber exactamente qué campos debe solicitar al usuario
-para cada tipo de acuerdo.
-
----
-
-## 6. Información de la empresa o sociedad
-
-El menú lateral incluye una sección **«Información de la empresa o sociedad»** donde el administrador captura los datos de la sociedad que comparece en las actas:
-
-| Campo | Descripción |
-|-------|-------------|
-| Razón social | Nombre legal de la sociedad (usado en el encabezado del acta) |
-| R.F.C. | Clave del Registro Federal de Contribuyentes (opcional) |
-| Tipo de sociedad | 7 opciones: Sociedad Anónima (S.A.), Sociedad de Responsabilidad Limitada (S. de R.L.), Sociedad en Comandita Simple (S. en C.), Sociedad por Acciones Simplificada (S.A.S.), Sociedad en Comandita por Acciones (S. en C. por A.), Sociedad Cooperativa (S.C.), Sociedad en Nombre Colectivo (S. en N.C.) |
-| Logo de la empresa | Imagen (PNG, JPG, SVG, WebP) que se muestra en el encabezado del acta |
-| Firma electrónica | Opcional: generar el PDF con indicación de firma electrónica |
-| Usar en generación de actas | Toggle: si se activa, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada |
-
-Esta información se persiste en `localStorage` del navegador y se puede usar al generar el acta: cuando está activa la opción «Usar esta información al generar el acta», el formulario de «Datos generales» muestra un aviso para aplicarla automáticamente, y la IA puede incorporar estos datos al redactar las cláusulas y el encabezado del PDF.
-
----
-
-## 5. Requisitos
-
-| Componente | Versión probada |
-|---|---|
-| Python | 3.14.6 (compatible con 3.10+) |
-| pip | 26.x |
-| Node.js | v24.17.0 |
-| npm | 11.13.0 |
+| Componente |             Versión probada             |
+|---         |---                                      |
+| Python     | 3.14.6 (compatible con 3.10+)           |
+| pip        | 26.x                                    |
+| Node.js    | v24.17.0                                |
+| npm        | 11.13.0                                 |
 | PostgreSQL | 16 (opcional; el desarrollo usa SQLite) |
 
 > En Windows con la política de ejecución restringida, usa `npm.cmd` y `cmd /c`
@@ -273,16 +207,16 @@ curl -X POST http://127.0.0.1:8000/api/v1/actas/generar-pdf \
 
 Tabla `actas` (SQLAlchemy 2.0, portable PostgreSQL/SQLite):
 
-| Grupo | Columnas |
-|---|---|
-| Identificación | `id`, `folio` (único), `version` |
-| Generales | `sociedad`, `rfc_sociedad`, `tipo_asamblea`, `titulo`, `fecha`, `hora`, `lugar` |
-| Convocatoria | `convocatoria_fecha`, `convocatoria_medio`, `convocatoria_quien` |
-| Capital | `capital_social`, `acciones_totales`, `capital_presente`, `quorum_porcentaje` |
-| Mesa directiva | `presidente`, `secretario` |
-| Cuerpo (JSON) | `asistentes`, `orden_del_dia`, `acuerdos`, `clausulas`, `validacion_ia` |
-| Documento | `texto_legal`, `observaciones` |
-| Trazabilidad | `proveedor_ia`, `estatus`, `created_at`, `updated_at` |
+| Grupo          | Columnas                                                                        |
+|---             |---                                                                              |
+| Identificación | `id`, `folio` (único), `version`                                                |
+| Generales      | `sociedad`, `rfc_sociedad`, `tipo_asamblea`, `titulo`, `fecha`, `hora`, `lugar` |
+| Convocatoria   | `convocatoria_fecha`, `convocatoria_medio`, `convocatoria_quien`                |
+| Capital        | `capital_social`, `acciones_totales`, `capital_presente`, `quorum_porcentaje`   |
+| Mesa directiva | `presidente`, `secretario`                                                      |
+| Cuerpo (JSON)  | `asistentes`, `orden_del_dia`, `acuerdos`, `clausulas`, `validacion_ia`         |
+| Documento      | `texto_legal`, `observaciones`                                                  |
+| Trazabilidad   | `proveedor_ia`, `estatus`, `created_at`, `updated_at`                           |
 
 Los catálogos (`tipo_asamblea`, `estatus`) se almacenan como `VARCHAR + CHECK`
 para ser portables entre PostgreSQL y SQLite.
@@ -409,43 +343,6 @@ cabecera `Content-Disposition`, respetando acentos y espacios.
 
 ---
 
-## 7.8 Otras capacidades del sistema
-
-### Administración de actas (versiones, vigencia y caducidad)
-
-PGAC no solo crea actas: las administra a lo largo de su ciclo de vida documental.
-
-| Función | Qué hace | Endpoint |
-|---------|----------|----------|
-| **Resumen del repositorio** | Totales de actas agrupadas por estatus y clasificación de vigencia (vencida, por vencer, vigente, sin fecha). | `GET /api/v1/administracion/resumen` |
-| **Vigencia** | Lista actas ordenadas por prioridad de atención, con las vencidas primero. Permite filtrar por estado de vigencia. | `GET /api/v1/administracion/vigencia` |
-| **Historial de versiones** | Cada actualización de un acta genera una nueva versión. Se pueden listar, ver el contenido completo de cualquier versión y restaurar una versión anterior (que emite una versión nueva, sin borrar el historial). | `GET/POST /api/v1/administracion/versiones/{id}[/{n}][/restaurar]` |
-| **Caducidad** | Fija, amplía o elimina la fecha de caducidad de un acta. El cambio queda registrado como nueva versión con su motivo. | `PUT /api/v1/administracion/caducidad/{id}` |
-
-### Asistente IA conversacional
-
-El asistente de IA (`/asistente/chat`) guía al usuario en la creación de actas mediante lenguaje natural:
-
-- **Creación guiada:** el usuario escribe "Quiero crear un acta" y el asistente solicita los datos faltantes paso a paso, mostrando el progreso de recopilación.
-- **Tipos de asamblea:** ofrece un catálogo de tipos de acta para elegir (ordinaria, extraordinaria, aumento de capital, fusión, disolución, etc.).
-- **Acciones rápidas:** validar una acta, cambiar su estatus, consultar versiones, descargar el PDF y restaurar versiones.
-- **Borrador organizable:** genera un texto estructurado del acta que puede copiarse al formulario manual.
-- **Estado del sistema:** `GET /api/v1/asistente/ayuda` devuelve sugerencias de preguntas válidas y capacidades del asistente.
-
-### Biblioteca de actas
-
-Desde la página **Biblioteca de actas** el usuario puede:
-
-- Listar actas con filtros por folio, sociedad, tipo de asamblea, estatus y texto libre, con paginación.
-- Ver el acta completa (cláusulas, validación, texto legal).
-- Descargar el PDF en cualquier momento (se regenera desde la base de datos, byte a byte idéntico gracias al maquetado determinista de ReportLab).
-- Editar el contenido de una acta (incrementa su versión automáticamente).
-- Cambiar el estatus del expediente (borrador → revisión → aprobada → firmada → archivada).
-- Revalidar la consistencia en cualquier momento.
-- Eliminar actas del historial.
-
----
-
 ## 8. Pruebas y verificación
 
 ```powershell
@@ -535,13 +432,3 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
 5. Exportación a expediente ZIP y API de integración para notarías.
-
----
-
-### Declaración de uso de IA
-
-Este proyecto fue desarrollado con **asistencia de IA** para la generación de código, documentación y pruebas. El uso de IA se declara en este README y en los archivos `docs/PRD.md` y `docs/MVP.md`. No se penaliza su uso y permite revisar el proceso de desarrollo.
-
-
-
-
