@@ -45,6 +45,17 @@ export const ESTATUS_ACTA = [
   { valor: 'archivada', etiqueta: 'Archivada (protocolizada)' },
 ]
 
+/** Tipos de sociedad mercantil (Ley General de Sociedades Mercantiles, México). */
+export const TIPOS_SOCIEDAD = [
+  { valor: 'sociedad_anonima', etiqueta: 'Sociedad Anónima (S.A.)' },
+  { valor: 'sociedad_responsabilidad_limitada', etiqueta: 'Sociedad de Responsabilidad Limitada (S. de R.L.)' },
+  { valor: 'sociedad_comandita_simple', etiqueta: 'Sociedad en Comandita Simple (S. en C.)' },
+  { valor: 'sociedad_acciones_simplificada', etiqueta: 'Sociedad por Acciones Simplificada (S.A.S.)' },
+  { valor: 'sociedad_comandita_acciones', etiqueta: 'Sociedad en Comandita por Acciones (S. en C. por A.)' },
+  { valor: 'sociedad_cooperativa', etiqueta: 'Sociedad Cooperativa (S.C.)' },
+  { valor: 'sociedad_nombre_colectivo', etiqueta: 'Sociedad en Nombre Colectivo (S. en N.C.)' },
+]
+
 /** Clasificación de vigencia de un acta (caducidad). */
 export const ESTADOS_VIGENCIA = [
   { valor: 'vencida', etiqueta: 'Vencida', tono: 'error' },
@@ -71,6 +82,11 @@ export const ACTA_VACIA = {
   quorum_porcentaje: '',
   presidente: '',
   secretario: '',
+  /** Información de la empresa / sociedad (sección lateral independiente). */
+  tipo_sociedad: '',
+  logo_empresa: '',
+  firma_electronica: false,
+  usar_info_empresa: false,
   asistentes: [],
   orden_del_dia: [{ numero: 1, titulo: '', descripcion: '', requiere_votacion: true }],
   acuerdos: [
