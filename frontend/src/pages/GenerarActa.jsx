@@ -44,7 +44,7 @@ function payloadParaPdf(estado, borrador, actaInicial) {
 }
 
 /** Página «Generar acta»: formulario por pasos + borrador con IA + PDF final. */
-export default function GenerarActa({ actaInicial = null, plantillaTipo = null, onVolver = null, onCerrarEdicion = null }) {
+export default function GenerarActa({ actaInicial = null, plantillaTipo = null, infoEmpresa = null, onVolver = null, onCerrarEdicion = null }) {
   const { estado, despachar, actualizarCampo, reiniciar, cargarActa, calculos, pasos } =
     useActaWizard(actaInicial ? estadoDesdeActa(actaInicial) : undefined)
 
@@ -250,6 +250,7 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
         despachar={despachar}
         actualizarCampo={actualizarCampo}
         errores={errores}
+        infoEmpresa={infoEmpresa}
         borrador={borrador}
         advertencias={advertencias}
         metadatosPdf={metadatosPdf}

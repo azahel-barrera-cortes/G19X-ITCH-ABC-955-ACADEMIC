@@ -8,6 +8,7 @@ import BibliotecaActas from './pages/BibliotecaActas.jsx'
 import ControlGeneraActa from './pages/ControlGeneraActa.jsx'
 import GenerarActa from './pages/GenerarActa.jsx'
 import GenerarActaConIA from './pages/GenerarActaConIA.jsx'
+import InformacionEmpresa from './pages/InformacionEmpresa.jsx'
 import { obtenerCatalogos } from './api/client.js'
 
 /**
@@ -25,6 +26,7 @@ export default function App() {
   const [plantillaTipo, setPlantillaTipo] = useState(null)
   const [actaEnEdicion, setActaEnEdicion] = useState(null)
   const [catalogos, setCatalogos] = useState(null)
+  const [infoEmpresa, setInfoEmpresa] = useState(null)
 
   // Los catálogos se cargan una sola vez; si la API no responde se usan los locales.
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function App() {
                 key={actaEnEdicion ? `edicion-${actaEnEdicion.id}` : `plantilla-${plantillaTipo || 'nueva'}`}
                 actaInicial={actaEnEdicion}
                 plantillaTipo={plantillaTipo}
+                infoEmpresa={infoEmpresa}
                 onVolver={volverAlPanel}
                 onCerrarEdicion={cerrarEdicion}
               />
@@ -111,6 +114,12 @@ export default function App() {
           ) : null}
           {seccion === 'administracion' ? <AdministracionActas onEditar={editarActa} /> : null}
           {seccion === 'ayuda' ? <Ayuda catalogos={catalogos} /> : null}
+          {seccion === 'empresa' ? (
+            <InformacionEmpresa
+              infoGuardada={infoEmpresa}
+              onGuardar={setInfoEmpresa}
+            />
+          ) : null}
         </main>
 
         <footer className="border-t border-slate-200 bg-white">

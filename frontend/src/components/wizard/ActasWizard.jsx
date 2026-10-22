@@ -22,6 +22,7 @@ export default function ActasWizard({
   despachar,
   actualizarCampo,
   errores = {},
+  infoEmpresa = null,
   ...accionesRevision
 }) {
   const paso = pasos.find((item) => item.id === pasoActual) || pasos[0]
@@ -29,7 +30,7 @@ export default function ActasWizard({
 
   const contenido =
     paso.id === 1 ? (
-      <PasoDatosGenerales estado={estado} actualizarCampo={actualizarCampo} errores={errores} />
+      <PasoDatosGenerales estado={estado} actualizarCampo={actualizarCampo} errores={errores} infoEmpresa={infoEmpresa} />
     ) : paso.id === 2 ? (
       <PasoAsistentes
         estado={estado}
