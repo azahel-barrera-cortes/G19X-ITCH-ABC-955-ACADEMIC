@@ -31,6 +31,18 @@ export default function Ayuda({ catalogos }) {
         </p>
       </header>
 
+ <Tarjeta>
+        <TarjetaEncabezado titulo="Aviso legal" descripcion="Alcance del documento generado" />
+        <TarjetaCuerpo>
+          <p className="text-sm text-slate-700">
+            PGAC es una herramienta de apoyo documental: estructura y redacta el acta,
+            pero no sustituye la revisión de un abogado corporativo. Antes de la firma y, en su caso, de
+            la protocolización ante fedatario público, verifica los datos societarios contra el acta
+            constitutiva, los estatutos vigentes y el libro de registro de acciones.
+          </p>
+        </TarjetaCuerpo>
+      </Tarjeta>
+
       <Tarjeta>
         <TarjetaEncabezado
           titulo="Navegación"
@@ -62,22 +74,118 @@ export default function Ayuda({ catalogos }) {
         <TarjetaCuerpo>
           <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
             <li>
-              <strong>Datos generales:</strong> sociedad, R.F.C., tipo de asamblea, fecha, hora, lugar y
-              datos de la convocatoria.
+              <strong>Datos generales:</strong> sociedad, R.F.C., tipo de asamblea, fecha, hora,
+              lugar y datos de la convocatoria.
             </li>
             <li>
-              <strong>Asistentes y quórum:</strong> capital social, acciones en circulación, capital
-              representado, mesa directiva y tenencia accionaria de cada asistente.
+              <strong>Asistentes y quórum:</strong> capital social, acciones totales, acciones
+              presentes, presidente y secretario; el sistema calcula el quórum automáticamente.
             </li>
             <li>
-              <strong>Orden del día y acuerdos:</strong> puntos desahogados, resumen de cada acuerdo y
-              resultado de la votación con el tipo de mayoría aplicable.
+              <strong>Orden del día y acuerdos:</strong> cada punto del orden del día con su
+              resumen de acuerdo; la IA redacta la cláusula legal y el fundamento normativo (o se
+              usan plantillas deterministas sin conexión).
             </li>
             <li>
-              <strong>Revisión y PDF:</strong> «Generar borrador con IA» produce las cláusulas legales y
-              la validación; «Descargar PDF final» compila el documento con ReportLab.
+              <strong>Revisión y PDF:</strong> se muestra la validación de consistencia (puntaje
+              y hallazgos), se genera el borrador con IA y se descarga el PDF final con encabezado,
+              quórum, firmas y numeración de páginas.
             </li>
           </ol>
+          <p className="mt-3 text-xs text-slate-500">
+            En el paso 4, el botón <strong>"Generar borrador con IA"</strong> devuelve las cláusulas
+            y la validación sin guardar; <strong>"Descargar PDF final"</strong> compila el PDF,
+            guarda el acta y devuelve el folio, versión, páginas y proveedor de IA.
+          </p>
+        </TarjetaCuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <TarjetaEncabezado
+          titulo="Administración de actas"
+          descripcion="Versiones, vigencia y caducidad de los expedientes"
+        />
+        <TarjetaCuerpo>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+            <li>
+              <strong>Resumen del repositorio:</strong> totales de actas agrupadas por estatus y
+              clasificación de vigencia (vencida, por vencer, vigente, sin fecha).
+            </li>
+            <li>
+              <strong>Vigencia:</strong> lista actas ordenadas por prioridad, con las vencidas
+              primero, para atenderlas con anticipación.
+            </li>
+            <li>
+              <strong>Historial de versiones:</strong> cada edición genera una nueva versión. Se
+              pueden listar, ver el contenido de cualquier versión y restaurar una versión anterior
+              (emitendo una nueva sin borrar el historial).
+            </li>
+            <li>
+              <strong>Caducidad:</strong> fija, amplía o elimina la fecha de caducidad de un acta.
+              El cambio queda registrado como nueva versión con su motivo.
+            </li>
+          </ul>
+        </TarjetaCuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <TarjetaEncabezado
+          titulo="Asistente IA conversacional"
+          descripcion="Creación guiada de actas mediante chat con lenguaje natural"
+        />
+        <TarjetaCuerpo>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+            <li>
+              <strong>Creación guiada:</strong> escribe "Quiero crear un acta" y el asistente te
+              solicita los datos faltantes paso a paso, mostrando el progreso de recopilación.
+            </li>
+            <li>
+              <strong>Tipos de asamblea:</strong> el asistente ofrece un catálogo de tipos (ordinaria,
+              extraordinaria, aumento de capital, fusión, disolución, etc.) para elegir.
+            </li>
+            <li>
+              <strong>Acciones rápidas:</strong> validar una acta, cambiar su estatus, consultar
+              versiones, descargar el PDF y restaurar versiones desde el chat.
+            </li>
+            <li>
+              <strong>Borrador organizable:</strong> genera un texto estructurado del acta que
+              puedes copiar al formulario manual.
+            </li>
+          </ul>
+          <p className="mt-3 text-xs text-slate-500">
+            El asistente opera bajo <code>/api/v1/asistente/chat</code> y no requiere credenciales
+            de IA externa: funciona con plantillas deterministas cuando no hay proveedor
+            configurado.
+          </p>
+        </TarjetaCuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <TarjetaEncabezado
+          titulo="Información de la empresa o sociedad"
+          descripcion="Datos de la sociedad que se usan en el encabezado de cada acta"
+        />
+        <TarjetaCuerpo>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+            <li>
+              <strong>Datos capturables:</strong> razón social, R.F.C., tipo de sociedad (7
+              opciones: S.A., S. de R.L., S. en C., S.A.S., S. en C. por A., S.C., S. en N.C.),
+              logo de la empresa y firma electrónica opcional.
+            </li>
+            <li>
+              <strong>Uso automático:</strong> activa el toggle "Usar esta información al generar
+              el acta" para que la sociedad, tipo de sociedad, logo y firma se incluyan en cada
+              acta generada.
+            </li>
+            <li>
+              <strong>Redacción asistida:</strong> la IA puede incorporar los datos de la sociedad
+              al redactar las cláusulas y el encabezado del PDF.
+            </li>
+            <li>
+              <strong>Persistencia:</strong> la información se guarda en el navegador
+              (localStorage) y está disponible sin necesidad de autenticación.
+            </li>
+          </ul>
         </TarjetaCuerpo>
       </Tarjeta>
 
@@ -156,19 +264,6 @@ export default function Ayuda({ catalogos }) {
           </div>
         </TarjetaCuerpo>
       </Tarjeta>
-
-      <Tarjeta>
-        <TarjetaEncabezado titulo="Aviso legal" descripcion="Alcance del documento generado" />
-        <TarjetaCuerpo>
-          <p className="text-sm text-slate-700">
-            PGAC es una herramienta de apoyo documental: estructura y redacta el acta,
-            pero no sustituye la revisión de un abogado corporativo. Antes de la firma y, en su caso, de
-            la protocolización ante fedatario público, verifica los datos societarios contra el acta
-            constitutiva, los estatutos vigentes y el libro de registro de acciones.
-          </p>
-        </TarjetaCuerpo>
-      </Tarjeta>
-
     </div>
   )
 }

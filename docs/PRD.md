@@ -44,6 +44,27 @@ Listar, crear, leer, actualizar, cambiar estatus y eliminar actas. Cada acta tie
 ### RF-07: Catálogos
 Proveer catálogos de tipos de asamblea, tipos de mayoría, caracteres de asistente y estatus de acta para los formularios del frontend.
 
+### RF-08: Administración de actas (versiones, vigencia y caducidad)
+El sistema debe administrar el ciclo de vida documental de cada acta:
+- **Resumen del repositorio:** obtener totales de actas agrupadas por estatus y clasificación de vigencia (vencida, por vencer, vigente, sin fecha).
+- **Vigencia:** listar actas ordenadas por prioridad de atención, con las vencidas primero, permitiendo filtro por estado de vigencia.
+- **Historial de versiones:** cada actualización de un acta genera una nueva versión. El usuario puede listar versiones, ver el contenido completo de cualquier versión y restaurar una versión anterior (emitando una versión nueva sin borrar el historial de auditoría).
+- **Caducidad:** fijar, ampliar o eliminar la fecha de caducidad de un acta, registrando el cambio como nueva versión con su motivo.
+
+### RF-09: Asistente IA conversacional
+El sistema debe incluir un asistente de IA basado en chat que guíe al usuario en la creación de actas mediante lenguaje natural:
+- **Creación guiada:** solicitar los datos faltantes paso a paso para generar un acta, mostrando el progreso de recopilación.
+- **Catálogo de tipos de asamblea:** ofrecer tipos de acta para elegir (ordinaria, extraordinaria, aumento de capital, fusión, disolución, etc.).
+- **Acciones rápidas:** validar una acta, cambiar su estatus, consultar versiones, descargar el PDF y restaurar versiones.
+- **Borrador organizable:** generar un texto estructurado del acta que pueda copiarse al formulario manual.
+- **Endpoint de ayuda:** devolver sugerencias de preguntas válidas y capacidades del asistente.
+
+### RF-10: Información de la empresa o sociedad
+El sistema debe permitir capturar y persistir los datos de la sociedad que comparece en las actas:
+- Razón social, R.F.C., tipo de sociedad (7 opciones), logo de la empresa y firma electrónica opcional.
+- Toggle «Usar esta información al generar el acta»: al activarse, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada, y la IA puede incorporar estos datos al redactar cláusulas y el encabezado del PDF.
+- Persistencia en localStorage del navegador (sin depender de autenticación ni backend).
+
 ---
 
 ## 4. Requisitos no funcionales (RNF)

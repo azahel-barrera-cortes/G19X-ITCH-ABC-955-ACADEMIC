@@ -409,6 +409,43 @@ cabecera `Content-Disposition`, respetando acentos y espacios.
 
 ---
 
+## 7.8 Otras capacidades del sistema
+
+### Administración de actas (versiones, vigencia y caducidad)
+
+PGAC no solo crea actas: las administra a lo largo de su ciclo de vida documental.
+
+| Función | Qué hace | Endpoint |
+|---------|----------|----------|
+| **Resumen del repositorio** | Totales de actas agrupadas por estatus y clasificación de vigencia (vencida, por vencer, vigente, sin fecha). | `GET /api/v1/administracion/resumen` |
+| **Vigencia** | Lista actas ordenadas por prioridad de atención, con las vencidas primero. Permite filtrar por estado de vigencia. | `GET /api/v1/administracion/vigencia` |
+| **Historial de versiones** | Cada actualización de un acta genera una nueva versión. Se pueden listar, ver el contenido completo de cualquier versión y restaurar una versión anterior (que emite una versión nueva, sin borrar el historial). | `GET/POST /api/v1/administracion/versiones/{id}[/{n}][/restaurar]` |
+| **Caducidad** | Fija, amplía o elimina la fecha de caducidad de un acta. El cambio queda registrado como nueva versión con su motivo. | `PUT /api/v1/administracion/caducidad/{id}` |
+
+### Asistente IA conversacional
+
+El asistente de IA (`/asistente/chat`) guía al usuario en la creación de actas mediante lenguaje natural:
+
+- **Creación guiada:** el usuario escribe "Quiero crear un acta" y el asistente solicita los datos faltantes paso a paso, mostrando el progreso de recopilación.
+- **Tipos de asamblea:** ofrece un catálogo de tipos de acta para elegir (ordinaria, extraordinaria, aumento de capital, fusión, disolución, etc.).
+- **Acciones rápidas:** validar una acta, cambiar su estatus, consultar versiones, descargar el PDF y restaurar versiones.
+- **Borrador organizable:** genera un texto estructurado del acta que puede copiarse al formulario manual.
+- **Estado del sistema:** `GET /api/v1/asistente/ayuda` devuelve sugerencias de preguntas válidas y capacidades del asistente.
+
+### Biblioteca de actas
+
+Desde la página **Biblioteca de actas** el usuario puede:
+
+- Listar actas con filtros por folio, sociedad, tipo de asamblea, estatus y texto libre, con paginación.
+- Ver el acta completa (cláusulas, validación, texto legal).
+- Descargar el PDF en cualquier momento (se regenera desde la base de datos, byte a byte idéntico gracias al maquetado determinista de ReportLab).
+- Editar el contenido de una acta (incrementa su versión automáticamente).
+- Cambiar el estatus del expediente (borrador → revisión → aprobada → firmada → archivada).
+- Revalidar la consistencia en cualquier momento.
+- Eliminar actas del historial.
+
+---
+
 ## 8. Pruebas y verificación
 
 ```powershell

@@ -20,7 +20,9 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible; si falla, degrada automáticamente a plantillas deterministas |
 | ReportLab | `build_acta_pdf(data) -> bytes` con encabezados, márgenes, firmas, numeración de páginas |
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
-| Endpoints | `GET /health`, `GET /api/v1/sistema/estado`, `GET /api/v1/actas/catalogos`, `POST /api/v1/actas/redactar`, `POST /api/v1/actas/generar-pdf`, `GET/PUT/DELETE /api/v1/actas/{id}`, `GET /api/v1/actas`, `PATCH /api/v1/actas/{id}/estatus`, `GET /api/v1/actas/{id}/pdf`, `POST /api/v1/actas/{id}/validar` |
+| Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
+| Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
+| Endpoints | `GET /health`, `GET /api/v1/sistema/estado`, `GET /api/v1/actas/catalogos`, `POST /api/v1/actas/redactar`, `POST /api/v1/actas/generar-pdf`, `GET/PUT/DELETE /api/v1/actas/{id}`, `GET /api/v1/actas`, `PATCH /api/v1/actas/{id}/estatus`, `GET /api/v1/actas/{id}/pdf`, `POST /api/v1/actas/{id}/validar`, `GET/POST /api/v1/administracion/resumen|vigencia|versiones/{id}|versiones/{id}/{n}|versiones/{id}/{n}/restaurar|caducidad/{id}`, `POST /api/v1/asistente/chat`, `GET /api/v1/asistente/ayuda` |
 | Base de datos | SQLite por defecto (sin instalación adicional); PostgreSQL opcional para producción |
 
 ### Frontend (React 18 + Vite + Tailwind)
@@ -28,7 +30,10 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 |------------|-------------|
 | Wizard de 4 pasos | 1. Datos generales → 2. Asistentes y quórum → 3. Orden del día y acuerdos → 4. Revisión y PDF |
 | Generación | Botón "Generar borrador con IA" y "Descargar PDF final" |
-| Biblioteca | Listar actas con filtros, descarga, edición, cambio de estatus, eliminación |
+| Biblioteca de actas | Listar actas con filtros, descarga de PDF, edición, cambio de estatus, revalidación y eliminación |
+| Administración de actas | Resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
+| Asistente IA | Chat conversacional para creación guiada de actas, validación, consulta de estatus y descarga de PDF |
+| Información de la empresa | Captura de razón social, R.F.C., tipo de sociedad (7 opciones), logo y firma electrónica; toggle para usar automáticamente en cada acta |
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
 
 ### Pruebas
@@ -58,6 +63,9 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 - [ ] El PDF generado contiene encabezado, quórum, orden del día, acuerdos, cierre y firmas
 - [ ] El acta se valida en consistencia (quórum, mayorías, fundamentos legales)
 - [ ] Las actas se pueden listar, editar, cambiar de estatus y eliminar
+- [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)
+- [ ] El asistente IA guía la creación de actas mediante conversación
+- [ ] La información de la empresa/sociedad se captura y se usa automáticamente al generar actas
 - [ ] 55 pruebas de backend pasando
 - [ ] Build del frontend exitoso
 
