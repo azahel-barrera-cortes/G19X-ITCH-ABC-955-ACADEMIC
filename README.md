@@ -432,3 +432,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
 5. Exportación a expediente ZIP y API de integración para notarías.
+
+## Declaración de uso de IA
+
+Este proyecto fue desarrollado con **asistencia de IA** para la generación de código, documentación y pruebas. El uso de IA se declara en este README y en los archivos `docs/PRD.md` y `docs/MVP.md`. No se penaliza su uso y permite revisar el proceso de desarrollo.
