@@ -1,10 +1,13 @@
 import Campo from '../ui/Campo.jsx'
-import { TIPOS_ASAMBLEA } from '../../constants/catalogos.js'
+import { TIPOS_ASAMBLEA, TIPOS_SOCIEDAD } from '../../constants/catalogos.js'
 import { fechaLarga, moneda } from '../../utils/formato.js'
 
 /** Paso 1 del formulario: empresa, fecha, hora y tipo de asamblea. */
-export default function PasoDatosGenerales({ estado, actualizarCampo, errores = {} }) {
+export default function PasoDatosGenerales({ estado, actualizarCampo, errores = {}, infoEmpresa = null }) {
   const tipoSeleccionado = TIPOS_ASAMBLEA.find((tipo) => tipo.valor === estado.tipo_asamblea)
+  const tipoSociedadSeleccionado = TIPOS_SOCIEDAD.find((t) => t.valor === (estado.tipo_sociedad || (infoEmpresa?.tipo_sociedad || '')))
+  const hayInfoGuardada = infoEmpresa && infoEmpresa.nombre_sociedad
+  const usaInfo = Boolean(estado.usar_info_empresa)
 
   return (
     <div className="space-y-5">
@@ -35,6 +38,59 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
             placeholder="CDN950101ABC"
           />
         </Campo>
+
+        {hayInfoGuardada && !usaInfo && (
+          <div className="rounded-xl border border-corporativo-200 bg-corporativo-50 p-4">
+            <p className="text-sm font-medium text-corporativo-700">¿Usar información de la sociedad guardada?</p>
+            <p className="text-xs text-slate-600 mt-1">
+              Se encontró información guardada en «Información de la empresa o sociedad»:
+              <strong className="text-corporativo-700">{infoEmpresa.nombre_sociedad}</strong>
+              ({tipoSociedadSeleccionado?.etiqueta || 'tipo no especificado'}).
+              ¿Desea usarla para esta acta? La IA y el PDF podrán incluirla automáticamente.
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                id="usar_info_empresa"
+                type="checkbox"
+                checked={usaInfo}
+                onChange={() => actualizarCampo('usar_info_empresa', true)}
+                className="campo"
+              />
+              <label htmlFor="usar_info_empresa" className="text-sm font-medium text-corporativo-700">
+                Sí, usar esta información para generar el acta
+              </label>
+            </div>
+          </div>
+        )}
+
+        {usaInfo && hayInfoGuardada && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-medium text-emerald-700">
+              ✓ Usando información de la sociedad guardada: <strong>{infoEmpresa.nombre_sociedad}</strong>
+            </p>
+            <p className="text-xs text-emerald-600 mt-1">
+              Se aplicará al encabezado, al tipo de sociedad y al logo del acta. Puedes desactivarlo en «Información de la empresa o sociedad».
+            </p>
+          </div>
+        )}
+
+        {!usaInfo && (
+          <Campo etiqueta="Tipo de sociedad" ayuda="Tipo de sociedad mercantil (determina qué actas corporativas pueden generarse)." htmlFor="tipo_sociedad_wizard">
+            <select
+              id="tipo_sociedad_wizard"
+              className="campo"
+              value={estado.tipo_sociedad || ''}
+              onChange={(evento) => actualizarCampo('tipo_sociedad', evento.target.value)}
+            >
+              <option value="">Selecciona un tipo de sociedad</option>
+              {TIPOS_SOCIEDAD.map((tipo) => (
+                <option key={tipo.valor} value={tipo.valor}>
+                  {tipo.etiqueta}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        )}
 
         <Campo
           etiqueta="Tipo de asamblea"
