@@ -423,8 +423,6 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 - El PDF se genera con ReportLab de forma determinista; los márgenes, la
   tipografía y el pie de página se ajustan desde `backend/.env`.
 
----
-
 ## 11. Siguientes pasos sugeridos
 
 1. Autenticación y roles (capturista, revisor, abogado responsable) + bitácora de cambios.
@@ -433,8 +431,5 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
 5. Exportación a expediente ZIP y API de integración para notarías.
 
-
-
-=======
 # G19X-ITCH-ABC-955-ACADEMIC
 Proyecto académico TODO Academy
