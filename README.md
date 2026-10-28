@@ -175,6 +175,23 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
 3. **Biblioteca de actas** → filtros por folio/sociedad, tipo y estatus;
    descarga, edición, revalidación, cambio de estatus y eliminación.
 
+### ¿Qué ve cada usuario al iniciar sesión?
+
+La navegación (barra lateral y menú móvil) se filtra automáticamente según el
+rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
+→ **403**).
+
+| Rol | Pantalla de entrada | Secciones visibles en la barra lateral | Acciones principales |
+|-----|---------------------|----------------------------------------|----------------------|
+| **Capturista** | Mi perfil (funciones de su rol) | Generar acta, Asistente IA, Información de la empresa o sociedad, Guía de uso | Crear y editar actas, redactar con IA, generar PDF, exportar expediente ZIP |
+| **Revisor** | Mi perfil (funciones de su rol) | Todo lo del capturista, además: Biblioteca de actas, Administración | Listar y consultar actas, descargar PDF guardado, administración (resumen, vigencia, versiones, caducidad), bitácora de cambios, API de notaría |
+| **Abogado responsable** | Mi perfil (funciones de su rol) | Todo lo del revisor | Cambiar estatus de actas, aprobar, validar y revalidar consistencia |
+| **Administrador** | Mi perfil (funciones de su rol) | Todas las secciones | Acceso total: gestionar usuarios (listar, cambiar rol, activar/desactivar), eliminar actas, todo lo anterior |
+
+> El primer usuario registrado se crea automáticamente como `Administrador`.
+> Los autoregistros posteriores quedan siempre como `capturista`; solo un
+> `Administrador` puede elevar el rol desde `PUT /api/v1/auth/users/{id}`.
+
 ---
 
 ## 5. Endpoints de la API
