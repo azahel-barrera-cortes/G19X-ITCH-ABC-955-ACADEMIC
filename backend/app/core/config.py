@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-pro"
 
+    # --- Seguridad / autenticación ------------------------------------------
+    secret_key: str = "cambiar_en_produccion_clave_secreta_minimo_32_caracteres"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7  # 7 días
+
     # --- Derivados ----------------------------------------------------------
     @property
     def cors_origins_list(self) -> List[str]:

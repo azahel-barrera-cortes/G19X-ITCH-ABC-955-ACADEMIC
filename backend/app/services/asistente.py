@@ -298,13 +298,45 @@ def _puede_avanzar(origen: str, destino: str) -> bool:
         return False
 
 
+_PATRON_MONTO = re.compile(r"\$?\s*(\d[\d,]*(?:\.\d{1,2})?)")
+
+
+def _extraer_monto_texto(mensaje: str) -> Optional[str]:
+    """Extrae la primera cifra del mensaje con formato monetario, si existe."""
+    coincidencia = _PATRON_MONTO.search(mensaje or "")
+    if not coincidencia:
+        return None
+    crudo = coincidencia.group(1).replace(",", "")
+    try:
+        from app.core import formato
+
+        return formato.moneda(float(crudo))
+    except (ValueError, TypeError):
+        return None
+
+
 def _redactar_libre(mensaje: str) -> Dict[str, Any]:
+    from app.models.enums import MateriaAcuerdo
+
     materia = plantillas_legales.detectar_materia(mensaje)
     plantilla = plantillas_legales.obtener_plantilla(materia)
     contexto = {"sociedad": "la sociedad", "resumen": mensaje.strip(),
                 "mayoria": "la mayoria aplicable",
                 "acciones": "las acciones presentes"}
-    red = plantillas_legales.redactar_con_plantilla(materia, contexto)
+    # Si el mensaje trae una cifra («aumento de capital por 500000») se usa para
+    # cubrir los parámetros monetarios de la plantilla detectada.
+    monto = _extraer_monto_texto(mensaje)
+    if monto:
+        contexto.setdefault("monto", monto)
+        contexto.setdefault("capital", monto)
+    try:
+        red = plantillas_legales.redactar_con_plantilla(materia, contexto)
+    except plantillas_legales.DatosPlantillaIncompletosError:
+        # Faltan datos para la materia detectada: se degrada a la plantilla
+        # genérica (solo requiere `resumen`) en lugar de romper el chat.
+        materia = MateriaAcuerdo.GENERICA
+        plantilla = plantillas_legales.obtener_plantilla(materia)
+        red = plantillas_legales.redactar_con_plantilla(materia, contexto)
     texto = ("Borrador con fundamento en " + red["fundamento_legal"]
              + ":\n\n" + red["clausula_legal"]
              + "\n\nAdaptalo con datos reales en Generar acta.")

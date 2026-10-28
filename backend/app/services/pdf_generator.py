@@ -218,6 +218,7 @@ class _CanvasActaLegal(lienzo.Canvas):
         self._pie: str = kwargs.pop("pie", "")
         self._margen: float = kwargs.pop("margen", 2.5 * cm)
         self._numerar: bool = kwargs.pop("numerar", True)
+        self._logo_empresa: Optional[str] = kwargs.pop("logo_empresa", None)
         super().__init__(*args, **kwargs)
         self._estados: List[Dict[str, Any]] = []
 
@@ -241,6 +242,31 @@ class _CanvasActaLegal(lienzo.Canvas):
         self.saveState()
         self.setStrokeColor(COLOR_LINEA)
         self.setLineWidth(0.4)
+
+        # Logo de la empresa en el encabezado (si se proporcionó).
+        if self._logo_empresa:
+            try:
+                from reportlab.lib.utils import ImageReader
+                datos_b64 = self._logo_empresa
+                if "," in datos_b64:
+                    datos_b64 = datos_b64.split(",", 1)[1]
+                import base64
+                imagen_bytes = base64.b64decode(datos_b64)
+                img_reader = ImageReader(io.BytesIO(imagen_bytes))
+                iw, ih = img_reader.getSize()
+                alto_logo = 1.15 * cm
+                ancho_logo = alto_logo * iw / ih
+                self.drawImage(
+                    img_reader,
+                    self._margen,
+                    alto - alto_logo - 0.25 * cm,
+                    width=ancho_logo,
+                    height=alto_logo,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                logger.warning("No se pudo renderizar el logo_empresa en el encabezado del PDF.")
 
         # Encabezado
         self.setFont(FUENTE_NEGRITA, 8)
@@ -320,11 +346,15 @@ def _seccion_titulo(data: Mapping[str, Any], estilos: Mapping[str, ParagraphStyl
         f"Acta {data.get('folio') or ''} · versión {meta.get('version', 1)} · "
         f"estatus {meta.get('estatus', 'borrador')}"
     )
+    tipo_sociedad = data.get("tipo_sociedad")
+    subtitulo_texto = data.get("subtitulo_documento") or (
+        f"{str(tipo_sociedad or '').replace('_', ' ').title()} · {referencia}"
+        if tipo_sociedad
+        else referencia
+    )
     return [
         Paragraph(_texto(titulo_documento, "ACTA DE ASAMBLEA"), estilos["titulo"]),
-        Paragraph(_texto(data.get("subtitulo_documento", "")), estilos["subtitulo"])
-        if data.get("subtitulo_documento")
-        else Paragraph(_texto(referencia), estilos["subtitulo"]),
+        Paragraph(_texto(subtitulo_texto), estilos["subtitulo"]),
         Spacer(1, 6),
         _regla(),
         Spacer(1, 10),
@@ -753,6 +783,7 @@ def build_acta_pdf(data: dict) -> bytes:
             pie=str(data.get("pie_confidencialidad") or ""),
             margen=margen,
             numerar=numerar,
+            logo_empresa=data.get("logo_empresa"),
         ),
     )
 

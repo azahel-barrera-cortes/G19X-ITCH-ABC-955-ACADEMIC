@@ -3,6 +3,10 @@
 Se publican bajo ``/api/v1/administracion`` en un router propio, separado de
 ``/actas`` para no colisionar con ``GET /actas/{acta_id}`` (que interpretaría
 cualquier segmento como un identificador numérico).
+
+Control de acceso (RBAC): las consultas requieren rol ``revisor`` o superior y
+las operaciones que modifican el documento (restaurar versión, fijar caducidad)
+requieren ``capturista`` o superior, registrando el cambio en la bitácora.
 """
 
 from __future__ import annotations
@@ -12,6 +16,12 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.deps import (
+    RequiereCapturista,
+    RequiereRevisor,
+    get_db,
+    registrar_bitacora,
+)
 from app.db.session import get_db
 from app.schemas.acta import (
     ActaRead,
@@ -34,7 +44,10 @@ router = APIRouter(prefix="/administracion", tags=["Administración"])
     response_model=ResumenAdministracion,
     summary="Estadísticas globales: actas, versiones y estado de vigencia",
 )
-def resumen(db: Session = Depends(get_db)) -> ResumenAdministracion:
+def resumen(
+    _usuario: RequiereRevisor,
+    db: Session = Depends(get_db),
+) -> ResumenAdministracion:
     """Totales por estatus y clasificación de caducidad de todo el repositorio."""
     return ResumenAdministracion(**administracion.resumen_administracion(db))
 
@@ -45,6 +58,7 @@ def resumen(db: Session = Depends(get_db)) -> ResumenAdministracion:
     summary="Actas clasificadas por vigencia (vencidas primero)",
 )
 def por_vigencia(
+    _usuario: RequiereRevisor,
     estado: Optional[str] = Query(
         None,
         description="Filtro: vencida | por_vencer | vigente | sin_fecha",
@@ -65,7 +79,11 @@ def por_vigencia(
     response_model=List[VersionActaResumen],
     summary="Historial de versiones de un acta (más reciente primero)",
 )
-def listar_versiones(acta_id: int, db: Session = Depends(get_db)) -> List[VersionActaResumen]:
+def listar_versiones(
+    _usuario: RequiereRevisor,
+    acta_id: int,
+    db: Session = Depends(get_db),
+) -> List[VersionActaResumen]:
     """Devuelve el listado de instantáneas registradas para el acta indicado."""
     return [
         VersionActaResumen.model_validate(version)
@@ -79,7 +97,10 @@ def listar_versiones(acta_id: int, db: Session = Depends(get_db)) -> List[Versio
     summary="Contenido completo de una versión concreta",
 )
 def detalle_version(
-    acta_id: int, numero: int, db: Session = Depends(get_db)
+    _usuario: RequiereRevisor,
+    acta_id: int,
+    numero: int,
+    db: Session = Depends(get_db),
 ) -> VersionActaDetalle:
     """Recupera el retrato completo del acta tal como quedó en esa versión."""
     version = administracion.obtener_version(db, acta_id, numero)
@@ -104,7 +125,10 @@ def detalle_version(
     summary="Restaurar una versión anterior (genera una versión nueva)",
 )
 def restaurar(
-    acta_id: int, numero: int, db: Session = Depends(get_db)
+    usuario_actual: RequiereCapturista,
+    acta_id: int,
+    numero: int,
+    db: Session = Depends(get_db),
 ) -> ActaRead:
     """Copia el contenido de la versión indicada sobre el acta actual.
 
@@ -112,6 +136,14 @@ def restaurar(
     contenido recuperado, de modo que la auditoría completa queda intacta.
     """
     acta = administracion.restaurar_version(db, acta_id, numero)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="restaurar_version",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_despues={"version_restaurada": numero, "version_actual": acta.version},
+    )
     return ActaRead.model_validate(acta)
 
 
@@ -124,6 +156,7 @@ def restaurar(
     summary="Fijar, ampliar o quitar la fecha de caducidad de un acta",
 )
 def fijar_caducidad(
+    usuario_actual: RequiereCapturista,
     acta_id: int,
     payload: CaducidadRequest,
     db: Session = Depends(get_db),
@@ -135,5 +168,16 @@ def fijar_caducidad(
     """
     acta = administracion.fijar_caducidad(
         db, acta_id, payload.fecha_caducidad, payload.motivo
+    )
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="fijar_caducidad",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_despues={
+            "fecha_caducidad": str(acta.fecha_caducidad) if acta.fecha_caducidad else None,
+            "motivo": payload.motivo,
+        },
     )
     return ActaRead.model_validate(acta)

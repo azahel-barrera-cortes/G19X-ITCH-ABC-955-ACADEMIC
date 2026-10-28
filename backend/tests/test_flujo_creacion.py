@@ -39,7 +39,8 @@ def _flujo_completo(cliente) -> dict:
     return ultimo
 
 
-def test_catalogo_si_no_sabe_que_acta(cliente):
+def test_catalogo_si_no_sabe_que_acta(cliente_autenticado):
+    cliente = cliente_autenticado
     r = cliente.post("/api/v1/asistente/chat", json={"mensaje": "No sé qué acta crear"})
     assert r.status_code == 200, r.text
     d = r.json()
@@ -47,7 +48,8 @@ def test_catalogo_si_no_sabe_que_acta(cliente):
     assert "ordinaria" in r.text.lower() or d.get("tipos_acta")
 
 
-def test_creacion_guiada_genera_pdf_y_control(cliente):
+def test_creacion_guiada_genera_pdf_y_control(cliente_autenticado):
+    cliente = cliente_autenticado
     ultimo = _flujo_completo(cliente)
     assert ultimo["intencion"] == "crear"
     control = ultimo.get("control_acta")
@@ -72,7 +74,8 @@ def test_creacion_guiada_genera_pdf_y_control(cliente):
     assert acta["created_at"]
 
 
-def test_creacion_directa_con_tipo(cliente):
+def test_creacion_directa_con_tipo(cliente_autenticado):
+    cliente = cliente_autenticado
     r = cliente.post("/api/v1/asistente/chat",
                      json={"mensaje": "Crea un acta de aumento de capital"})
     assert r.status_code == 200, r.text

@@ -90,6 +90,12 @@ class Acta(Base):
     # --- Control de autoría (quién la realizó; listo para integración de usuarios)
     creado_por: Mapped[Optional[str]] = mapped_column(String(150), nullable=True, index=True)
 
+    # --- Información de la empresa / sociedad (RF-10) ---
+    tipo_sociedad: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    logo_empresa: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    firma_electronica: Mapped[bool] = mapped_column(default=False, nullable=False)
+    usar_info_empresa: Mapped[bool] = mapped_column(default=False, nullable=False)
+
     # --- Gobernanza: vigencia ----------------------------------------------
     fecha_caducidad: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     motivo_caducidad: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)

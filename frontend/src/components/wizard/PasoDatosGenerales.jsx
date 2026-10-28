@@ -53,7 +53,16 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
                 id="usar_info_empresa"
                 type="checkbox"
                 checked={usaInfo}
-                onChange={() => actualizarCampo('usar_info_empresa', true)}
+                onChange={() => {
+                  actualizarCampo('usar_info_empresa', true)
+                  if (infoEmpresa) {
+                    actualizarCampo('sociedad', infoEmpresa.nombre_sociedad || '')
+                    actualizarCampo('rfc_sociedad', infoEmpresa.rfc_sociedad || '')
+                    actualizarCampo('tipo_sociedad', infoEmpresa.tipo_sociedad || '')
+                    actualizarCampo('logo_empresa', infoEmpresa.logo_empresa || '')
+                    actualizarCampo('firma_electronica', Boolean(infoEmpresa.firma_electronica))
+                  }
+                }}
                 className="campo"
               />
               <label htmlFor="usar_info_empresa" className="text-sm font-medium text-corporativo-700">

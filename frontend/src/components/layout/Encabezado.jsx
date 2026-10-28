@@ -1,19 +1,28 @@
-/** Encabezado superior: navegación compacta para móvil y estado del backend. */
+﻿/** Encabezado superior: navegación compacta para móvil y estado del backend. */
 import { useEffect, useState } from 'react'
 import { consultarEstado } from '../../api/client.js'
 import Etiqueta from '../ui/Etiqueta.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 
 const SECCIONES = [
   { id: 'generar', etiqueta: 'Generar acta', titulo: 'Generar acta corporativa' },
   { id: 'asistente', etiqueta: 'Asistente IA', titulo: 'Asistente IA de actas' },
   { id: 'biblioteca', etiqueta: 'Biblioteca', titulo: 'Biblioteca de actas' },
   { id: 'administracion', etiqueta: 'Administración', titulo: 'Administración de actas' },
+  { id: 'empresa', etiqueta: 'Empresa', titulo: 'Información de la empresa o sociedad' },
   { id: 'ayuda', etiqueta: 'Guía', titulo: 'Guía de uso' },
+  { id: 'perfil', etiqueta: 'Mi perfil', titulo: 'Mi perfil y funciones disponibles' },
 ]
 
-export default function Encabezado({ seccion, onCambiarSeccion }) {
+export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = null, onCerrarSesion = null, seccionesVisibles = null }) {
+  const { usuario } = useAuth()
   const [estado, setEstado] = useState(null)
   const [error, setError] = useState(false)
+
+  // Navegación móvil filtrada por las secciones permitidas al rol.
+  const seccionesNav = seccionesVisibles
+    ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
+    : SECCIONES
 
   useEffect(() => {
     let activo = true
@@ -44,17 +53,15 @@ export default function Encabezado({ seccion, onCambiarSeccion }) {
 
         {/* Navegación compacta: solo visible en móvil (la lateral la reemplaza en escritorio). */}
         <nav aria-label="Secciones" className="flex flex-wrap items-center gap-1 md:hidden">
-          {SECCIONES.map((item) => (
+          {seccionesNav.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => onCambiarSeccion(item.id)}
               aria-current={seccion === item.id ? 'page' : undefined}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-                seccion === item.id
-                  ? 'bg-corporativo-50 text-corporativo-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
+              className={seccion === item.id
+                ? 'rounded-lg px-2.5 py-1.5 text-xs font-medium bg-corporativo-50 text-corporativo-700'
+                : 'rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100'}
             >
               {item.etiqueta}
             </button>
@@ -67,6 +74,7 @@ export default function Encabezado({ seccion, onCambiarSeccion }) {
         </p>
 
         <div className="flex items-center gap-2">
+          {/* Estado del backend */}
           {error ? (
             <Etiqueta tono="error">Backend sin conexión</Etiqueta>
           ) : estado ? (
@@ -81,6 +89,28 @@ export default function Encabezado({ seccion, onCambiarSeccion }) {
           ) : (
             <Etiqueta>Consultando estado…</Etiqueta>
           )}
+
+          {/* Sesión del usuario (este encabezado solo se muestra autenticado) */}
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-slate-600 sm:inline">
+              {usuario?.nombre_completo || usuario?.email}
+              {usuario?.rol && <span className="ml-1 text-slate-400">({usuario.rol})</span>}
+            </span>
+            <button
+              type="button"
+              onClick={() => onIrAPerfil && onIrAPerfil('perfil')}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-corporativo-600 hover:bg-corporativo-50"
+            >
+              Mi perfil
+            </button>
+            <button
+              type="button"
+              onClick={() => onCerrarSesion && onCerrarSesion()}
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </div>
     </header>

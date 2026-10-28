@@ -332,6 +332,7 @@ class AIService:
         return {
             "sociedad": acta.sociedad,
             "rfc_sociedad": acta.rfc_sociedad or "",
+            "tipo_sociedad": acta.tipo_sociedad or "",
             "tipo_asamblea": str(acta.tipo_asamblea),
             "tipo_asamblea_texto": etiqueta_tipo_asamblea(acta.tipo_asamblea),
             "fecha": formato.fecha_larga(acta.fecha),

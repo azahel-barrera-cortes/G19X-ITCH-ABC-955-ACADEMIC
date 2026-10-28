@@ -20,9 +20,19 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.api.v1.deps import (
+    RequiereAbogado,
+    RequiereAdmin,
+    RequiereCapturista,
+    RequiereRevisor,
+    UsuarioActual,
+    get_db,
+    registrar_bitacora,
+)
 from app.core.catalogos import catalogos as obtener_catalogos_dominio
 from app.core.config import settings
 from app.db.session import get_db
+from app.models.acta import Acta
 from app.schemas.acta import (
     ActaActualizarRequest,
     ActaGenerarPdfRequest,
@@ -111,6 +121,7 @@ def _evento_sse(evento: str, datos: Mapping[str, Any]) -> str:
 )
 def redactar_acta(
     payload: ActaRedaccionRequest,
+    _usuario: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> ActaRedaccionResponse:
     """Redacta las cláusulas legales y valida la consistencia del acta."""
@@ -128,7 +139,10 @@ def redactar_acta(
         }
     },
 )
-def redactar_stream(payload: ActaRedaccionRequest) -> StreamingResponse:
+def redactar_stream(
+    payload: ActaRedaccionRequest,
+    _usuario: UsuarioActual,
+) -> StreamingResponse:
     """Genera la cláusula del primer acuerdo y la transmite fragmento a fragmento.
 
     Es útil para que el usuario vea la redacción en curso en lugar de esperar a que
@@ -197,6 +211,7 @@ def redactar_stream(payload: ActaRedaccionRequest) -> StreamingResponse:
 )
 def generar_pdf(
     payload: ActaGenerarPdfRequest,
+    _usuario: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Solicita la redacción a la IA, compila el PDF con ReportLab y lo retorna."""
@@ -215,11 +230,20 @@ def generar_pdf(
 )
 def crear_acta(
     payload: ActaGenerarPdfRequest,
+    usuario_actual: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> ActaRead:
     """Persiste el acta aplicando la redacción asistida configurada."""
     borrador = acta_service.redactar(payload)
     modelo = acta_service.crear_acta(db, payload, borrador)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="crear",
+        entidad="actas",
+        entidad_id=modelo.id,
+        datos_despues={"folio": modelo.folio, "sociedad": modelo.sociedad},
+    )
     return ActaRead.model_validate(modelo)
 
 
@@ -229,6 +253,7 @@ def crear_acta(
     summary="Listar el historial de actas con filtros",
 )
 def listar_actas(
+    _usuario: RequiereRevisor,
     sociedad: Optional[str] = Query(None, description="Filtro parcial por razón social"),
     tipo_asamblea: Optional[str] = Query(None, description="Tipo de asamblea"),
     estatus: Optional[str] = Query(None, description="Estatus del ciclo de vida"),
@@ -253,7 +278,11 @@ def listar_actas(
 # Consulta y mantenimiento de un acta concreta
 # ---------------------------------------------------------------------------
 @router.get("/{acta_id}", response_model=ActaRead, summary="Obtener un acta por identificador")
-def obtener_acta(acta_id: int, db: Session = Depends(get_db)) -> ActaRead:
+def obtener_acta(
+    _usuario: RequiereRevisor,
+    acta_id: int,
+    db: Session = Depends(get_db),
+) -> ActaRead:
     """Devuelve el acta completa, incluidas sus cláusulas y su validación."""
     return ActaRead.model_validate(acta_service.obtener_acta(db, acta_id))
 
@@ -264,6 +293,7 @@ def obtener_acta(acta_id: int, db: Session = Depends(get_db)) -> ActaRead:
     summary="Reemplazar el contenido de un acta e incrementar su versión",
 )
 def actualizar_acta(
+    usuario_actual: RequiereCapturista,
     acta_id: int,
     payload: ActaActualizarRequest,
     db: Session = Depends(get_db),
@@ -274,7 +304,27 @@ def actualizar_acta(
     configurado; en caso contrario se reutilizan las cláusulas ya guardadas y solo
     se completan con plantillas locales las que falten.
     """
+    datos_antes = acta_service.obtener_acta(db, acta_id)
     modelo = acta_service.actualizar_acta(db, acta_id, payload)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="actualizar",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={
+            "folio": datos_antes.folio,
+            "sociedad": datos_antes.sociedad,
+            "estatus": datos_antes.estatus,
+            "version": datos_antes.version,
+        },
+        datos_despues={
+            "folio": modelo.folio,
+            "sociedad": modelo.sociedad,
+            "estatus": modelo.estatus,
+            "version": modelo.version,
+        },
+    )
     return ActaRead.model_validate(modelo)
 
 
@@ -284,12 +334,24 @@ def actualizar_acta(
     summary="Cambiar el estatus del acta (borrador, revisión, aprobada, firmada, archivada)",
 )
 def actualizar_estatus(
+    usuario_actual: RequiereAbogado,
     acta_id: int,
     estatus: str = Query(..., description="Nuevo estatus del acta"),
     db: Session = Depends(get_db),
 ) -> ActaRead:
     """Avanza el acta dentro de su ciclo de vida documental."""
-    return ActaRead.model_validate(acta_service.actualizar_estatus(db, acta_id, estatus))
+    datos_antes = acta_service.obtener_acta(db, acta_id)
+    modelo = acta_service.actualizar_estatus(db, acta_id, estatus)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="cambiar_estatus",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={"estatus": datos_antes.estatus},
+        datos_despues={"estatus": modelo.estatus},
+    )
+    return ActaRead.model_validate(modelo)
 
 
 @router.get(
@@ -299,6 +361,7 @@ def actualizar_estatus(
     responses={200: {"content": {"application/pdf": {}}}},
 )
 def descargar_pdf(
+    _usuario: RequiereRevisor,
     acta_id: int,
     incluir_tabla_asistentes: bool = Query(True),
     incluir_hoja_firmas: bool = Query(True),
@@ -323,15 +386,46 @@ def descargar_pdf(
     response_model=ValidacionActa,
     summary="Volver a validar la consistencia del acta",
 )
-def validar_acta(acta_id: int, db: Session = Depends(get_db)) -> ValidacionActa:
+def validar_acta(
+    usuario_actual: RequiereAbogado,
+    acta_id: int,
+    db: Session = Depends(get_db),
+) -> ValidacionActa:
     """Ejecuta la validación (IA + reglas) y guarda el resultado en el acta."""
-    return acta_service.validar_acta_almacenada(db, acta_id)
+    datos_antes = acta_service.obtener_acta(db, acta_id)
+    resultado = acta_service.validar_acta_almacenada(db, acta_id)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="validar",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={"estatus": datos_antes.estatus},
+        datos_despues={
+            "estatus": datos_antes.estatus,
+            "puntaje_validacion": resultado.puntaje,
+        },
+    )
+    return resultado
 
 
 @router.delete("/{acta_id}", response_model=ApiMensaje, summary="Eliminar un acta")
-def eliminar_acta(acta_id: int, db: Session = Depends(get_db)) -> ApiMensaje:
+def eliminar_acta(
+    usuario_actual: RequiereAdmin,
+    acta_id: int,
+    db: Session = Depends(get_db),
+) -> ApiMensaje:
     """Borra el acta del historial y confirma el folio eliminado."""
+    datos_antes = acta_service.obtener_acta(db, acta_id)
     folio = acta_service.eliminar_acta(db, acta_id)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="eliminar",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={"folio": datos_antes.folio, "sociedad": datos_antes.sociedad},
+    )
     return ApiMensaje(mensaje=f"El acta {folio} fue eliminada.", detalle=None)
 
 

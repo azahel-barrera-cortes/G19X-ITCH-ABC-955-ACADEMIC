@@ -28,8 +28,9 @@ def test_catalogos_del_formulario(cliente: TestClient) -> None:
 
 
 def test_redactar_devuelve_clausulas_y_validacion(
-    cliente: TestClient, payload_acta: Dict[str, Any]
+    cliente_autenticado: TestClient, payload_acta: Dict[str, Any]
 ) -> None:
+    cliente = cliente_autenticado
     respuesta = cliente.post("/api/v1/actas/redactar", json=payload_acta)
     assert respuesta.status_code == 200, respuesta.text
 
@@ -43,8 +44,9 @@ def test_redactar_devuelve_clausulas_y_validacion(
 
 
 def test_generar_pdf_guarda_el_acta_y_retorna_el_archivo(
-    cliente: TestClient, payload_acta: Dict[str, Any]
+    cliente_autenticado: TestClient, payload_acta: Dict[str, Any]
 ) -> None:
+    cliente = cliente_autenticado
     respuesta = cliente.post("/api/v1/actas/generar-pdf", json=payload_acta)
 
     assert respuesta.status_code == 200, respuesta.text
@@ -67,8 +69,9 @@ def test_generar_pdf_guarda_el_acta_y_retorna_el_archivo(
 
 
 def test_generar_pdf_sin_guardar_no_persiste(
-    cliente: TestClient, payload_acta: Dict[str, Any]
+    cliente_autenticado: TestClient, payload_acta: Dict[str, Any]
 ) -> None:
+    cliente = cliente_autenticado
     datos = dict(payload_acta)
     datos["guardar"] = False
     respuesta = cliente.post("/api/v1/actas/generar-pdf", json=datos)
@@ -78,7 +81,8 @@ def test_generar_pdf_sin_guardar_no_persiste(
     assert cliente.get("/api/v1/actas").json() == []
 
 
-def test_crud_completo_del_acta(cliente: TestClient, payload_acta: Dict[str, Any]) -> None:
+def test_crud_completo_del_acta(cliente_autenticado: TestClient, payload_acta: Dict[str, Any]) -> None:
+    cliente = cliente_autenticado
     # Crear
     respuesta = cliente.post("/api/v1/actas", json=payload_acta)
     assert respuesta.status_code == 201, respuesta.text
@@ -125,11 +129,12 @@ def test_crud_completo_del_acta(cliente: TestClient, payload_acta: Dict[str, Any
     assert cliente.get(f"/api/v1/actas/{acta_id}").status_code == 404
 
 
-def test_acta_inexistente_devuelve_404(cliente: TestClient) -> None:
-    assert cliente.get("/api/v1/actas/999999").status_code == 404
+def test_acta_inexistente_devuelve_404(cliente_autenticado: TestClient) -> None:
+    assert cliente_autenticado.get("/api/v1/actas/999999").status_code == 404
 
 
-def test_estatus_invalido_devuelve_422(cliente: TestClient, payload_acta: Dict[str, Any]) -> None:
+def test_estatus_invalido_devuelve_422(cliente_autenticado: TestClient, payload_acta: Dict[str, Any]) -> None:
+    cliente = cliente_autenticado
     acta = cliente.post("/api/v1/actas", json=payload_acta).json()
     respuesta = cliente.patch(
         f"/api/v1/actas/{acta['id']}/estatus", params={"estatus": "inventado"}
@@ -138,8 +143,9 @@ def test_estatus_invalido_devuelve_422(cliente: TestClient, payload_acta: Dict[s
 
 
 def test_formulario_invalido_devuelve_422_con_detalle(
-    cliente: TestClient, payload_acta: Dict[str, Any]
+    cliente_autenticado: TestClient, payload_acta: Dict[str, Any]
 ) -> None:
+    cliente = cliente_autenticado
     datos = dict(payload_acta)
     datos["acuerdos"] = []
     datos["asistentes"] = []

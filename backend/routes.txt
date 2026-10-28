@@ -1,0 +1,7 @@
+Route /openapi.json
+Route /docs
+Route /docs/oauth2-redirect
+Route /redoc
+APIRoute /
+APIRoute /health
+_IncludedRouter N/A

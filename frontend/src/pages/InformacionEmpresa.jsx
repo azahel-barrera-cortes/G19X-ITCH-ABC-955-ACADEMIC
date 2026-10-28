@@ -184,11 +184,11 @@ export default function InformacionEmpresa({ infoGuardada = null, onGuardar = nu
                 className="campo"
               />
               <label htmlFor="firma_electronica" className="text-sm font-medium">
-                Generar acta ya firmada (firma electrónica)
+                Incluir leyenda de firma electrónica
               </label>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Si se activa, el PDF del acta se generará con indicación de firma electrónica.
+              Si se activa, el PDF del acta incluirá una leyenda de firma electrónica.
               Esta función es opcional y puede habilitarse o deshabilitarse por acta.
             </p>
           </fieldset>

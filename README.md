@@ -1,4 +1,4 @@
-# PGAC
+﻿# PGAC
 
 **Página de Gestión de Actas Corporativas (PGAC).**
 Automatiza la redacción, estructuración, validación y exportación a PDF de actas
@@ -10,6 +10,9 @@ disolución, etc.) conforme a la Ley General de Sociedades Mercantiles (México)
 - **ReportLab para el PDF** — renderizado reproducible y ajeno al modelo.
 - **Validación de consistencia** — reglas duras sobre quórum, convocatoria,
   mayorías, orden del día y fundamentos.
+- **Autenticación y roles (JWT + RBAC)** — interfaz de acceso separada del
+  sistema de actas; capturista, revisor, abogado responsable y Administrador,
+  con bitácora de cambios sobre las operaciones sensibles.
 
 ---
 
@@ -26,33 +29,42 @@ PGAC/
 │   ├── requirements-postgres.txt   Driver de PostgreSQL (psycopg 3)
 │   ├── requirements-dev.txt        pytest + pypdf
 │   ├── pytest.ini, .env.example
-│   ├── scripts/                generar_acta_ejemplo.py, verificar_pdf.py, verificar_rutas.py, verificar_api_e2e.py
+│   ├── scripts/                generar_acta_ejemplo.py, verificar_pdf.py, verificar_rutas.py, verificar_api_e2e.py, verificar_admin_e2e.py, verificar_ia_e2e.py, diagnosticar_pdf.py
 │   ├── ejemplos/               acta_ejemplo.pdf y acta_e2e.pdf (PDF generados de muestra)
-│   ├── tests/                  29 pruebas automatizadas
+│   ├── tests/                  85 pruebas automatizadas
 │   └── app/
 │       ├── main.py                 FastAPI, CORS, manejadores de errores, /health
-│       ├── core/                   config, catálogos LGSM, formato, excepciones
+│       ├── core/                   config, catálogos LGSM, formato, excepciones,
+│       │                           security (bcrypt + JWT)
 │       ├── db/                     motor, sesiones, creación de tablas
-│       ├── models/                 modelo SQLAlchemy `Acta` + enums de dominio
-│       ├── schemas/acta.py         contratos Pydantic (entrada, validación, respuestas)
+│       ├── models/                 `Acta` + enums de dominio, `Usuario` y `BitacoraCambios`
+│       ├── schemas/                contratos Pydantic (acta, usuario/auth)
 │       ├── services/
 │       │   ├── plantillas_legales.py   15 materias con fundamentos de la LGSM
 │       │   ├── ai_service.py           LLM + reglas + degradación a plantillas
 │       │   ├── pdf_generator.py        build_acta_pdf(data: dict) -> bytes
+│       │   ├── auth_service.py         registro, login y recuperación de contraseña
 │       │   └── acta_service.py         orquestación, folios, CRUD
-│       └── api/v1/                 router + endpoints (actas, sistema)
+│       └── api/v1/                 router, deps (RBAC) + endpoints (actas,
+│                                   administración, asistente, auth, bitácora,
+│                                   expediente ZIP, notaría, sistema)
 └── frontend/                   React 18 + Vite + Tailwind CSS
     ├── package.json, vite.config.js, tailwind.config.js, postcss.config.js
     └── src/
-        ├── App.jsx                 Navegación (Generar / Biblioteca / Guía)
-        ├── api/client.js           axios: payloads JSON y PDF como Blob
-        ├── constants/catalogos.js  catálogos con respaldo local
+        ├── App.jsx                 Compuerta de acceso + navegación filtrada por rol
+        ├── api/client.js           axios: JWT automático, payloads JSON y PDF como Blob
+        ├── api/auth.js             login, registro, perfil y recuperación de contraseña
+        ├── context/AuthContext.jsx sesión (token + usuario) persistida en localStorage
+        ├── constants/              catalogos.js (respaldo local) y roles.js (permisos)
         ├── hooks/                  useActaWizard (reducer), useHistorialActas
         ├── utils/                  formato (es-MX) y descarga de archivos
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  GenerarActa, BibliotecaActas, Ayuda
+        └── pages/                  Acceso (login/registro/recuperar, interfaz
+                                    separada), Perfil (funciones por rol),
+                                    GenerarActa, BibliotecaActas,
+                                    AdministracionActas, InformacionEmpresa, Ayuda
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -113,6 +125,9 @@ copy .env.example .env
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | vacío | Credenciales de Google Gemini |
 | `MARGEN_CM` | `2.5` | Márgenes del PDF |
 | `PIE_CONFIDENCIALIDAD` | texto legal | Leyenda al pie de cada página |
+| `SECRET_KEY` | *(cambiar)* | Clave de firma de los JWT. **Obligatorio cambiarla en producción** |
+| `ALGORITHM` | `HS256` | Algoritmo de firma de los JWT |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Vigencia del token de acceso (7 días) |
 
 ---
 
@@ -140,6 +155,18 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
 
 ### Flujo de uso de la interfaz
 
+0. **Acceso (interfaz separada del sistema de actas)** — sin sesión iniciada la
+   aplicación solo muestra la pantalla de acceso: **Iniciar sesión**,
+   **Crear cuenta** o **Recuperar contraseña**. No se muestra la barra lateral
+   ni ninguna función de actas, así que nadie puede ver ni modificar nada sin
+   entrar. El **primer usuario registrado** se crea como `Administrador`
+   (arranque del sistema); los autoregistros posteriores quedan siempre como
+   `capturista` y solo un administrador puede elevar el rol
+   (`PUT /api/v1/auth/users/{id}`).
+   Tras un acceso correcto se abre **Mi perfil**, que muestra las funciones
+   permitidas según el rol; la barra lateral y la navegación móvil solo
+   presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca ni
+   Administración, y el backend responde 403 si las invoca directamente).
 1. **Generar acta** → Paso 1 *Datos generales* → Paso 2 *Asistentes y quórum* →
    Paso 3 *Orden del día y acuerdos* → Paso 4 *Revisión y PDF*.
 2. En el paso 4: **«Generar borrador con IA»** devuelve cláusulas + validación;
@@ -152,8 +179,26 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
 
 ## 5. Endpoints de la API
 
+**Autenticación y roles (RBAC).** Los endpoints de actas, administración,
+asistente, bitácora, expediente y notaría exigen el encabezado
+`Authorization: Bearer <JWT>` (se obtiene en `POST /api/v1/auth/login`); sin
+token responden **401** y con rol insuficiente **403**. Niveles crecientes:
+`capturista` (1) < `revisor` (2) < `abogado_responsable` (3) < `Administrador` (4).
+
+| Rol | Permisos sobre la API |
+|---|---|
+| `capturista` | Redactar (IA y SSE), crear y editar actas, generar PDF, usar el asistente, exportar expediente ZIP |
+| `revisor` | Lo anterior + listar y consultar actas, descargar PDF guardado, administración (resumen, vigencia, versiones), bitácora y API de notaría |
+| `abogado_responsable` | Lo anterior + cambiar estatus y revalidar actas |
+| `Administrador` | Acceso total + eliminar actas y gestionar usuarios |
+
 | Método | Ruta | Descripción |
 |---|---|---|
+| `POST` | `/api/v1/auth/registro` | Registro (público: rol `capturista`; el primer usuario, `Administrador`; un admin asigna cualquier rol) |
+| `POST` | `/api/v1/auth/login` | Iniciar sesión; devuelve el JWT de acceso |
+| `GET` `PUT` | `/api/v1/auth/me` | Perfil del usuario autenticado (consulta y actualización) |
+| `POST` | `/api/v1/auth/reset-password` | Solicita token de recuperación (público; en `DEBUG` lo devuelve en `detalle`) |
+| `POST` | `/api/v1/auth/reset-password/confirm` | Confirma la nueva contraseña con el token |
 | `GET` | `/health` | Estado de la plataforma (BD + proveedor de IA) |
 | `GET` | `/api/v1/sistema/estado` | Igual que `/health`, dentro de la API versionada |
 | `GET` | `/api/v1/actas/catalogos` | Tipos de asamblea, mayorías, caracteres y estatus |
@@ -173,6 +218,13 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
 | `GET` | `/api/v1/administracion/versiones/{id}/{n}` | Instantánea completa de una versión |
 | `POST` | `/api/v1/administracion/versiones/{id}/{n}/restaurar` | Restaura y emite una versión nueva |
 | `PUT` | `/api/v1/administracion/caducidad/{id}` | Fija, amplía o elimina la fecha de caducidad |
+| `GET` | `/api/v1/auth/users` | Lista de usuarios (Administrador) |
+| `PUT` | `/api/v1/auth/users/{id}` | Cambiar rol, activar/desactivar o restablecer contraseña (Administrador) |
+| `GET` | `/api/v1/bitacora` | Bitácora de cambios con filtros `accion` y `entidad` (revisor+) |
+| `GET` | `/api/v1/bitacora/{id}` | Entrada concreta de la bitácora (revisor+) |
+| `GET` | `/api/v1/expediente/{id}/zip` | Expediente ZIP: PDF del acta + `metadatos.json` (capturista+) |
+| `GET` | `/api/v1/notaria/actas` | Listado de actas para integración notarial (revisor+) |
+| `GET` | `/api/v1/notaria/actas/{id}` | Metadatos públicos del acta para validación notarial (revisor+) |
 
 ### Endpoint principal: `POST /api/v1/actas/generar-pdf`
 
@@ -220,6 +272,30 @@ Tabla `actas` (SQLAlchemy 2.0, portable PostgreSQL/SQLite):
 
 Los catálogos (`tipo_asamblea`, `estatus`) se almacenan como `VARCHAR + CHECK`
 para ser portables entre PostgreSQL y SQLite.
+<br/><br/>
+
+### `usuarios`
+| Campo | Descripción |
+|---|---|
+| `id` (PK) | Identificador autoincremental |
+| `email` (único) | Correo de acceso (credencial de `login`) |
+| `nombre_completo` | Nombre visible del usuario |
+| `rol` | `capturista`, `revisor`, `abogado_responsable` o `Administrador` |
+| `password_hash` | Contraseña hasheada con bcrypt; **nunca se expone** por la API |
+| `activo` | Desactivar la cuenta sin borrarla |
+| `reset_token`, `reset_token_expires` | Token temporal de recuperación (1 hora, de solo lectura) |
+| `created_at`, `updated_at` | Auditoría de fechas |
+
+### `bitacora_cambios`
+| Campo | Descripción |
+|---|---|
+| `id` (PK) | Identificador autoincremental |
+| `usuario_id` (FK) | Quién realizó la acción (NULL si la cuenta fue eliminada) |
+| `accion` | `crear`, `actualizar`, `eliminar`, `cambiar_estatus`, `validar`, `restaurar_version`, `fijar_caducidad`, `exportar_zip`, etc. |
+| `entidad`, `entidad_id` | Recurso afectado (p. ej. `actas`, `42`) |
+| `datos_antes`, `datos_despues` | Retrato JSON anterior/después del cambio |
+| `ip_origen`, `user_agent` | Contexto de la petición |
+| `created_at` | Marca de tiempo |
 
 ---
 
@@ -347,7 +423,7 @@ cabecera `Content-Disposition`, respetando acentos y espacios.
 
 ```powershell
 cd backend
-.venv\Scripts\python.exe -m pytest                            # 44 pruebas
+.venv\Scripts\python.exe -m pytest                            # 85 pruebas
 .venv\Scripts\python.exe scripts\generar_acta_ejemplo.py     # PDF de demostración
 .venv\Scripts\python.exe scripts\verificar_pdf.py            # inspecciona el PDF
 .venv\Scripts\python.exe scripts\verificar_rutas.py          # lista las rutas OpenAPI
@@ -367,11 +443,15 @@ Cobertura de las pruebas:
 | `tests/test_ai_service.py` | Detección de proveedor (4 proveedores), redacción determinista, validación con puntaje alto y quórum crítico, extracción de JSON, **redacción vía LLM simulado**, **degradación por fallo**, **streaming**, **auditoría de fidelidad** y que la clave API nunca viaje en el cuerpo JSON |
 | `tests/test_pdf_generator.py` | Integración real redacción→documento→PDF, secciones presentes, numeración de páginas, anexo de validación y nombre de archivo |
 | `tests/test_api_actas.py` | `/health`, catálogos, `redactar`, `generar-pdf` (binario + guardado), CRUD completo, 404 y 422 |
+| `tests/test_asistente.py` | Chat del asistente IA, validación, estatus, versiones y resumen por estatus (pasa con usuario autenticado) |
+| `tests/test_flujo_creacion.py` | Flujo guiado de creación, PDF y control del acta generada (pasa con usuario autenticado) |
+| `tests/test_administracion.py` | Resumen del repositorio, clasificación de vigencia, historial de versiones, restauración y caducidad |
+| `tests/test_auth.py` | **Nuevo**: registro público (1er usuario = `Administrador`, el resto = `capturista`), login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
 
 Resultados obtenidos en esta máquina:
 
 ```
-55 passed
+85 passed
 PDF de ejemplo: 4 páginas, 11,940 bytes, validación 100.00/100
 Frontend: vite build -> 115 módulos, dist/assets/index-*.js 279.48 kB (gzip 86.82 kB)
 
@@ -418,8 +498,11 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 - El número de acciones y los importes se almacenan como `float` para simplificar
   el andamiaje; si se requiere precisión monetaria estricta, migra esas columnas a
   `Numeric`/`Decimal`.
-- El proyecto cubre la **estructura base** solicitada en `PGAC.md`: no incluye
-  autenticación, multiempresa ni firma electrónica avanzada (fuera de alcance).
+- La plataforma incluye **autenticación JWT con roles (RBAC)** y bitácora de
+  cambios. Quedan fuera de alcance la multiempresa, la firma electrónica
+  avanzada y el envío de correo: la recuperación de contraseña muestra el
+  token solo en modo `DEBUG` (ver `README.md#3-autenticacion-y-control-de-acceso`).
+- El proyecto cubre la **estructura base** solicitada en `PGAC.md`.
 - El PDF se genera con ReportLab de forma determinista; los márgenes, la
   tipografía y el pie de página se ajustan desde `backend/.env`.
 
@@ -427,12 +510,8 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 
 ## 11. Siguientes pasos sugeridos
 
-1. Autenticación y roles (capturista, revisor, abogado responsable) + bitácora de cambios.
+1. Servicio de correo para la recuperación de contraseña (hoy el token se expone solo en `DEBUG`).
 2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
-5. Exportación a expediente ZIP y API de integración para notarías.
-
-## Declaración de uso de IA
-
-Este proyecto fue desarrollado con **asistencia de IA** para la generación de código, documentación y pruebas. El uso de IA se declara en este README y en los archivos `docs/PRD.md` y `docs/MVP.md`. No se penaliza su uso y permite revisar el proceso de desarrollo.
+5. Panel de gestión de usuarios en el frontend y aislamiento multiempresa.

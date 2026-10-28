@@ -32,9 +32,17 @@ _COLUMNAS_NUEVAS = {
         ("fecha_caducidad", "DATE"),
         ("motivo_caducidad", "VARCHAR(300)"),
         ("creado_por", "VARCHAR(150)"),
+        ("tipo_sociedad", "VARCHAR(60)"),
+        ("logo_empresa", "TEXT"),
+        ("firma_electronica", "BOOLEAN DEFAULT 0"),
+        ("usar_info_empresa", "BOOLEAN DEFAULT 0"),
     ),
     "actas_versiones": (
         ("creado_por", "VARCHAR(150)"),
+    ),
+    "usuarios": (
+        ("reset_token", "VARCHAR(128)"),
+        ("reset_token_expires", "DATETIME"),
     ),
 }
 

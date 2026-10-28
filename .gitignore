@@ -1,5 +1,5 @@
 # ===========================================================================
-#  PGAC (Paguina Gestora de Actas Corporativas) - Archivos ignorados por Git
+#  PGAC (Página de Gestión de Actas Corporativas) - Archivos ignorados por Git
 # ===========================================================================
 
 # --- Python (backend) ------------------------------------------------------
@@ -109,6 +109,7 @@ dist-ssr/
 .vite/
 
 # --- Registros y temporales de trabajo ------------------------------------
+*.tmp.md
 .tmp-*
 *.log
 .env-check.txt

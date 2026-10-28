@@ -74,7 +74,11 @@ const SECCIONES = [
   },
 ]
 
-export default function BarraLateral({ seccion, onCambiarSeccion }) {
+export default function BarraLateral({ seccion, onCambiarSeccion, seccionesVisibles = null }) {
+  // Solo se muestran las secciones que el rol del usuario tiene permitidas.
+  const secciones = seccionesVisibles
+    ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
+    : SECCIONES
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
@@ -92,7 +96,7 @@ export default function BarraLateral({ seccion, onCambiarSeccion }) {
       </div>
 
       <nav aria-label="Secciones" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {SECCIONES.map((item) => {
+        {secciones.map((item) => {
           const activa = seccion === item.id
           return (
             <button

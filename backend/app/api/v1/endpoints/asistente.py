@@ -1,6 +1,8 @@
 """Endpoints del Asistente IA interno de actas administrativas.
 
 Expone el chat bajo /api/v1/asistente sin dependencias externas.
+El chat requiere un usuario autenticado: desde la conversación se pueden crear
+actas y cambiar su estatus, por lo que no puede quedar abierto al público.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.v1.deps import UsuarioActual, get_db
 from app.db.session import get_db
 from app.services import asistente as motor
 
@@ -61,7 +64,11 @@ class AsistenteChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=AsistenteChatResponse, summary="Conversar con el asistente")
-def chatear(payload: AsistenteChatRequest, db: Session = Depends(get_db)) -> AsistenteChatResponse:
+def chatear(
+    payload: AsistenteChatRequest,
+    _usuario: UsuarioActual,
+    db: Session = Depends(get_db),
+) -> AsistenteChatResponse:
     """Procesa un mensaje: creación guiada, validación, estatus y versiones."""
     resultado = motor.procesar_mensaje(
         db, payload.mensaje, payload.folio, payload.acta_id,

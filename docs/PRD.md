@@ -65,7 +65,53 @@ El sistema debe permitir capturar y persistir los datos de la sociedad que compa
 - Toggle «Usar esta información al generar el acta»: al activarse, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada, y la IA puede incorporar estos datos al redactar cláusulas y el encabezado del PDF.
 - Persistencia en localStorage del navegador (sin depender de autenticación ni backend).
 
----
+### RF-11: Autenticación y control de acceso por roles (RBAC)
+El sistema debe exigir autenticación para toda operación del dominio:
+- El primer usuario registrado se crea como `Administrador`; los registros
+  públicos posteriores se asignan forzosamente como `capturista` (un
+  administrador puede elevar el rol desde `PUT /api/v1/auth/users/{id}`).
+- Inicio de sesión con email y contraseña (bcrypt); devolución de un JWT
+  firmado (HS256) con expiración configurada.
+- Roles con privilegios crecientes: `capturista` (1) < `revisor` (2) <
+  `abogado_responsable` (3) < `Administrador` (4). Cada operación declara el
+  rol mínimo requerido y el backend responde 401 si no hay token y 403 si el
+  rol es insuficiente.
+- Perfil del usuario autenticado: consulta y actualización de nombre y
+  contraseña; gestión de usuarios (listar, cambiar rol, activar/desactivar)
+  reservada al Administrador.
+- Recuperación de contraseña mediante token temporal de un solo uso (1 hora).
+
+### RF-12: Interfaz de acceso separada y perfil por rol
+- Sin sesión iniciada, la aplicación muestra únicamente la interfaz de acceso
+  (inicio de sesión, creación de cuenta, recuperación de contraseña): ninguna
+  sección del sistema de actas es visible ni accesible.
+- Tras un acceso correcto se abre el perfil del usuario, que enumera las
+  funciones permitidas por su rol; la navegación (barra lateral y móvil) solo
+  presenta esas secciones.
+- El frontend adjunta el JWT en cada llamada a la API (interceptor axios y
+  cabecera en el flujo SSE de redacción en vivo).
+- La separación por rol también protege los datos: un capturista no puede
+  listar ni eliminar actas, ni ver la bitácora ni la administración, incluso
+  si intenta llamar directamente a los endpoints.
+
+### RF-13: Bitácora de cambios (auditoría)
+El sistema debe registrar automáticamente quién realizó cada acción sensible
+(crear, actualizar, eliminar, cambiar estatus, validar, restaurar versión,
+fijar caducidad, exportar ZIP y consultas de integración) con: usuario,
+rol, IP, user-agent y retrato `datos_antes` / `datos_después`. La bitácora se
+puede listar y consultar con filtros `accion` y `entidad`, mediante
+`GET /api/v1/bitacora` y `GET /api/v1/bitacora/{id}` (revisor+).
+
+### RF-14: Exportación a expediente ZIP
+Generar `GET /api/v1/expediente/{acta_id}/zip` con el PDF del acta y un
+`metadatos.json` (folio, sociedad, estatus, quién exportó y cuándo), y
+registrar la operación en la bitácora. Disponible para capturista+.
+
+### RF-15: API de integración para notarías
+Endpoints de solo lectura y metadatos (`/api/v1/notaria/actas` y
+`/api/v1/notaria/actas/{id}`) que exponen resúmenes y datos públicos del
+ Acta para validación notarial (sin cláusulas completas), requieren rol
+ revisor+ y dejan constancia en la bitácora.
 
 ## 4. Requisitos no funcionales (RNF)
 
@@ -82,40 +128,53 @@ El sistema debe permitir capturar y persistir los datos de la sociedad que compa
 
 ## 5. Alcance del MVP vs. Post-MVP
 
-### ✅ Entra en el MVP (ver `docs/MVP.md`)
-Todo lo listado en RF-01 a RF-07, sin autenticación ni firma electrónica.
+### ✅ Entra en el MVP (ver `docs/MVP.md`) y en la versión entregada
+RF-01 a RF-10 (MVP original) más RF-11 a RF-15 de esta versión:
+autenticación con roles (JWT + RBAC), interfaz de acceso separada y perfil por
+rol, bitácora de cambios, expediente ZIP y API para notarías.
 
-### ❌ Queda fuera del MVP (posterior)
+### ❌ Queda fuera (post-escimiento actual)
 | Área | Qué queda fuera |
 |------|-----------------|
-| Autenticación y roles | Login, capturista/revisor/abogado responsable, bitácora de cambios |
 | Firma electrónica | Firma electrónica avanzada, hash + sellado de tiempo |
 | Multiempresa | Aislamiento de datos por sociedad/cliente |
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
-| Exportación ZIP | Expediente comprimido |
-| API de integración para notarías | Webhooks, endpoints de terceros |
+| Servicio de correo | Envío del token de recuperación por email (hoy solo en `DEBUG`) |
+| Panel de gestión de usuarios en UI | El alta/cambio de roles se hace por API; el frontend no incluye un panel de usuarios |
 
 ---
 
-## 6. Seguridad y acceso (declarado en PRD)
+## 6. Seguridad y acceso
 
-**Advertencia:** En el MVP **no hay autenticación ni autorización**. Cualquier persona que tenga acceso a la API puede:
-- Listar todas las actas (`GET /api/v1/actas`)
-- Leer cualquier acta (`GET /api/v1/actas/{id}`)
-- Editar cualquier acta (`PUT /api/v1/actas/{id}`)
-- Eliminar cualquier acta (`DELETE /api/v1/actas/{id}`)
+La plataforma implementa autenticación JWT con control de acceso por roles
+(RBAC) y bitácora de cambios:
 
-Como las actas son documentos societarios confidenciales, esto es un riesgo conocido del MVP. Se debe agregar en una versión posterior:
-- Inicio de sesión sencillo con roles (capturista, revisor, abogado responsable)
-- Control de acceso basado en roles (RBAC) sobre los endpoints de actas
-- Bitácora de cambios (quién modificó qué y cuándo)
+- Todas las operaciones sensibles (actas, administración, asistente, bitácora,
+  expediente, notaría) requieren `Authorization: Bearer <JWT>`; sin token
+  responden 401 y con rol insuficiente 403.
+- El registro es público pero el servidor fuerza el rol `capturista`; el
+  primer usuario del sistema arranca como `Administrador`.
+- Las contraseñas se guardan con bcrypt y la recuperación se hace con un
+  token temporal de un solo uso de 1 hora (en `DEBUG` el token viaja en la
+  respuesta para poder probar el flujo de extremo a extremo).
+- Las acciones sensibles quedan registradas en la bitácora de cambios
+  (usuario, rol, IP, antes/después).
+
+Riesgos conocidos (aceptados hasta la versión post-actual):
+- El JWT se almacena en `localStorage` del navegador (exposición ante XSS);
+  recomiéndase HTTPS y, a futuro, cookies `HttpOnly`.
+- No hay aislamiento multiempresa: un revisor+ puede consultar todas las
+  actas del repositorio.
+- El asistente conversacional opera con el usuario autenticado, pero no
+  restringe intenciones por rol (un usuario autenticado puede pedir por chat
+  cambios de estatus que, en el flujo guiado, requieren un rol superior).
 
 ---
 
 ## 7. Métricas de éxito del MVP
 
-- 55 pruebas de backend pasando
+- 85 pruebas de backend pasando (55 originales + 12 de seguridad/autenticación)
 - Build del frontend sin errores
 - PDF generado: ≥ 1 página, con encabezado, quórum y firmas
 - Validación de consistencia: puntaje visible y hallazgos listados
@@ -125,11 +184,11 @@ Como las actas son documentos societarios confidenciales, esto es un riesgo cono
 
 ## 8. Hoja de ruta sugerida (post-MVP)
 
-1. Autenticación y roles + bitácora de cambios
-2. Migraciones con Alembic y fusión con catálogos de sociedades
-3. Firma electrónica y control de versiones firmadas
-4. Plantillas en Word/PDF adjuntas y anexos
-5. Exportación a expediente ZIP y API de integración para notarías
+1. Servicio de correo para la recuperación de contraseña
+2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades
+3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances)
+4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo)
+5. Multiusuario/logotipos por sociedad y gestión de usuarios en el frontend
 
 ---
 

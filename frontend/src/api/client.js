@@ -8,11 +8,23 @@
 import axios from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const CLAVE_TOKEN = 'pgac_token'
 
 export const http = axios.create({
   baseURL: BASE_URL,
   timeout: 120000, // la redacción con IA puede tardar: 2 minutos de margen
   headers: { 'Content-Type': 'application/json' },
+})
+
+/**
+ * Adjunta el JWT de la sesión a todas las llamadas protegidas por el RBAC del
+ * backend. El token lo guarda `AuthContext` en localStorage al iniciar sesión;
+ * sin sesión las peticiones salen anónimas y el backend responde 401.
+ */
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem(CLAVE_TOKEN)
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
 })
 
 /**
@@ -89,9 +101,13 @@ export async function redactarActa(payload) {
  * @returns el texto completo de la cláusula generada.
  */
 export async function redactarEnVivo(payload, { alFragmento, alInicio } = {}) {
+  const token = localStorage.getItem(CLAVE_TOKEN)
   const respuesta = await fetch(`${BASE_URL}/actas/redactar-stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(payload),
   })
 

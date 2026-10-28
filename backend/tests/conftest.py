@@ -1,4 +1,4 @@
-"""Configuración compartida de las pruebas.
+﻿"""Configuración compartida de las pruebas.
 
 Antes de importar la aplicación se fijan variables de entorno para que las
 pruebas sean deterministas y aisladas:
@@ -37,6 +37,51 @@ def cliente() -> Iterator[TestClient]:
 
     with TestClient(app) as cliente_pruebas:
         yield cliente_pruebas
+
+
+@pytest.fixture(scope="session")
+def admin_token(cliente: TestClient) -> str:
+    """Crea un administrador en la base de datos y devuelve el token de acceso."""
+    from app.core import security
+    from app.db.session import SessionLocal
+    from app.models.usuario import Usuario
+
+    # Sesión propia: un fixture de scope "session" no puede depender de uno
+    # de scope "function" (ScopeMismatch).
+    base = SessionLocal()
+    try:
+        base.query(Usuario).filter(Usuario.email == "admin@pgac.com").delete()
+        base.commit()
+        base.add(
+            Usuario(
+                email="admin@pgac.com",
+                nombre_completo="Administrador del Sistema",
+                rol="Administrador",
+                password_hash=security.hash_password("clave-segura-123"),
+                activo=True,
+            )
+        )
+        base.commit()
+    finally:
+        base.close()
+
+    # Iniciar sesión
+    login = cliente.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@pgac.com", "password": "clave-segura-123"},
+    )
+    assert login.status_code == 200, f"No se pudo iniciar sesión: {login.text}"
+    return login.json()["access_token"]
+
+
+@pytest.fixture(scope="session")
+def cliente_autenticado(cliente: TestClient, admin_token: str) -> TestClient:
+    """Cliente HTTP con el encabezado Authorization incluido."""
+    cliente.headers["Authorization"] = f"Bearer {admin_token}"
+    yield cliente
+    # Limpiar encabezado
+    if "Authorization" in cliente.headers:
+        del cliente.headers["Authorization"]
 
 
 @pytest.fixture(autouse=True)

@@ -10,16 +10,19 @@ from app.models.enums import (
     TipoAsamblea,
     TipoMayoria,
 )
+from app.models.usuario import BitacoraCambios, Usuario
 
 __all__ = [
     "Acta",
     "ActaVersion",
+    "BitacoraCambios",
     "DIAS_AVISO_CADUCIDAD",
-    "TipoAsamblea",
     "EstatusActa",
+    "TipoAsamblea",
     "CaracterAsistente",
     "TipoMayoria",
     "MateriaAcuerdo",
     "SeveridadHallazgo",
     "ProveedorIA",
+    "Usuario",
 ]
