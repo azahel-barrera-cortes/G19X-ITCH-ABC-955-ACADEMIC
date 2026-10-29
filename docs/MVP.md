@@ -58,11 +58,6 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
 | **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |
 | **Servicio de correo** | Envío del token de recuperación por email | El token se muestra en la respuesta solo en modo DEBUG |
-| **Multiempresa** | Aislamiento de datos por sociedad/cliente | El MVP asume una sola instancia |
-| **Migraciones Alembic** | `AUTO_CREATE_TABLES=false` + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
-| **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |
-| **Exportación ZIP** | Expediente comprimido con anexos | Solo PDF individual |
-| **API de integración para notarías** | Webhooks, endpoints de terceros | Fuera de alcance inicial |
 
 ---
 
@@ -76,7 +71,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 - [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)
 - [ ] El asistente IA guía la creación de actas mediante conversación
 - [ ] La información de la empresa/sociedad se captura y se usa automáticamente al generar actas
-- [ ] Las 55 pruebas de la versión anterior **y** las 12 pruebas de autenticación/RBAC pasan (85 en total); el frontend builda sin errores.
+- [ ] Las 85 pruebas de backend pasan; el frontend builda sin errores.
 - [ ] Build del frontend exitoso
 
 ---

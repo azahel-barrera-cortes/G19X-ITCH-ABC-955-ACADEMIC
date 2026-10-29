@@ -63,13 +63,15 @@ El sistema debe incluir un asistente de IA basado en chat que guíe al usuario e
 El sistema debe permitir capturar y persistir los datos de la sociedad que comparece en las actas:
 - Razón social, R.F.C., tipo de sociedad (7 opciones), logo de la empresa y firma electrónica opcional.
 - Toggle «Usar esta información al generar el acta»: al activarse, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada, y la IA puede incorporar estos datos al redactar cláusulas y el encabezado del PDF.
-- Persistencia en localStorage del navegador (sin depender de autenticación ni backend).
+- Persistencia en el backend: los datos de la sociedad se guardan con cada acta (campos `tipo_sociedad` y `logo_empresa` del modelo `Acta`) y están disponibles para el usuario autenticado; el frontend también conserva una copia en `localStorage` para uso inmediato.
 
 ### RF-11: Autenticación y control de acceso por roles (RBAC)
 El sistema debe exigir autenticación para toda operación del dominio:
 - El primer usuario registrado se crea como `Administrador`; los registros
-  públicos posteriores se asignan forzosamente como `capturista` (un
-  administrador puede elevar el rol desde `PUT /api/v1/auth/users/{id}`).
+  públicos posteriores se asignan forzosamente como `capturista` (cualquier
+  usuario autenticado puede elevar su propio rol desde `PUT /api/v1/auth/me`;
+  solo un Administrador puede elevar el rol de otros usuarios desde
+  `PUT /api/v1/auth/users/{id}`).
 - Inicio de sesión con email y contraseña (bcrypt); devolución de un JWT
   firmado (HS256) con expiración configurada.
 - Roles con privilegios crecientes: `capturista` (1) < `revisor` (2) <
@@ -174,7 +176,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 
 ## 7. Métricas de éxito del MVP
 
-- 85 pruebas de backend pasando (55 originales + 12 de seguridad/autenticación)
+- 85 pruebas de backend pasando
 - Build del frontend sin errores
 - PDF generado: ≥ 1 página, con encabezado, quórum y firmas
 - Validación de consistencia: puntaje visible y hallazgos listados
