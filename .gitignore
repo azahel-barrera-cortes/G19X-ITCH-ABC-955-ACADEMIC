@@ -133,3 +133,7 @@ test_*.txt
 *.out.txt
 *.err.txt
 
+# --- Salidas de consola del backend (excepto requirements.txt) --------------
+backend/*.txt
+!backend/requirements.txt
+
