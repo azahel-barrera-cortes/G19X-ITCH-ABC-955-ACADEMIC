@@ -219,6 +219,7 @@ class _CanvasActaLegal(lienzo.Canvas):
         self._margen: float = kwargs.pop("margen", 2.5 * cm)
         self._numerar: bool = kwargs.pop("numerar", True)
         self._logo_empresa: Optional[str] = kwargs.pop("logo_empresa", None)
+        self._firma_electronica: bool = kwargs.pop("firma_electronica", False)
         super().__init__(*args, **kwargs)
         self._estados: List[Dict[str, Any]] = []
 
@@ -286,6 +287,14 @@ class _CanvasActaLegal(lienzo.Canvas):
                 ancho - self._margen,
                 1.05 * cm,
                 f"Página {self._pageNumber} de {total}",
+            )
+        if self._firma_electronica:
+            self.setFont(FUENTE_CURSIVA, 7.5)
+            self.setFillColor(COLOR_TEXTO_TENUE)
+            self.drawCentredString(
+                ancho / 2,
+                0.65 * cm,
+                "Este acta cuenta con firma electrónica avanzada conforme a la normativa aplicable.",
             )
         self.line(self._margen, 1.35 * cm, ancho - self._margen, 1.35 * cm)
         self.restoreState()
@@ -784,6 +793,7 @@ def build_acta_pdf(data: dict) -> bytes:
             margen=margen,
             numerar=numerar,
             logo_empresa=data.get("logo_empresa"),
+        firma_electronica=bool(data.get("firma_electronica")),
         ),
     )
 
