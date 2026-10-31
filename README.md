@@ -1,18 +1,14 @@
-﻿# PGAC
+# PGAC
 
 **Página de Gestión de Actas Corporativas (PGAC).**
 Automatiza la redacción, estructuración, validación y exportación a PDF de actas
 corporativas (asambleas ordinarias, extraordinarias, aumento de capital, fusión,
 disolución, etc.) conforme a la Ley General de Sociedades Mercantiles (México).
 
-- **IA para el texto legal** (Azure OpenAI / Gemini) — con plantillas legales
-  deterministas como respaldo offline.
+- **IA para el texto legal** (Azure OpenAI / Gemini / OpenAI-compatible) — con plantillas legales deterministas como respaldo offline.
 - **ReportLab para el PDF** — renderizado reproducible y ajeno al modelo.
-- **Validación de consistencia** — reglas duras sobre quórum, convocatoria,
-  mayorías, orden del día y fundamentos.
-- **Autenticación y roles (JWT + RBAC)** — interfaz de acceso separada del
-  sistema de actas; capturista, revisor, abogado responsable y Administrador,
-  con bitácora de cambios sobre las operaciones sensibles.
+- **Validación de consistencia** — reglas duras sobre quórum, convocatoria, mayorías, orden del día y fundamentos.
+- **Autenticación y roles (JWT + RBAC)** — interfaz de acceso separada del sistema de actas; capturista, revisor, abogado responsable y Administrador, con bitácora de cambios sobre las operaciones sensibles.
 
 ---
 
@@ -29,13 +25,14 @@ PGAC/
 │   ├── requirements-postgres.txt   Driver de PostgreSQL (psycopg 3)
 │   ├── requirements-dev.txt        pytest + pypdf
 │   ├── pytest.ini, .env.example
-│   ├── scripts/                generar_acta_ejemplo.py, verificar_pdf.py, verificar_rutas.py, verificar_api_e2e.py, verificar_admin_e2e.py, verificar_ia_e2e.py, diagnosticar_pdf.py
+│   ├── scripts/                generar_acta_ejemplo.py, verificar_pdf.py, verificar_rutas.py,
+│   │                              verificar_api_e2e.py, verificar_admin_e2e.py, verificar_ia_e2e.py,
+│   │                              diagnosticar_pdf.py
 │   ├── ejemplos/               acta_ejemplo.pdf y acta_e2e.pdf (PDF generados de muestra)
 │   ├── tests/                  85 pruebas automatizadas
 │   └── app/
 │       ├── main.py                 FastAPI, CORS, manejadores de errores, /health
-│       ├── core/                   config, catálogos LGSM, formato, excepciones,
-│       │                           security (bcrypt + JWT)
+│       ├── core/                   config, catálogos LGSM, formato, excepciones, security (bcrypt + JWT)
 │       ├── db/                     motor, sesiones, creación de tablas
 │       ├── models/                 `Acta` + enums de dominio, `Usuario` y `BitacoraCambios`
 │       ├── schemas/                contratos Pydantic (acta, usuario/auth)
@@ -45,9 +42,7 @@ PGAC/
 │       │   ├── pdf_generator.py        build_acta_pdf(data: dict) -> bytes
 │       │   ├── auth_service.py         registro, login y recuperación de contraseña
 │       │   └── acta_service.py         orquestación, folios, CRUD
-│       └── api/v1/                 router, deps (RBAC) + endpoints (actas,
-│                                   administración, asistente, auth, bitácora,
-│                                   expediente ZIP, notaría, sistema)
+│       └── api/v1/                 router, deps (RBAC) + endpoints (actas, administración, asistente, auth, bitácora, expediente ZIP, notaría, sistema)
 └── frontend/                   React 18 + Vite + Tailwind CSS
     ├── package.json, vite.config.js, tailwind.config.js, postcss.config.js
     └── src/
@@ -61,10 +56,7 @@ PGAC/
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  Acceso (login/registro/recuperar, interfaz
-                                    separada), Perfil (funciones por rol),
-                                    GenerarActa, BibliotecaActas,
-                                    AdministracionActas, InformacionEmpresa, Ayuda
+        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil (funciones por rol), GenerarActa, BibliotecaActas, AdministracionActas, InformacionEmpresa, Ayuda
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -75,8 +67,7 @@ PGAC/
 | Composición | `acta_service.py` | Encabezado, quórum, cierre y texto consolidado |
 | Maquetado | `pdf_generator.py` | **PDF formal** con ReportLab (única responsabilidad) |
 
-Este aislamiento hace que el PDF sea determinista: el modelo nunca "dibuja" el
-documento, solo redacta el cuerpo del acta.
+Este aislamiento hace que el PDF sea determinista: el modelo nunca "dibuja" el documento, solo redacta el cuerpo del acta.
 
 ---
 
@@ -119,17 +110,18 @@ copy .env.example .env
 | `DATABASE_URL` | `sqlite:///./pgac.db` | Cadena SQLAlchemy. PostgreSQL: `postgresql+psycopg://usuario:clave@host:5432/pgac` |
 | `AUTO_CREATE_TABLES` | `true` | Crea las tablas al arrancar (en producción usa migraciones) |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Orígenes permitidos por CORS |
-| `AI_PROVIDER` | `auto` | `auto` \| `azure_openai` \| `gemini` \| `plantillas` |
+| `AI_PROVIDER` | `auto` | `auto` \| `azure_openai` \| `gemini` \| `openai_compatible` \| `plantillas` |
 | `AI_ALLOW_FALLBACK` | `true` | Degrada a plantillas si el LLM falla |
 | `AZURE_OPENAI_*` | vacío | Endpoint, clave, deployment y api-version |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | vacío | Credenciales de Google Gemini |
+| `AI_BASE_URL` | vacío | Base URL para proveedores OpenAI-compatibles (Ollama, Groq, DeepSeek, etc.) |
+| `AI_MODEL` | vacío | Nombre del modelo para proveedores OpenAI-compatibles |
+| `AI_API_KEY` | vacío | Clave opcional para proveedores OpenAI-compatibles |
 | `MARGEN_CM` | `2.5` | Márgenes del PDF |
 | `PIE_CONFIDENCIALIDAD` | texto legal | Leyenda al pie de cada página |
 | `SECRET_KEY` | *(cambiar)* | Clave de firma de los JWT. **Obligatorio cambiarla en producción** |
 | `ALGORITHM` | `HS256` | Algoritmo de firma de los JWT |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Vigencia del token de acceso (7 días) |
-
----
 
 ## 4. Puesta en marcha del frontend
 
@@ -179,8 +171,7 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
 ### ¿Qué ve cada usuario al iniciar sesión?
 
 La navegación (barra lateral y menú móvil) se filtra automáticamente según el
-rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
-→ **403**).
+rol, y el backend valida cada petición (sin token → **401**; rol insuficiente → **403**).
 
 | Rol | Pantalla de entrada | Secciones visibles en la barra lateral | Acciones principales |
 |-----|---------------------|----------------------------------------|----------------------|
@@ -194,8 +185,6 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 > usuario autenticado puede elevar su propio rol desde `PUT /api/v1/auth/me`;
 > solo un Administrador puede elevar el rol de otros usuarios desde
 > `PUT /api/v1/auth/users/{id}`.
-
----
 
 ## 5. Endpoints de la API
 
@@ -261,7 +250,7 @@ Devuelve el binario `application/pdf` con estos encabezados de trazabilidad
 | `X-Acta-Id` / `X-Acta-Version` | Identificador y versión del acta guardada |
 | `X-Acta-Paginas` | Número de páginas del PDF |
 | `X-Acta-Guardada` | `true` si quedó persistida |
-| `X-IA-Proveedor` / `X-IA-Habilitada` | `azure_openai`, `gemini` o `plantillas` |
+| `X-IA-Proveedor` / `X-IA-Habilitada` | `azure_openai`, `gemini`, `openai_compatible` o `plantillas` |
 | `X-IA-Advertencias` | Avisos cuando el LLM falló y se usaron plantillas |
 | `X-Validacion-Puntaje` | Puntaje de consistencia (0-100) |
 
@@ -292,7 +281,6 @@ Tabla `actas` (SQLAlchemy 2.0, portable PostgreSQL/SQLite):
 
 Los catálogos (`tipo_asamblea`, `estatus`) se almacenan como `VARCHAR + CHECK`
 para ser portables entre PostgreSQL y SQLite.
-<br/><br/>
 
 ### `usuarios`
 | Campo | Descripción |
@@ -448,27 +436,29 @@ cd backend
 .venv\Scripts\python.exe scripts\verificar_pdf.py            # inspecciona el PDF
 .venv\Scripts\python.exe scripts\verificar_rutas.py          # lista las rutas OpenAPI
 .venv\Scripts\python.exe scripts\verificar_api_e2e.py        # flujo HTTP real con uvicorn
-.venv\Scripts\python.exe scripts\verificar_ia_e2e.py        # IA con un LLM simulado local
+.venv\Scripts\python.exe scripts\verificar_admin_e2e.py      # flujo de administración (RBAC)
+.venv\Scripts\python.exe scripts\verificar_ia_e2e.py         # IA con un LLM simulado local
+.venv\Scripts\python.exe scripts\diagnosticar_pdf.py         # diagnóstico del PDF generado
 ```
 
 > `verificar_ia_e2e.py` levanta un **LLM falso** con la API de OpenAI y un servidor
 > uvicorn real: comprueba la redacción con IA, el streaming SSE y la auditoría de
 > fidelidad **sin requerir credenciales ni conexión a internet**.
 
-Cobertura de las pruebas:
+### Cobertura de las pruebas
 
 | Archivo | Qué verifica |
 |---|---|
 | `tests/test_plantillas_legales.py` | Todas las materias con plantilla, detección por palabras clave y tipo de asamblea, ordinales y fundamentos |
-| `tests/test_ai_service.py` | Detección de proveedor (4 proveedores), redacción determinista, validación con puntaje alto y quórum crítico, extracción de JSON, **redacción vía LLM simulado**, **degradación por fallo**, **streaming**, **auditoría de fidelidad** y que la clave API nunca viaje en el cuerpo JSON |
+| `tests/test_ai_service.py` | Detección de proveedor (4 proveedores), redacción determinista, validación con puntaje alto y quórum crítico, extracción de JSON, redacción vía LLM simulado, degradación por fallo, streaming, auditoría de fidelidad y que la clave API nunca viaje en el cuerpo JSON |
 | `tests/test_pdf_generator.py` | Integración real redacción→documento→PDF, secciones presentes, numeración de páginas, anexo de validación y nombre de archivo |
 | `tests/test_api_actas.py` | `/health`, catálogos, `redactar`, `generar-pdf` (binario + guardado), CRUD completo, 404 y 422 |
 | `tests/test_asistente.py` | Chat del asistente IA, validación, estatus, versiones y resumen por estatus (pasa con usuario autenticado) |
 | `tests/test_flujo_creacion.py` | Flujo guiado de creación, PDF y control del acta generada (pasa con usuario autenticado) |
 | `tests/test_administracion.py` | Resumen del repositorio, clasificación de vigencia, historial de versiones, restauración y caducidad |
-| `tests/test_auth.py` | **Nuevo**: registro público (1er usuario = `Administrador`, el resto = `capturista`), login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
+| `tests/test_auth.py` | Registro público (1er usuario = `Administrador`, el resto = `capturista`), login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
 
-Resultados obtenidos en esta máquina:
+### Resultados obtenidos en esta máquina
 
 ```
 85 passed
@@ -482,6 +472,15 @@ Verificación E2E de la IA (LLM simulado, llamadas HTTP reales):
   3) /actas/redactar-stream -> text/event-stream, 43 fragmentos, texto completo (328 chars)
   Llamadas reales al LLM: 4  ->  RESULTADO: todas las verificaciones pasaron
 ```
+
+### Mejoras sugeridas para la suite de pruebas
+
+Para mantener la cobertura por encima del 90 % a medida que crece el proyecto:
+
+- **Pruebas de seguridad**: verificar que los endpoints RBAC rechazan tokens inválidos o expirados, y que un usuario `capturista` no puede acceder a rutas de `Administrador`.
+- **Pruebas de integración frontend-backend**: usar Playwright o Cypress para validar flujos críticos (login → generar acta → descargar PDF).
+- **Pruebas de rendimiento**: medir tiempo de generación de PDF y respuesta de endpoints bajo carga concurrente.
+- **Pruebas de PostgreSQL**: ejecutar la suite completa contra una instancia real de PostgreSQL 16 para garantizar portabilidad.
 
 ---
 
@@ -535,3 +534,9 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
 5. Panel de gestión de usuarios en el frontend y aislamiento multiempresa.
+
+---
+
+## Declaración de uso de IA
+
+Este proyecto fue desarrollado con **asistencia de IA** para la generación de código, documentación y pruebas. El uso de IA se declara en este README y en los archivos `docs/PRD.md` y `docs/MVP.md`. No se penaliza su uso y permite revisar el proceso de desarrollo.
