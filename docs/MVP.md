@@ -15,9 +15,9 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ### Backend (Python + FastAPI)
 | Módulo | Qué incluye |
 |--------|-------------|
-| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión |
+| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, rol, password_hash, activo, reset_token) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
 | Plantillas legales parametrizadas | `PlantillaLegal` + `ParametroPlantilla` con validación de parámetros requeridos, valores por defecto, `obtener_parametros_plantilla()`, `parametros_requeridos_por_materia()`, `DatosPlantillaIncompletosError` — 15 materias cubiertas con fundamentos LGSM |
-| IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible; si falla, degrada a plantillas deterministas |
+| IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible (Ollama, Groq, DeepSeek, LM Studio, vLLM); si falla, degrada a plantillas deterministas |
 | ReportLab | `build_acta_pdf(data) -> bytes` con encabezados, márgenes, firmas, numeración de páginas |
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
@@ -26,7 +26,8 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
-| Endpoints | `GET /health`, catálogos, `redactar`, `redactar-stream`, `generar-pdf`, CRUD de actas, `estatus`, `pdf`, `validar`, `bitacora`, `expediente/zip`, `notaria/actas*`, `administracion/*`, `asistente/chat*`, `auth/*` |
+| Endpoints | `GET /health`, catálogos, `redactar`, `redactar-stream`, `generar-pdf`, CRUD de actas, `estatus`, `pdf`, `validar`, `bitacora`, `expediente/zip`, `notaria/actas*`, `administracion/*`, `asistente/chat*`, `auth/*`; el PDF devuelve encabezados de trazabilidad `X-Acta-Folio`, `X-Acta-Id`, `X-Acta-Version`, `X-Acta-Paginas`, `X-Acta-Guardada`, `X-IA-Proveedor`, `X-IA-Advertencias`, `X-Validacion-Puntaje` |
+| Variables de entorno | `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AZURE_OPENAI_*`, `GEMINI_API_KEY`, `MARGEN_CM`, `PIE_CONFIDENCIALIDAD`, `CORS_ORIGINS` |
 
 ### Frontend (React 18 + Vite + Tailwind)
 | Componente | Qué incluye |

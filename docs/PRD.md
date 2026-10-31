@@ -24,7 +24,7 @@ PGAC automatiza la redacción, estructuración, validación y exportación a PDF
 El usuario debe poder capturar datos generales (sociedad, fecha, hora, tipo de asamblea, lugar), asistentes con quórum, orden del día y acuerdos, y generar el acta completa.
 
 ### RF-02: Redacción asistida por IA
-El sistema debe redactar las cláusulas legales de cada acuerdo usando IA (Azure OpenAI, Gemini o compatible) y devolver el texto en español jurídico formal.
+El sistema debe redactar las cláusulas legales de cada acuerdo usando IA (Azure OpenAI, Gemini o compatible con OpenAI, incluyendo Ollama local, Groq, DeepSeek, LM Studio, vLLM) y devolver el texto en español jurídico formal. El maquetado del PDF nunca lo hace el modelo: ReportLab es determinista y aislado de la IA.
 
 ### RF-03: Plantillas legales parametrizadas (respaldo offline)
 Cuando no haya proveedor de IA disponible o falle, el sistema debe usar plantillas legales deterministas parametrizadas:
@@ -36,7 +36,7 @@ Cuando no haya proveedor de IA disponible o falle, el sistema debe usar plantill
 El sistema debe validar quórum, convocatoria, mayorías, orden del día y fundamentos legales, asignando un puntaje y lista de hallazgos (crítico, advertencia, informativo).
 
 ### RF-05: Exportación a PDF
-El sistema debe generar un PDF formal con ReportLab: encabezados, márgenes profesionales, firmas, numeración de página y leyenda de confidencialidad.
+El sistema debe generar un PDF formal con ReportLab: encabezados, márgenes profesionales, firmas, numeración de página y leyenda de confidencialidad. El PDF debe devolver encabezados de trazabilidad (`X-Acta-Folio`, `X-Acta-Id`, `X-Acta-Version`, `X-Acta-Paginas`, `X-Acta-Guardada`, `X-IA-Proveedor`, `X-IA-Advertencias`, `X-Validacion-Puntaje`) y nombrarse `PGAC-AAAA-NNNN_Razón_Social_AAAA-MM-DD.pdf` respetando acentos y espacios en `Content-Disposition`.
 
 ### RF-06: Gestión de actas (CRUD)
 Listar, crear, leer, actualizar, cambiar estatus y eliminar actas. Cada acta tiene folio, versión y historial.
@@ -115,6 +115,54 @@ Endpoints de solo lectura y metadatos (`/api/v1/notaria/actas` y
  Acta para validación notarial (sin cláusulas completas), requieren rol
  revisor+ y dejan constancia en la bitácora.
 
+### RF-16: Redacción en vivo por streaming (SSE)
+El sistema debe ofrecer un endpoint `POST /api/v1/actas/redactar-stream` que transmita la cláusula del primer acuerdo fragmento a fragmento (`inicio` → `fragmento`… → `fin`) mediante `text/event-stream`, permitiendo al frontend mostrar la redacción mientras se genera. Requiere autenticación y rol capturista+.
+
+---
+
+## Modelo de datos
+
+El backend persiste la información en tres tablas principales (portables entre SQLite y PostgreSQL):
+
+### `actas`
+| Grupo | Columnas |
+|-------|----------|
+| Identificación | `id`, `folio` (único), `version` |
+| Generales | `sociedad`, `rfc_sociedad`, `tipo_asamblea`, `titulo`, `fecha`, `hora`, `lugar` |
+| Convocatoria | `convocatoria_fecha`, `convocatoria_medio`, `convocatoria_quien` |
+| Capital | `capital_social`, `acciones_totales`, `capital_presente`, `quorum_porcentaje` |
+| Mesa directiva | `presidente`, `secretario` |
+| Cuerpo (JSON) | `asistentes`, `orden_del_dia`, `acuerdos`, `clausulas`, `validacion_ia` |
+| Documento | `texto_legal`, `observaciones` |
+| Trazabilidad | `proveedor_ia`, `estatus`, `created_at`, `updated_at` |
+
+### `usuarios`
+| Campo | Descripción |
+|-------|-------------|
+| `id` (PK) | Autoincremental |
+| `email` (único) | Credencial de login |
+| `nombre_completo` | Nombre visible |
+| `rol` | `capturista`, `revisor`, `abogado_responsable`, `Administrador` |
+| `password_hash` | bcrypt, nunca expuesto por la API |
+| `activo` | Habilita/deshabilita la cuenta |
+| `reset_token`, `reset_token_expires` | Token de recuperación (1 hora) |
+| `created_at`, `updated_at` | Auditoría |
+
+### `bitacora_cambios`
+| Campo | Descripción |
+|-------|-------------|
+| `id` (PK) | Autoincremental |
+| `usuario_id` (FK) | Quién realizó la acción |
+| `accion` | `crear`, `actualizar`, `eliminar`, `cambiar_estatus`, `validar`, `restaurar_version`, `fijar_caducidad`, `exportar_zip`, etc. |
+| `entidad`, `entidad_id` | Recurso afectado (p. ej. `actas`, `42`) |
+| `datos_antes`, `datos_despues` | Retrato JSON del cambio |
+| `ip_origen`, `user_agent` | Contexto de la petición |
+| `created_at` | Marca de tiempo |
+
+Los catálogos (`tipo_asamblea`, `estatus`) se almacenan como `VARCHAR + CHECK` para portabilidad.
+
+---
+
 ## 4. Requisitos no funcionales (RNF)
 
 | ID | Requisito |
@@ -131,9 +179,9 @@ Endpoints de solo lectura y metadatos (`/api/v1/notaria/actas` y
 ## 5. Alcance del MVP vs. Post-MVP
 
 ### ✅ Entra en el MVP (ver `docs/MVP.md`) y en la versión entregada
-RF-01 a RF-10 (MVP original) más RF-11 a RF-15 de esta versión:
+RF-01 a RF-10 (MVP original) más RF-11 a RF-16 de esta versión:
 autenticación con roles (JWT + RBAC), interfaz de acceso separada y perfil por
-rol, bitácora de cambios, expediente ZIP y API para notarías.
+rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vivo por streaming (SSE).
 
 ### ❌ Queda fuera (post-escimiento actual)
 | Área | Qué queda fuera |
