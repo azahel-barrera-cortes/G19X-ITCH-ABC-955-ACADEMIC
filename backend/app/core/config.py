@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     )
     app_version: str = "0.1.0"
     environment: str = "development"
-    debug: bool = True
+    debug: bool = False
     api_v1_prefix: str = "/api/v1"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

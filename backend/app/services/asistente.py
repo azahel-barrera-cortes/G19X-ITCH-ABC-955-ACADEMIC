@@ -21,6 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.catalogos import etiqueta_tipo_asamblea
+from app.core import security
 from app.models.acta import Acta
 from app.models.enums import EstatusActa
 from app.schemas.acta import ActaGenerarPdfRequest
@@ -397,11 +398,12 @@ def _flujo_creacion(db, texto, sesion_id, autor):
 
 def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                       acta_id: Optional[int] = None, sesion_id: Optional[str] = None,
-                      autor: Optional[str] = None) -> Dict[str, Any]:
+                      autor: Optional[str] = None, usuario=None) -> Dict[str, Any]:
     texto = (mensaje or "").strip()
     # Sesión de creación en curso (incluye catálogo->elección de tipo).
     if sesion_id and obtener_sesion(sesion_id) is not None:
-        return _flujo_creacion(db, texto, sesion_id, autor)
+        autor_efectivo = (usuario.email if usuario is not None else None) or autor
+        return _flujo_creacion(db, texto, sesion_id, autor_efectivo)
     if not es_tema_valido(texto):
         return {"respuesta": MENSAJE_FUERA, "intencion": "fuera_de_tema",
                 "tema_valido": False,
@@ -499,6 +501,9 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                                       "Corrige: %s" % (acta.folio, destino, len(crit), det)),
                         "intencion": "aprobar", "tema_valido": True,
                         "acta": _dato_acta(acta), "validacion": val.model_dump(mode="json")}
+        if not (usuario is not None and security.tiene_nivel_minimo(usuario.rol, "abogado_responsable")):
+            return {"respuesta": "Tu rol no permite cambiar el estatus de actas.",
+                    "intencion": "aprobar", "tema_valido": True, "acta": _dato_acta(acta)}
         acta2 = actualizar_estatus(db, acta.id, destino)
         administracion.registrar_version(db, acta2, "Estatus a %s desde asistente" % destino)
         db.commit()
@@ -522,6 +527,9 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
         if num is None:
             return {"respuesta": ("Que version restauro? Ejemplo: restaura %s a la version 1."
                                   % acta.folio),
+                    "intencion": "restaurar", "tema_valido": True, "acta": dato}
+        if not (usuario is not None and security.tiene_nivel_minimo(usuario.rol, "abogado_responsable")):
+            return {"respuesta": "Tu rol no permite restaurar versiones.",
                     "intencion": "restaurar", "tema_valido": True, "acta": dato}
         try:
             acta2 = administracion.restaurar_version(db, acta.id, num)

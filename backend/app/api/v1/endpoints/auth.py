@@ -13,6 +13,7 @@ from app.core.exceptions import DatosActaInvalidosError
 from app.models.usuario import Usuario
 from app.schemas.acta import ApiMensaje
 from app.schemas.usuario import (
+    PerfilActualizar,
     ConfirmarResetPassword,
     LoginRequest,
     SolicitudResetPassword,
@@ -103,21 +104,12 @@ def perfil(usuario_actual: UsuarioActual) -> UsuarioRespuesta:
 )
 def actualizar_perfil(
     usuario_actual: UsuarioActual,
-    cambios: UsuarioActualizar,
+    cambios: PerfilActualizar,
     db: Session = Depends(get_db),
 ) -> UsuarioRespuesta:
     """Actualiza los datos del usuario autenticado."""
     if cambios.nombre_completo is not None:
         usuario_actual.nombre_completo = cambios.nombre_completo
-    if cambios.rol is not None:
-        if cambios.rol not in security.ROLES_VALIDOS:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Rol no válido. Roles permitidos: {', '.join(security.ROLES_VALIDOS)}.",
-            )
-        usuario_actual.rol = cambios.rol
-    if cambios.activo is not None:
-        usuario_actual.activo = cambios.activo
     if cambios.password is not None:
         usuario_actual.password_hash = security.hash_password(cambios.password)
     db.commit()

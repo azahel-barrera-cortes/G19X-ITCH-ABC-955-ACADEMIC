@@ -28,6 +28,13 @@ class UsuarioCrear(UsuarioBase):
     password: str = Field(min_length=6, max_length=128)
 
 
+class PerfilActualizar(BaseModel):
+    """Lo único que un usuario puede cambiar de sí mismo."""
+
+    nombre_completo: Optional[str] = Field(default=None, min_length=3, max_length=200)
+    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
+
+
 class UsuarioActualizar(BaseModel):
     """Petición de actualización parcial de usuario."""
 

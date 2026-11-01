@@ -72,7 +72,7 @@ def chatear(
     """Procesa un mensaje: creación guiada, validación, estatus y versiones."""
     resultado = motor.procesar_mensaje(
         db, payload.mensaje, payload.folio, payload.acta_id,
-        payload.sesion_id, payload.autor,
+        payload.sesion_id, usuario=_usuario,
     )
     return AsistenteChatResponse(**resultado)
 
