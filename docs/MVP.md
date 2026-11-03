@@ -43,8 +43,16 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
 
 ### Pruebas
-- 85 pruebas automatizadas pasando (55 de la versión anterior + 12 de seguridad,
-  autenticación y RBAC en `tests/test_auth.py`)
+- 85 pruebas automatizadas pasando, desglose por archivo:
+  - `test_administracion.py`: 11
+  - `test_ai_service.py`: 23
+  - `test_api_actas.py`: 9
+  - `test_asistente.py`: 6
+  - `test_auth.py`: 11
+  - `test_flujo_creacion.py`: 3
+  - `test_pdf_generator.py`: 5
+  - `test_plantillas_legales.py`: 17
+  - Total: 85
 - Build del frontend exitoso (Vite)
 
 ---
