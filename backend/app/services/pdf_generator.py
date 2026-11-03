@@ -59,16 +59,16 @@ FUENTE_BASE = "Helvetica"
 FUENTE_NEGRITA = "Helvetica-Bold"
 FUENTE_CURSIVA = "Helvetica-Oblique"
 
-COLOR_TITULO = colors.HexColor("#12213A")
-COLOR_ACENTO = colors.HexColor("#1F4E79")
-COLOR_LINEA = colors.HexColor("#9AA5B1")
-COLOR_FONDO = colors.HexColor("#F1F4F8")
+COLOR_TITULO = colors.HexColor("#037C5D")
+COLOR_ACENTO = colors.HexColor("#037C5D")
+COLOR_LINEA = colors.HexColor("#7CC3B2")
+COLOR_FONDO = colors.HexColor("#E5F2F0")
 COLOR_TEXTO_TENUE = colors.HexColor("#5A6472")
 
 COLOR_SEVERIDAD = {
     "critico": colors.HexColor("#B3261E"),
     "advertencia": colors.HexColor("#A15C00"),
-    "informativo": colors.HexColor("#1F4E79"),
+    "informativo": colors.HexColor("#037C5D"),
 }
 
 
