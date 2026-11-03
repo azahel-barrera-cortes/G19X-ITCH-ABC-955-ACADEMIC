@@ -73,6 +73,22 @@ def test_incluye_anexo_de_validacion(payload_acta: Dict[str, Any]) -> None:
     assert "VALIDACIÓN DE CONSISTENCIA" in texto
 
 
+def test_leyenda_firma_electronica_en_pdf(payload_acta: Dict[str, Any]) -> None:
+    payload = dict(payload_acta)
+    payload["firma_electronica"] = True
+    documento = _documento_desde_servicio(payload)
+    pdf_con_leyenda = build_acta_pdf(documento)
+
+    payload_sin = dict(payload_acta)
+    payload_sin["firma_electronica"] = False
+    documento_sin = _documento_desde_servicio(payload_sin)
+    pdf_sin_leyenda = build_acta_pdf(documento_sin)
+
+    assert pdf_con_leyenda != pdf_sin_leyenda
+    texto = _texto_del_pdf(pdf_con_leyenda)
+    assert "firma electrónica avanzada" in texto
+
+
 def test_build_acta_pdf_rechaza_valores_no_diccionario() -> None:
     with pytest.raises(TypeError):
         build_acta_pdf("no soy un diccionario")  # type: ignore[arg-type]
