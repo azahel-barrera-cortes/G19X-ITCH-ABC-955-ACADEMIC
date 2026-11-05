@@ -93,8 +93,10 @@ cd backend
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 
-# 2) Configuración (opcional; sin .env se usa SQLite y plantillas locales)
+# 2) Configuración: copia el ejemplo y genera tu SECRET_KEY
 copy .env.example .env
+.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+# pega el resultado en SECRET_KEY= dentro de backend/.env
 
 # 3) Arranque en desarrollo
 .venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
