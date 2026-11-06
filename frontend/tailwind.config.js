@@ -4,30 +4,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Paleta institucional alineada con el PDF corporativo (azul jurídico + dorado).
+        // Paleta verde institucional alineada con el PDF corporativo.
         corporativo: {
-          50: '#f2f6fb',
-          100: '#e2eaf6',
-          200: '#c4d5ec',
-          300: '#9bb6da',
-          400: '#6b8fc0',
-          500: '#1f4e79',
-          600: '#1a4164',
-          700: '#12213a',
-          800: '#0d1a2d',
+          50: '#e5f2f0',
+          100: '#d4ebe6',
+          200: '#a8d7cc',
+          300: '#7cc3b2',
+          400: '#50af98',
+          500: '#037c5d',
+          600: '#036a50',
+          700: '#025540',
+          800: '#023f30',
         },
         acento: {
-          100: '#f7efdc',
-          400: '#d3a84a',
-          500: '#b98a2f',
-          600: '#96701f',
+          100: '#e5f2f0',
+          400: '#037c5d',
+          500: '#037c5d',
+          600: '#025540',
         },
       },
       fontFamily: {
         sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        tarjeta: '0 1px 2px rgba(15, 32, 58, 0.06), 0 8px 24px rgba(15, 32, 58, 0.06)',
+        tarjeta: '0 1px 2px rgba(3, 124, 93, 0.06), 0 8px 24px rgba(3, 124, 93, 0.06)',
       },
     },
   },

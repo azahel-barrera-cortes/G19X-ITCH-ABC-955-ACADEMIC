@@ -74,3 +74,21 @@ def test_resumen_general(cliente_autenticado, payload_acta):
     assert r.status_code == 200
     assert r.json()["intencion"] == "resumen"
     assert r.json()["resumen"]["total_actas"] >= 1
+
+def test_capturista_no_cambia_estatus_por_chat(cliente_anonimo, cliente_autenticado, sesion, payload_acta):
+    from app.core import security
+    from app.models.usuario import Usuario
+    sesion.query(Usuario).filter(Usuario.email == "capturista@pgac.com").delete()
+    sesion.add(Usuario(email="capturista@pgac.com", nombre_completo="Usuario de Prueba", rol="capturista", password_hash=security.hash_password("secreto-1"), activo=True))
+    sesion.commit()
+    try:
+        acta = _crear_acta(cliente_autenticado, payload_acta)
+        login = cliente_anonimo.post("/api/v1/auth/login", json={"email": "capturista@pgac.com", "password": "secreto-1"})
+        cabeceras = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        r = cliente_anonimo.post("/api/v1/asistente/chat", json={"mensaje": f"Pasa el acta {acta['id']} a revision"}, headers=cabeceras)
+        assert "Tu rol no permite" in r.json()["respuesta"]
+        sigue = cliente_autenticado.get(f"/api/v1/actas/{acta['id']}").json()
+        assert sigue["estatus"] == acta["estatus"]
+    finally:
+        sesion.query(Usuario).filter(Usuario.email == "capturista@pgac.com").delete()
+        sesion.commit()

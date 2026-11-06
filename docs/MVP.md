@@ -43,7 +43,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
 
 ### Pruebas
-- 85 pruebas automatizadas pasando, desglose por archivo:
+- 87 pruebas automatizadas pasando, desglose por archivo:
   - `test_administracion.py`: 11
   - `test_ai_service.py`: 23
   - `test_api_actas.py`: 9
@@ -80,7 +80,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 - [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)
 - [ ] El asistente IA guía la creación de actas mediante conversación
 - [ ] La información de la empresa/sociedad se captura y se usa automáticamente al generar actas
-- [ ] Las 85 pruebas de backend pasan; el frontend builda sin errores.
+- [ ] Las 87 pruebas de backend pasan; el frontend builda sin errores.
 - [ ] Build del frontend exitoso
 
 ---

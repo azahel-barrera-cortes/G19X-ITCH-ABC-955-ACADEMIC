@@ -29,7 +29,7 @@ PGAC/
 │   │                              verificar_api_e2e.py, verificar_admin_e2e.py, verificar_ia_e2e.py,
 │   │                              diagnosticar_pdf.py
 │   ├── ejemplos/               acta_ejemplo.pdf y acta_e2e.pdf (PDF generados de muestra)
-│   ├── tests/                  85 pruebas automatizadas
+│   ├── tests/                  87 pruebas automatizadas
 │   └── app/
 │       ├── main.py                 FastAPI, CORS, manejadores de errores, /health
 │       ├── core/                   config, catálogos LGSM, formato, excepciones, security (bcrypt + JWT)
@@ -433,7 +433,7 @@ cabecera `Content-Disposition`, respetando acentos y espacios.
 
 ```powershell
 cd backend
-.venv\Scripts\python.exe -m pytest                            # 85 pruebas
+.venv\Scripts\python.exe -m pytest                            # 87 pruebas
 .venv\Scripts\python.exe scripts\generar_acta_ejemplo.py     # PDF de demostración
 .venv\Scripts\python.exe scripts\verificar_pdf.py            # inspecciona el PDF
 .venv\Scripts\python.exe scripts\verificar_rutas.py          # lista las rutas OpenAPI

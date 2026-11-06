@@ -224,7 +224,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 
 ## 7. Métricas de éxito del MVP
 
-- 85 pruebas de backend pasando
+- 87 pruebas de backend pasando
 - Build del frontend sin errores
 - PDF generado: ≥ 1 página, con encabezado, quórum y firmas
 - Validación de consistencia: puntaje visible y hallazgos listados

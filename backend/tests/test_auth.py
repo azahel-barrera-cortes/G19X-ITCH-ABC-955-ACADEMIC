@@ -235,3 +235,21 @@ def test_token_de_recuperacion_invalido_devuelve_422(cliente_anonimo) -> None:
     )
     assert respuesta.status_code == 422
 
+
+def test_capturista_no_puede_elevarse_por_me(cliente_anonimo, cliente_autenticado, sesion) -> None:
+    _crear_usuario(sesion, "capturista@pgac.com", "capturista")
+    try:
+        login = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": "capturista@pgac.com", "password": "secreto-1"},
+        )
+        cabeceras = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        r = cliente_anonimo.put(
+            "/api/v1/auth/me",
+            json={"rol": "Administrador", "activo": True},
+            headers=cabeceras,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["rol"] == "capturista"
+    finally:
+        _borrar_usuario(sesion, "capturista@pgac.com")
