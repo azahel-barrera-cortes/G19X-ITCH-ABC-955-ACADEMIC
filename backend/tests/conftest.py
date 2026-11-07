@@ -21,6 +21,7 @@ DIRECTORIO_TEMPORAL = Path(tempfile.mkdtemp(prefix="pgac-tests-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(DIRECTORIO_TEMPORAL / 'pruebas.db').as_posix()}"
 os.environ["AI_PROVIDER"] = "plantillas"
 os.environ["AUTO_CREATE_TABLES"] = "true"
+os.environ["SECRET_KEY"] = "clave-de-prueba-para-tests-1234567890"
 os.environ["SQL_ECHO"] = "false"
 
 import pytest  # noqa: E402

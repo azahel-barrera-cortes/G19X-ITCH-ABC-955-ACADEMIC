@@ -11,11 +11,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py  ->  parents[2] == carpeta `backend/`
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
+
+CLAVE_DE_EJEMPLO = "cambiar_en_produccion_clave_secreta_minimo_32_caracteres"
 
 class Settings(BaseSettings):
     """Parámetros de ejecución de la API, la base de datos, el PDF y la IA."""
@@ -82,11 +85,19 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-1.5-pro"
 
     # --- Seguridad / autenticación ------------------------------------------
-    secret_key: str = "cambiar_en_produccion_clave_secreta_minimo_32_caracteres"
+    secret_key: str = CLAVE_DE_EJEMPLO
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 días
 
     # --- Derivados ----------------------------------------------------------
+    @model_validator(mode="after")
+    def _validar_secret_key(self) -> "Settings":
+        if not self.secret_key.strip():
+            raise ValueError("SECRET_KEY está vacía: genérala como dice backend/.env.example")
+        if self.environment == "production" and self.secret_key == CLAVE_DE_EJEMPLO:
+            raise ValueError("Cambia SECRET_KEY antes de usar producción.")
+        return self
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Orígenes CORS como lista, ignorando entradas vacías."""
