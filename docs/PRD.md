@@ -68,10 +68,10 @@ El sistema debe permitir capturar y persistir los datos de la sociedad que compa
 ### RF-11: Autenticación y control de acceso por roles (RBAC)
 El sistema debe exigir autenticación para toda operación del dominio:
 - El primer usuario registrado se crea como `Administrador`; los registros
-  públicos posteriores se asignan forzosamente como `capturista` (cualquier
-  usuario autenticado puede elevar su propio rol desde `PUT /api/v1/auth/me`;
-  solo un Administrador puede elevar el rol de otros usuarios desde
-  `PUT /api/v1/auth/users/{id}`).
+   públicos posteriores se asignan forzosamente como `capturista` (Cada
+   usuario puede cambiar su nombre y su contraseña desde `PUT /api/v1/auth/me`;
+   sólo un Administrador cambia roles o activa cuentas desde
+   `PUT /api/v1/auth/users/{id}`).
 - Inicio de sesión con email y contraseña (bcrypt); devolución de un JWT
   firmado (HS256) con expiración configurada.
 - Roles con privilegios crecientes: `capturista` (1) < `revisor` (2) <
@@ -134,6 +134,8 @@ El backend persiste la información en tres tablas principales (portables entre 
 | Mesa directiva | `presidente`, `secretario` |
 | Cuerpo (JSON) | `asistentes`, `orden_del_dia`, `acuerdos`, `clausulas`, `validacion_ia` |
 | Documento | `texto_legal`, `observaciones` |
+| Empresa | `tipo_sociedad`, `logo_empresa`, `firma_electronica`, `usar_info_empresa` |
+| Empresa | `tipo_sociedad`, `logo_empresa`, `firma_electronica`, `usar_info_empresa` |
 | Trazabilidad | `proveedor_ia`, `estatus`, `created_at`, `updated_at` |
 
 ### `usuarios`
@@ -215,9 +217,9 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 - El JWT se almacena en `localStorage` del navegador (exposición ante XSS);
   recomiéndase HTTPS y, a futuro, cookies `HttpOnly`.
 - No hay aislamiento multiempresa: un revisor+ puede consultar todas las
-  actas del repositorio.
-- El asistente conversacional opera con el usuario autenticado, pero no
-  restringe intenciones por rol (un usuario autenticado puede pedir por chat
+- El asistente conversacional exige rol `abogado_responsable` (o superior)
+   para cambiar el estatus de un acta y restaurar versiones anteriores;
+   las demás intenciones respetan el RBAC del usuario autenticado.
   cambios de estatus que, en el flujo guiado, requieren un rol superior).
 
 ---

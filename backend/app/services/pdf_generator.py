@@ -294,7 +294,7 @@ class _CanvasActaLegal(lienzo.Canvas):
             self.drawCentredString(
                 ancho / 2,
                 0.65 * cm,
-                "Este acta cuenta con firma electrónica avanzada conforme a la normativa aplicable.",
+                "Documento preparado para firma electrónica.",
             )
         self.line(self._margen, 1.35 * cm, ancho - self._margen, 1.35 * cm)
         self.restoreState()

@@ -155,9 +155,9 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    ni ninguna función de actas, así que nadie puede ver ni modificar nada sin
    entrar. El **primer usuario registrado** se crea como `Administrador`
    (arranque del sistema); los autoregistros posteriores quedan siempre como
-   `capturista`; cualquier usuario autenticado puede elevar su propio rol
-   desde `PUT /api/v1/auth/me`; solo un Administrador puede elevar el rol de
-   otros usuarios desde `PUT /api/v1/auth/users/{id}`.
+    `capturista`; Cada usuario puede cambiar su nombre y su contraseña desde
+    `PUT /api/v1/auth/me`; sólo un Administrador cambia roles o activa cuentas
+    desde `PUT /api/v1/auth/users/{id}`.
    Tras un acceso correcto se abre **Mi perfil**, que muestra las funciones
    permitidas según el rol; la barra lateral y la navegación móvil solo
    presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca ni
@@ -183,9 +183,9 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 | **Administrador** | Mi perfil (funciones de su rol) | Todas las secciones | Acceso total: gestionar usuarios (listar, cambiar rol, activar/desactivar), eliminar actas, todo lo anterior |
 
 > El primer usuario registrado se crea automáticamente como `Administrador`.
-> Los autoregistros posteriores quedan siempre como `capturista`; cualquier
-> usuario autenticado puede elevar su propio rol desde `PUT /api/v1/auth/me`;
-> solo un Administrador puede elevar el rol de otros usuarios desde
+> Los autoregistros posteriores quedan siempre como `capturista`; Cada usuario
+> puede cambiar su nombre y su contraseña desde `PUT /api/v1/auth/me`; sólo un
+> Administrador cambia roles o activa cuentas desde
 > `PUT /api/v1/auth/users/{id}`.
 
 ## 5. Endpoints de la API

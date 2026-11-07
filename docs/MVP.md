@@ -95,8 +95,8 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
   monetaria estricta migrar a `Numeric`/`Decimal`.
 - La recuperación de contraseña no envía mail: en `DEBUG` el token viaja en la
   respuesta (se debe eliminar antes de la producción).
-- El asistente conversacional opera con el usuario autenticado, pero no
-  restringe intenciones por rol dentro del chat.
+- El asistente conversacional exige rol `abogado_responsable` (o superior)
+   para cambiar el estatus de un acta y restaurar versiones anteriores.
 - El front-end guarda la sesión (JWT + usuario) en `localStorage`: si se
   evalúa un entorno multi-usuario, migrar a cookies `HttpOnly` + `Secure`.
 
