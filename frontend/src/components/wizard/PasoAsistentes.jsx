@@ -146,6 +146,7 @@ export default function PasoAsistentes({ estado, actualizarCampo, despachar, cal
       ) : null}
 
       {errores.asistentes ? <Alerta tono="error">{errores.asistentes}</Alerta> : null}
+      {errores.capital_presente ? <Alerta tono="error">{errores.capital_presente}</Alerta> : null}
 
       <div className="space-y-3">
         {estado.asistentes.map((asistente, indice) => (

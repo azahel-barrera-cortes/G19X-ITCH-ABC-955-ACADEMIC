@@ -159,7 +159,15 @@ class ActaBase(BaseSchema):
         """Deriva datos que el usuario puede omitir para reducir errores de captura."""
         # 1) Quórum porcentual a partir del capital presente.
         if self.quorum_porcentaje is None and self.capital_presente is not None and self.capital_social:
-            self.quorum_porcentaje = round(self.capital_presente / self.capital_social * 100, 4)
+            if self.capital_presente > self.capital_social:
+                raise ValueError(
+                    "El capital representado no puede exceder el capital social. "
+                    f"Capital social: {self.capital_social:,.2f}, "
+                    f"capital representado: {self.capital_presente:,.2f}."
+                )
+            self.quorum_porcentaje = min(
+                100, round(self.capital_presente / self.capital_social * 100, 4)
+            )
 
         # 2) Porcentaje de capital de cada asistente cuando se conoce su tenencia.
         base_acciones = self.acciones_totales or self.capital_social

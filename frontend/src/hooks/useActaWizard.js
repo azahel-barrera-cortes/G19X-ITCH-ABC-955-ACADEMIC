@@ -323,6 +323,12 @@ export function validarPaso(paso, estado) {
     if (totalAcciones > 0 && sumaAcciones > totalAcciones + 0.001) {
       errores.asistentes = 'La suma de acciones de los asistentes excede el total en circulación.'
     }
+    const capitalSocial = Number(estado.capital_social) || 0
+    const capitalPresente = Number(estado.capital_presente) || 0
+    if (capitalSocial > 0 && capitalPresente > capitalSocial) {
+      errores.capital_presente =
+        'El capital representado no puede exceder el capital social.'
+    }
   }
 
   if (paso === 3) {
@@ -375,7 +381,7 @@ export function useActaWizard(estadoInicial) {
         ? (Number(estado.capital_presente) / Number(estado.capital_social)) * 100
         : null
     const porAcciones = accionesTotales > 0 ? (accionesPresentes / accionesTotales) * 100 : 0
-    const quorum = explicito ?? porCapital ?? porAcciones
+    const quorum = Math.min(100, explicito ?? porCapital ?? porAcciones)
 
     return {
       accionesTotales,
