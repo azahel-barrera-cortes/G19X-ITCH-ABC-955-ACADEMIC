@@ -95,65 +95,139 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
   return (
     <div className="space-y-4">
       {!compacto ? (
-        <header>
-          <h1 className="text-lg font-semibold text-corporativo-700">{titulo || 'Asistente IA de actas'}</h1>
+        <header className="mb-2">
+          <h1 className="text-lg font-semibold text-corporativo-700 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-corporativo-100 text-corporativo-700 text-sm font-bold">IA</span>
+            {titulo || 'Asistente IA de actas'}
+          </h1>
           <p className="text-sm text-slate-500">Te acompaña a crear el acta paso a paso, genera texto + PDF y lleva el control (folio, fecha, autor, caducidad, versión).</p>
         </header>
       ) : null}
       {sesionId ? <Alerta tono="info" titulo={`Creación en curso · sesión ${sesionId}`}>Responde el dato pedido o escribe «cancelar» para empezar de nuevo.</Alerta> : null}
-      {error ? <Alerta tono="error" titulo="Sin conexion al asistente">{error}</Alerta> : null}
-      <Tarjeta>
-        <TarjetaEncabezado titulo={compacto ? 'Asistente IA' : 'Conversacion'} descripcion="Creación guiada de actas" acciones={<Etiqueta tono="info">IA interna</Etiqueta>} />
-        <TarjetaCuerpo>
-          <div className="max-h-96 space-y-3 overflow-y-auto">
-            {mensajes.map((m, i) => (
-              <div key={i} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${burbujaClase(m.origen)}`}>
-                <p className="whitespace-pre-line">{m.texto}</p>
-                {m.progreso ? <p className="mt-1 text-xs opacity-70">Progreso: {m.progreso.completados}/{m.progreso.total} datos</p> : null}
-                {m.tipos?.length ? (
-                  <ul className="mt-2 space-y-1">
-                    {m.tipos.map((t) => (
-                      <li key={t.valor}>
-                        <button type="button" onClick={() => enviar(t.etiqueta)} className="w-full rounded-lg bg-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-200">
-                          <span className="font-semibold">{t.etiqueta}</span> — {t.descripcion}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {m.acta ? <p className="mt-2 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600">{m.acta.folio} · {m.acta.estatus} · v{m.acta.version}{m.acta.creado_por ? ` · por ${m.acta.creado_por}` : ''}</p> : null}
-                {m.control ? (
-                  <div className="mt-2 rounded-lg bg-emerald-50 px-2 py-1 text-xs text-emerald-900 ring-1 ring-inset ring-emerald-200">
-                    <p className="font-semibold">Control: {m.control.folio} · v{m.control.version}</p>
-                    <p>Fecha: {m.control.fecha_acta} · Creada: {m.control.fecha_creacion || '—'} · Por: {m.control.creado_por || '—'}</p>
-                    <p>Caducidad: {m.control.fecha_caducidad || 'sin fecha'} ({m.control.estado_caducidad})</p>
-                    <div className="mt-1"><Boton tamano="sm" variante="primario" cargando={descargando} onClick={() => descargar(m.actaId || m.control.acta_id, m.control.pdf_nombre)}>Descargar PDF ({m.control.pdf_paginas || '?'} págs.)</Boton></div>
-                  </div>
-                ) : null}
-                {m.borrador && onUsarBorrador ? <div className="mt-2"><Boton tamano="sm" variante="secundario" onClick={() => onUsarBorrador(m)}>Usar en formulario</Boton></div> : null}
-                {m.acciones?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.acciones.map((a, j) => (
-                      <button key={j} type="button" onClick={() => accionar(a)} className="rounded-full bg-corporativo-50 px-2.5 py-1 text-xs font-medium text-corporativo-700 ring-1 ring-inset ring-corporativo-200 hover:bg-corporativo-100">{a.etiqueta}</button>
-                    ))}
-                  </div>
-                ) : null}
+      {error ? <Alerta tono="error" titulo="Sin conexión al asistente">{error}</Alerta> : null}
+
+      {/* Contenedor principal con borde animado estilo Apple (difuminado de color rotativo) */}
+      <div className="relative rounded-3xl p-[2px] bg-white">
+        <div
+          className="absolute inset-0 rounded-3xl p-[2px] bg-gradient-to-r from-corporativo-500 via-acento-400 to-corporativo-500 blur opacity-60 animate-spin pointer-events-none"
+          aria-hidden="true"
+        ></div>
+        <div className="relative z-10 rounded-2xl bg-white overflow-hidden flex flex-col h-full">
+          <Tarjeta className="border-none shadow-none p-0 mb-0">
+            <TarjetaEncabezado
+              titulo="Conversación"
+              descripcion="Creación guiada de actas"
+              acciones={<Etiqueta tono="info">IA interna</Etiqueta>}
+            />
+            <TarjetaCuerpo className="p-0">
+          {/* Espacio grande para ver los mensajes entre el usuario y la IA */}
+          <div className="flex-1 min-h-[320px] max-h-[520px] overflow-y-auto p-6 space-y-5">
+            {mensajes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
+                <p className="font-medium">Sin mensajes aún</p>
+                <p className="mt-1 text-xs">Escribe «Quiero crear un acta» para comenzar.</p>
               </div>
-            ))}
-            {cargando ? <p className="text-xs text-slate-400">El asistente esta pensando…</p> : null}
-            <div ref={finRef} />
+            ) : (
+              <>
+                {mensajes.map((m, i) => (
+                  <div key={i} className={`max-w-[90%] rounded-2xl px-4 py-3.5 text-sm ${burbujaClase(m.origen)} shadow-sm border`}>
+                    <p className="whitespace-pre-line leading-relaxed">{m.texto}</p>
+                    {m.progreso ? <p className="mt-2 text-xs opacity-80">Progreso: {m.progreso.completados}/{m.progreso.total} datos</p> : null}
+                    {m.tipos?.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {m.tipos.map((t) => (
+                          <li key={t.valor}>
+                            <button
+                              type="button"
+                              onClick={() => enviar(t.etiqueta)}
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 transition"
+                            >
+                              <span className="font-semibold text-corporativo-700">{t.etiqueta}</span> — {t.descripcion}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {m.acta ? (
+                      <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 border border-slate-100">
+                        {m.acta.folio} · {m.acta.estatus} · v{m.acta.version}{m.acta.creado_por ? ` · por ${m.acta.creado_por}` : ''}
+                      </p>
+                    ) : null}
+                    {m.control ? (
+                      <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900 border border-emerald-100">
+                        <p className="font-semibold mb-1">Control: {m.control.folio} · v{m.control.version}</p>
+                        <p className="mb-1">Fecha: {m.control.fecha_acta} · Creada: {m.control.fecha_creacion || '—'} · Por: {m.control.creado_por || '—'}</p>
+                        <p className="mb-2">Caducidad: {m.control.fecha_caducidad || 'sin fecha'} ({m.control.estado_caducidad})</p>
+                        <Boton tamano="sm" variante="primario" cargando={descargando} onClick={() => descargar(m.actaId || m.control.acta_id, m.control.pdf_nombre)}>
+                          Descargar PDF ({m.control.pdf_paginas || '?'} págs.)
+                        </Boton>
+                      </div>
+                    ) : null}
+                    {m.borrador && onUsarBorrador ? (
+                      <div className="mt-3"><Boton tamano="sm" variante="secundario" onClick={() => onUsarBorrador(m)}>Usar en formulario</Boton></div>
+                    ) : null}
+                    {m.acciones?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {m.acciones.map((a, j) => (
+                          <button
+                            key={j}
+                            type="button"
+                            onClick={() => accionar(a)}
+                            className="rounded-full bg-corporativo-50 px-3 py-1.5 text-xs font-semibold text-corporativo-700 border border-corporativo-200 hover:bg-corporativo-100 transition"
+                          >
+                            {a.etiqueta}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                {cargando ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <span className="h-3 w-3 rounded-full border-2 border-corporativo-500 border-t-transparent animate-spin"></span>
+                    El asistente está pensando…
+                  </div>
+                ) : null}
+                <div ref={finRef} />
+              </>
+            )}
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {ejemplos.map((s) => (
-              <button key={s} type="button" disabled={cargando} onClick={() => enviar(s)} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-50">{s}</button>
-            ))}
+          {/* Opciones en botones (sugerencias rápidas) */}
+          <div className="p-6 border-t border-slate-100 bg-slate-50/50">
+            <div className="flex flex-wrap gap-2 pb-3">
+              {ejemplos.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={cargando}
+                  onClick={() => enviar(s)}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm border border-slate-200 hover:bg-corporativo-50 hover:text-corporativo-700 hover:border-corporativo-300 transition disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
-          <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); enviar() }}>
-            <input className="campo flex-1" value={entrada} onChange={(e) => setEntrada(e.target.value)} placeholder={sesionId ? 'Responde el dato pedido…' : 'Quiero crear un acta…'} aria-label="Mensaje" />
-            <Boton type="submit" variante="primario" cargando={cargando}>Enviar</Boton>
+
+          {/* Entrada de texto para pedir el acta */}
+          <form className="p-6 border-t border-slate-100 bg-white" onSubmit={(e) => { e.preventDefault(); enviar() }}>
+            <div className="flex gap-2">
+              <input
+                className="campo flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:ring-2 focus:ring-corporativo-500 focus:border-transparent outline-none transition"
+                value={entrada}
+                onChange={(e) => setEntrada(e.target.value)}
+                placeholder={sesionId ? 'Responde el dato pedido…' : 'Quiero crear un acta…'}
+                aria-label="Mensaje"
+              />
+              <Boton type="submit" variante="primario" cargando={cargando} className="px-4">
+                Enviar
+              </Boton>
+            </div>
           </form>
         </TarjetaCuerpo>
       </Tarjeta>
+        </div>
+      </div>
     </div>
   )
 }
