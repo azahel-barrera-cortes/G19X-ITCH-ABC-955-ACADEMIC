@@ -70,6 +70,12 @@ export const SECCIONES_SISTEMA = [
     descripcion: 'Chat de actas: redacta, valida y crea guiado',
   },
   {
+    id: 'perfil',
+    minimo: 'capturista',
+    etiqueta: 'Perfil',
+    descripcion: 'Mis datos, funciones y sesión',
+  },
+  {
     id: 'biblioteca',
     minimo: 'revisor',
     etiqueta: 'Biblioteca de actas',

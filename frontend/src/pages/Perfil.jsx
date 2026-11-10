@@ -6,6 +6,7 @@ import Alerta from '../components/ui/Alerta.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { actualizarPerfil, cambiarPassword } from '../api/auth.js'
 import { ROLES, etiquetaRol, seccionesConAcceso } from '../constants/roles.js'
+import InformacionEmpresa from './InformacionEmpresa.jsx'
 
 const ROLES_PERFIL = ROLES
 
@@ -60,11 +61,17 @@ export default function Perfil({ onCambiarVista = null }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 py-6">
+    <div className="mx-auto max-w-7xl space-y-6 py-6">
       <header>
         <h1 className="text-xl font-semibold text-corporativo-700">Mi perfil</h1>
-        <p className="text-sm text-slate-500">Gestiona tu información personal y tu contraseña.</p>
+        <p className="text-sm text-slate-500">
+          Gestiona tu información personal, tu contraseña y los datos de la sociedad.
+        </p>
       </header>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Izquierda: bloque de Perfil */}
+        <div className="space-y-6">
 
       {/* Funciones permitidas al rol: es lo primero que ve el usuario al entrar. */}
       <Tarjeta>
@@ -164,6 +171,13 @@ export default function Perfil({ onCambiarVista = null }) {
           </Boton>
         </div>
       </Tarjeta>
+        </div>
+
+        {/* Derecha: bloque de Información de la empresa o sociedad */}
+        <div className="space-y-6">
+          <InformacionEmpresa />
+        </div>
+      </div>
     </div>
   )
 }

@@ -18,28 +18,6 @@ const SECCIONES = [
     ),
   },
   {
-    id: 'biblioteca',
-    etiqueta: 'Biblioteca de actas',
-    descripcion: 'Historial, estatus, PDF y edición',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5.5A2.5 2.5 0 016.5 3H20v15H6.5A2.5 2.5 0 004 20.5V5.5z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20.5A2.5 2.5 0 016.5 18H20" />
-      </svg>
-    ),
-  },
-  {
-    id: 'administracion',
-    etiqueta: 'Administración',
-    descripcion: 'Versiones, vigencia y caducidad',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3m9-9h-3M6 12H3m14.5-5.5l-2 2m-7 7l-2 2m11 0l-2-2m-7-7l-2-2" />
-        <circle cx="12" cy="12" r="3.2" />
-      </svg>
-    ),
-  },
-  {
     id: 'asistente',
     etiqueta: 'Asistente IA',
     descripcion: 'Chat de actas: redacta, valida y aprueba',
@@ -47,6 +25,16 @@ const SECCIONES = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-13.2 8L3 21l1.1-4.4A9 9 0 1121 12z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'perfil',
+    etiqueta: 'Perfil',
+    descripcion: 'Mis datos, funciones y sesión',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     ),
   },
@@ -62,19 +50,9 @@ const SECCIONES = [
       </svg>
     ),
   },
-  {
-    id: 'empresa',
-    etiqueta: 'Información de la empresa o sociedad',
-    descripcion: 'Datos de la sociedad, tipo, logo y firma electrónica',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
 ]
 
-export default function BarraLateral({ seccion, onCambiarSeccion, seccionesVisibles = null }) {
+export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null }) {
   // Solo se muestran las secciones que el rol del usuario tiene permitidas.
   const secciones = seccionesVisibles
     ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
@@ -128,7 +106,18 @@ export default function BarraLateral({ seccion, onCambiarSeccion, seccionesVisib
         })}
       </nav>
 
-      <div className="border-t border-slate-200 px-5 py-3">
+      <div className="flex-1" />
+
+      <div className="border-t border-slate-200 px-5 py-3 space-y-3">
+        {onCerrarSesion && (
+          <button
+            type="button"
+            onClick={() => onCerrarSesion()}
+            className="w-full rounded-xl px-3 py-2.5 text-left text-red-600 font-medium hover:bg-red-50 transition border border-red-100"
+          >
+            Cerrar sesión
+          </button>
+        )}
         <p className="text-[11px] leading-snug text-slate-400">
           La IA asiste la redacción; la revisión legal final corresponde al abogado responsable.
         </p>

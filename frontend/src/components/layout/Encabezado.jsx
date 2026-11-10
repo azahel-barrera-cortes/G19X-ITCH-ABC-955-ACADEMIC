@@ -98,13 +98,6 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
             </span>
             <button
               type="button"
-              onClick={() => onIrAPerfil && onIrAPerfil('perfil')}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-corporativo-600 hover:bg-corporativo-50"
-            >
-              Mi perfil
-            </button>
-            <button
-              type="button"
               onClick={() => onCerrarSesion && onCerrarSesion()}
               className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
             >

@@ -141,6 +141,7 @@ function Aplicacion() {
       <BarraLateral
         seccion={seccion}
         onCambiarSeccion={cambiarSeccion}
+        onCerrarSesion={manejarCerrarSesion}
         seccionesVisibles={seccionesVisibles}
       />
 
