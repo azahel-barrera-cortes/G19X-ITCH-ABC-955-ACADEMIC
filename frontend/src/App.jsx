@@ -13,9 +13,24 @@ import Acceso from './pages/Acceso.jsx'
 import Perfil from './pages/Perfil.jsx'
 import { obtenerCatalogos } from './api/client.js'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
-import { seccionesPermitidas } from './constants/roles.js'
+import { seccionesPermitidas, SECCIONES_SISTEMA } from './constants/roles.js'
 
 const CLAVE_INFO_EMPRESA = 'pgac_info_empresa'
+const CLAVE_SECCION = 'pgac_seccion'
+
+/** IDs de sección válidas (espejo de las secciones del sistema). */
+const SECCIONES_VALIDAS = SECCIONES_SISTEMA.map((seccion) => seccion.id)
+
+/**
+ * Lee el hash de la URL (`#/asistente`) y devuelve el id de sección si es
+ * válido, o `null` si no hay hash o el id no es válido.
+ */
+function seccionDesdeHash() {
+  const hash = window.location.hash
+  if (!hash) return null
+  const id = hash.replace(/^#\//, '')
+  return SECCIONES_VALIDAS.includes(id) ? id : null
+}
 
 /**
  * Raíz de la aplicación: envuelve todo en el proveedor de autenticación.
@@ -35,7 +50,17 @@ export default function App() {
 
 function Aplicacion() {
   const { autenticado, usuario, cerrarSesion } = useAuth()
-  const [seccion, setSeccion] = useState('perfil')
+  const [seccion, setSeccion] = useState(() => {
+    const desdeHash = seccionDesdeHash()
+    if (desdeHash) return desdeHash
+    try {
+      const guardado = sessionStorage.getItem(CLAVE_SECCION)
+      if (guardado && SECCIONES_VALIDAS.includes(guardado)) return guardado
+    } catch {
+      /* silent */
+    }
+    return 'perfil'
+  })
   const [vistaGenerar, setVistaGenerar] = useState('panel')
   const [plantillaTipo, setPlantillaTipo] = useState(null)
   const [actaEnEdicion, setActaEnEdicion] = useState(null)
@@ -80,6 +105,36 @@ function Aplicacion() {
       setVistaGenerar('panel')
     }
   }, [autenticado, seccion, seccionesVisibles])
+
+  // Mantiene la URL (`#/seccion`) y el sessionStorage sincronizados con la
+  // sección actual para que al refrescar la página el usuario se quede en
+  // la misma sección en la que estaba.
+  useEffect(() => {
+    if (!autenticado) return
+    const hash = seccionDesdeHash()
+    if (hash !== seccion) {
+      history.pushState(null, '', `#/${seccion}`)
+    }
+    try {
+      sessionStorage.setItem(CLAVE_SECCION, seccion)
+    } catch {
+      /* silent */
+    }
+  }, [seccion, autenticado])
+
+  // Navegación con Atrás / Adelante del navegador entre secciones de la app.
+  useEffect(() => {
+    const manejarPopstate = () => {
+      const desdeHash = seccionDesdeHash()
+      if (desdeHash) {
+        setSeccion(desdeHash)
+      }
+    }
+    window.addEventListener('popstate', manejarPopstate)
+    return () => {
+      window.removeEventListener('popstate', manejarPopstate)
+    }
+  }, [])
 
   const editarActa = useCallback((acta) => {
     setActaEnEdicion(acta)
@@ -127,6 +182,8 @@ function Aplicacion() {
     cerrarSesion()
     volverAlPanel()
     setSeccion('perfil')
+    history.replaceState(null, '', '')
+    sessionStorage.removeItem(CLAVE_SECCION)
   }, [cerrarSesion, volverAlPanel])
 
   // ── Compuerta de acceso ─────────────────────────────────────────────────
