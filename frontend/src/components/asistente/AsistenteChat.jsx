@@ -93,7 +93,7 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-corporativo-50 min-h-screen">
       {!compacto ? (
         <header className="mb-2">
           <h1 className="text-lg font-semibold text-corporativo-700 flex items-center gap-2">
@@ -113,10 +113,10 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
           className="absolute inset-[-3px] rounded-[calc(3xl+3px)] bg-[conic-gradient(from_0deg_at_50%_50%_,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#8b00ff,#ff0000)] animate-[spin_4s_linear_infinite] pointer-events-none -z-10 opacity-100"
           aria-hidden="true"
         ></div>
-        <div className="relative z-10 overflow-hidden flex flex-col h-full">
+        <div className="relative z-10 overflow-hidden flex flex-col h-full" border="4">
           <Tarjeta className="border-none shadow-none p-0 mb-0">
             <TarjetaEncabezado
-              titulo="Conversación"
+              titulo="¿Que haremos hoy?"
               descripcion="Creación guiada de actas"
               acciones={<Etiqueta tono="info">IA interna</Etiqueta>}
             />
