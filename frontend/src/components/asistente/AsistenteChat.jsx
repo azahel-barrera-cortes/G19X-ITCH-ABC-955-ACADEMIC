@@ -110,10 +110,11 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
       <div className="relative rounded-3xl p-[3px] bg-white">
         {/* Borde de arcoíris que se mueve (gradiente cónico rotativo) */}
         <div
-          className="absolute inset-0 rounded-3xl p-[3px] bg-[conic-gradient(from_0deg_at_50%_50%_,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#8b00ff,#ff0000)] animate-[spin_4s_linear_infinite] pointer-events-none opacity-90"
+          className="absolute inset-0 rounded-3xl bg-[conic-gradient(from_0deg_at_50%_50%_,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#8b00ff,#ff0000)] animate-[spin_4s_linear_infinite] pointer-events-none opacity-100"
           aria-hidden="true"
         ></div>
-        <div className="relative z-10 rounded-2xl bg-white overflow-hidden flex flex-col h-full">
+        {/* Centro blanco que cubre todo excepto el borde de 3px */}
+        <div className="absolute inset-[3px] z-10 rounded-[calc(3xl-3px)] bg-white overflow-hidden flex flex-col h-full">
           <Tarjeta className="border-none shadow-none p-0 mb-0">
             <TarjetaEncabezado
               titulo="Conversación"
