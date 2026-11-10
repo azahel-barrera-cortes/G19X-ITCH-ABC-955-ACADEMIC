@@ -106,10 +106,11 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
       {sesionId ? <Alerta tono="info" titulo={`Creación en curso · sesión ${sesionId}`}>Responde el dato pedido o escribe «cancelar» para empezar de nuevo.</Alerta> : null}
       {error ? <Alerta tono="error" titulo="Sin conexión al asistente">{error}</Alerta> : null}
 
-      {/* Contenedor principal con borde animado estilo Apple (difuminado de color rotativo) */}
-      <div className="relative rounded-3xl p-[2px] bg-white">
+      {/* Contenedor principal con borde arcoíris animado */}
+      <div className="relative rounded-3xl p-[3px] bg-white">
+        {/* Borde de arcoíris que se mueve (gradiente cónico rotativo) */}
         <div
-          className="absolute inset-0 rounded-3xl p-[2px] bg-gradient-to-r from-corporativo-500 via-acento-400 to-corporativo-500 blur opacity-60 animate-spin pointer-events-none"
+          className="absolute inset-0 rounded-3xl p-[3px] bg-[conic-gradient(from_0deg_at_50%_50%_,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#8b00ff,#ff0000)] animate-[spin_4s_linear_infinite] pointer-events-none opacity-90"
           aria-hidden="true"
         ></div>
         <div className="relative z-10 rounded-2xl bg-white overflow-hidden flex flex-col h-full">
