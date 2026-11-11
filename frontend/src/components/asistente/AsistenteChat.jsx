@@ -93,7 +93,7 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
   }
 
   return (
-    <div className="w-full space-y-4 bg-corporativo-100 min-h-screen">
+    <div className="w-full space-y-4 bg-slate-100 min-h-screen">
       {!compacto ? (
         <header className="mb-2">
           <h1 className="text-lg font-semibold text-corporativo-700 flex items-center gap-2">

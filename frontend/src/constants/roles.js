@@ -6,13 +6,14 @@
  * para que nadie vea funciones que no le corresponden.
  *
  * Niveles (un número mayor incluye los permisos del menor):
- *   capturista (1) < revisor (2) < abogado_responsable (3) < Administrador (4)
+ *   capturista (1) < revisor (2) < abogado_responsable (3) < Administrador (4) < SuperAdministrador (5)
  */
 export const NIVEL_ROL = {
   capturista: 1,
   revisor: 2,
   abogado_responsable: 3,
   Administrador: 4,
+  SuperAdministrador: 5,
 }
 
 export const ROLES = [
@@ -35,6 +36,11 @@ export const ROLES = [
     valor: 'Administrador',
     etiqueta: 'Administrador',
     descripcion: 'Acceso total: gestiona usuarios y puede eliminar actas.',
+  },
+  {
+    valor: 'SuperAdministrador',
+    etiqueta: 'Super Administrador',
+    descripcion: 'Acceso absoluto a todo el sistema: panel global de superadministración, gestión de empresas, usuarios, vitácora y seguridad.',
   },
 ]
 
@@ -104,6 +110,12 @@ export const SECCIONES_SISTEMA = [
     minimo: 'Administrador',
     etiqueta: 'Administrador',
     descripcion: 'Panel de administración de la empresa',
+  },
+  {
+    id: 'superadministrador',
+    minimo: 'SuperAdministrador',
+    etiqueta: 'Super Administrador',
+    descripcion: 'Panel global de superadministración del sistema',
   },
 ]
 

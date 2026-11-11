@@ -22,12 +22,12 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
-| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = Administrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol |
+| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = SuperAdministrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol, semilla inicial de Super Administrador via variables de entorno |
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
 | Endpoints | `GET /health`, catálogos, `redactar`, `redactar-stream`, `generar-pdf`, CRUD de actas, `estatus`, `pdf`, `validar`, `bitacora`, `expediente/zip`, `notaria/actas*`, `administracion/*`, `asistente/chat*`, `auth/*`; el PDF devuelve encabezados de trazabilidad `X-Acta-Folio`, `X-Acta-Id`, `X-Acta-Version`, `X-Acta-Paginas`, `X-Acta-Guardada`, `X-IA-Proveedor`, `X-IA-Advertencias`, `X-Validacion-Puntaje` |
-| Variables de entorno | `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AZURE_OPENAI_*`, `GEMINI_API_KEY`, `MARGEN_CM`, `PIE_CONFIDENCIALIDAD`, `CORS_ORIGINS` |
+| Variables de entorno | `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AZURE_OPENAI_*`, `GEMINI_API_KEY`, `MARGEN_CM`, `PIE_CONFIDENCIALIDAD`, `CORS_ORIGINS`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NOMBRE` |
 
 ### Frontend (React 18 + Vite + Tailwind)
 | Componente | Qué incluye |
@@ -74,7 +74,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 
 - [ ] Se instala y arranca la aplicación: backend con PostgreSQL o SQLite, frontend en Vite.
 - [ ] El **primer usuario** se registra (o lo crea el administrador) y accede por login; **sin sesión iniciada solo se muestra la interfaz de acceso**: ninguna sección del sistema de actas visible.
-- [ ] Tras un acceso correcto se abre **Mi perfil** con las funciones permitidas por el rol: capturista (generar actas, asistente, empresa), revisor+ (biblioteca, administración, bitácora, API notarial), abogado responsable+ (estatus, validación, aprobación) y Administrador (total, gestión de usuarios).
+- [ ] Tras un acceso correcto se abre **Mi perfil** con las funciones permitidas por el rol: capturista (generar actas, asistente, empresa), revisor+ (biblioteca, administración, bitácora, API notarial), abogado responsable+ (estatus, validación, aprobación), Administrador (total, gestión de usuarios de la empresa) y SuperAdministrador (panel global de superadministración del sistema).
 - [ ] El acta se valida en consistencia (quórum, mayorías, fundamentos legales)
 - [ ] Las actas se pueden listar, editar, cambiar de estatus y eliminar
 - [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)

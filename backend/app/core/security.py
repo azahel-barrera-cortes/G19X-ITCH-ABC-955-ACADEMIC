@@ -1,7 +1,8 @@
 """Utilidades de seguridad: hash de contraseñas, generación y validación de JWT.
 
 Roles soportados:
-- Administrador: acceso total a todos los endpoints.
+- SuperAdministrador: acceso total y absoluto a todo el sistema, incluido el panel global de superadministración.
+- Administrador: acceso total a los endpoints de la empresa y gestión de perfiles de usuarios (capturista, revisor, abogado responsable).
 - capturista: puede crear, leer y editar actas propias.
 - revisor: puede leer todas las actas y cambiar su estatus.
 - abogado_responsable: puede leer todas las actas, aprobarlas y firmarlas.
@@ -50,7 +51,7 @@ def decodificar_token(token: str) -> Optional[dict[str, Any]]:
 
 
 # Roles válidos del sistema.
-ROLES_VALIDOS = ("Administrador", "capturista", "revisor", "abogado_responsable")
+ROLES_VALIDOS = ("SuperAdministrador", "Administrador", "capturista", "revisor", "abogado_responsable")
 
 # Acceso mínimo por rol (número mayor = más permisos).
 NIVEL_ROL = {
@@ -58,6 +59,7 @@ NIVEL_ROL = {
     "revisor": 2,
     "abogado_responsable": 3,
     "Administrador": 4,
+    "SuperAdministrador": 5,
 }
 
 

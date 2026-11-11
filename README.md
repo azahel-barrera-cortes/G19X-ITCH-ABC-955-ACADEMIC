@@ -153,11 +153,11 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    aplicación solo muestra la pantalla de acceso: **Iniciar sesión**,
    **Crear cuenta** o **Recuperar contraseña**. No se muestra la barra lateral
    ni ninguna función de actas, así que nadie puede ver ni modificar nada sin
-   entrar. El **primer usuario registrado** se crea como `Administrador`
+   entrar. El **primer usuario registrado** se crea como `SuperAdministrador`
    (arranque del sistema); los autoregistros posteriores quedan siempre como
     `capturista`; Cada usuario puede cambiar su nombre y su contraseña desde
-    `PUT /api/v1/auth/me`; sólo un Administrador cambia roles o activa cuentas
-    desde `PUT /api/v1/auth/users/{id}`.
+    `PUT /api/v1/auth/me`; sólo un SuperAdministrador o Administrador cambia
+    roles o activa cuentas desde `PUT /api/v1/auth/users/{id}`.
    Tras un acceso correcto se abre **Mi perfil**, que muestra las funciones
    permitidas según el rol; la barra lateral y la navegación móvil solo
    presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca ni
@@ -182,10 +182,10 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 | **Abogado responsable** | Mi perfil (funciones de su rol) | Todo lo del revisor | Cambiar estatus de actas, aprobar, validar y revalidar consistencia |
 | **Administrador** | Mi perfil (funciones de su rol) | Todas las secciones | Acceso total: gestionar usuarios (listar, cambiar rol, activar/desactivar), eliminar actas, todo lo anterior |
 
-> El primer usuario registrado se crea automáticamente como `Administrador`.
+> El primer usuario registrado se crea automáticamente como `SuperAdministrador`.
 > Los autoregistros posteriores quedan siempre como `capturista`; Cada usuario
 > puede cambiar su nombre y su contraseña desde `PUT /api/v1/auth/me`; sólo un
-> Administrador cambia roles o activa cuentas desde
+> SuperAdministrador o Administrador cambia roles o activa cuentas desde
 > `PUT /api/v1/auth/users/{id}`.
 
 ## 5. Endpoints de la API
@@ -194,18 +194,19 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 asistente, bitácora, expediente y notaría exigen el encabezado
 `Authorization: Bearer <JWT>` (se obtiene en `POST /api/v1/auth/login`); sin
 token responden **401** y con rol insuficiente **403**. Niveles crecientes:
-`capturista` (1) < `revisor` (2) < `abogado_responsable` (3) < `Administrador` (4).
+`capturista` (1) < `revisor` (2) < `abogado_responsable` (3) < `Administrador` (4) < `SuperAdministrador` (5).
 
 | Rol | Permisos sobre la API |
 |---|---|
 | `capturista` | Redactar (IA y SSE), crear y editar actas, generar PDF, usar el asistente, exportar expediente ZIP |
 | `revisor` | Lo anterior + listar y consultar actas, descargar PDF guardado, administración (resumen, vigencia, versiones), bitácora y API de notaría |
 | `abogado_responsable` | Lo anterior + cambiar estatus y revalidar actas |
-| `Administrador` | Acceso total + eliminar actas y gestionar usuarios |
+| `Administrador` | Acceso total + eliminar actas y gestionar usuarios (capturista, revisor, abogado_responsable) |
+| `SuperAdministrador` | Acceso absoluto a todo el sistema, incluido el panel global de superadministración |
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/v1/auth/registro` | Registro (público: rol `capturista`; el primer usuario, `Administrador`; un admin asigna cualquier rol) |
+| `POST` | `/api/v1/auth/registro` | Registro (público: rol `capturista`; el primer usuario, `SuperAdministrador`; un SuperAdministrador o Administrador asigna cualquier rol) |
 | `POST` | `/api/v1/auth/login` | Iniciar sesión; devuelve el JWT de acceso |
 | `GET` `PUT` | `/api/v1/auth/me` | Perfil del usuario autenticado (consulta y actualización) |
 | `POST` | `/api/v1/auth/reset-password` | Solicita token de recuperación (público; en `DEBUG` lo devuelve en `detalle`) |

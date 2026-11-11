@@ -206,7 +206,9 @@ La plataforma implementa autenticación JWT con control de acceso por roles
   expediente, notaría) requieren `Authorization: Bearer <JWT>`; sin token
   responden 401 y con rol insuficiente 403.
 - El registro es público pero el servidor fuerza el rol `capturista`; el
-  primer usuario del sistema arranca como `Administrador`.
+  primer usuario del sistema arranca como `SuperAdministrador` (acceso
+  absoluto). Un SuperAdministrador o Administrador puede asignar cualquier
+  rol válido a usuarios posteriores.
 - Las contraseñas se guardan con bcrypt y la recuperación se hace con un
   token temporal de un solo uso de 1 hora (en `DEBUG` el token viaja en la
   respuesta para poder probar el flujo de extremo a extremo).

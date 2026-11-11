@@ -11,6 +11,9 @@ import logging
 
 from app.db.base import Base
 from app.db.session import engine
+from app.core.config import settings
+from app.core import security
+from app.models.usuario import Usuario
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,41 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _aplicar_migraciones_ligeras()
+    _crear_super_administrador_inicial()
     logger.info("Estructura de base de datos verificada (%d tablas)", len(Base.metadata.tables))
+
+
+def _crear_super_administrador_inicial() -> None:
+    """Crea un Super Administrador inicial si la base de datos está vacía.
+
+    Garantiza que el sistema nunca quede huérfano: siempre existirá al menos
+    un usuario con acceso total para iniciar la plataforma. Las credenciales
+    se leen de las variables de entorno SEED_ADMIN_*.
+    """
+    from sqlalchemy.orm import Session
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        total = db.query(Usuario).count()
+        if total == 0:
+            usuario = Usuario(
+                email=settings.seed_admin_email,
+                nombre_completo=settings.seed_admin_nombre,
+                rol="SuperAdministrador",
+                password_hash=security.hash_password(settings.seed_admin_password),
+                activo=True,
+            )
+            db.add(usuario)
+            db.commit()
+            db.refresh(usuario)
+            logger.info(
+                "Super Administrador inicial creado: %s (rol=%s)",
+                usuario.email,
+                usuario.rol,
+            )
+    finally:
+        db.close()
 
 
 # Columnas añadidas después de la primera versión, que ``create_all`` no agrega

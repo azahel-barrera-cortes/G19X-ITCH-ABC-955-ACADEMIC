@@ -47,17 +47,17 @@ def registrar_usuario(
 ) -> UsuarioRespuesta:
     """Crea un nuevo usuario aplicando reglas de rol seguras:
 
-    * **Primer usuario del sistema** (base vacía): se crea como ``Administrador``
-      para poder arrancar la plataforma.
+    * **Primer usuario del sistema** (base vacía): se crea como ``SuperAdministrador``
+      para poder arrancar la plataforma con acceso total.
     * **Autoregistro anónimo**: el rol se fuerza a ``capturista`` (el mínimo
-      privilegio), sin importar el rol solicitado. Un Administrador puede
-      elevarlo después desde ``PUT /auth/users/{id}``.
+      privilegio), sin importar el rol solicitado. Un SuperAdministrador o
+      Administrador puede elevarlo después desde ``PUT /auth/users/{id}``.
     * **Administrador autenticado**: puede asignar cualquier rol válido.
     """
     total_usuarios = db.query(Usuario).count()
     if total_usuarios == 0:
-        datos.rol = "Administrador"
-    elif not (solicitante and solicitante.rol == "Administrador"):
+        datos.rol = "SuperAdministrador"
+    elif not (solicitante and solicitante.rol in ("SuperAdministrador", "Administrador")):
         datos.rol = "capturista"
     usuario = crear_usuario(db, datos)
     return usuario_desde_respuesta(usuario)
