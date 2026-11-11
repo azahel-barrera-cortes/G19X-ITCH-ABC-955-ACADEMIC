@@ -7,8 +7,8 @@ traducidos a respuestas JSON uniformes en ``app.main``.
 from __future__ import annotations
 
 
-class PluriActasError(Exception):
-    """Error base de la plataforma PGAC (se conserva el nombre técnico)."""
+class PGACError(Exception):
+    """Error base de la plataforma PGAC."""
 
     codigo_http: int = 400
 
@@ -18,19 +18,19 @@ class PluriActasError(Exception):
         self.detalle = detalle
 
 
-class ActaNoEncontradaError(PluriActasError):
+class ActaNoEncontradaError(PGACError):
     """El acta solicitada no existe (HTTP 404)."""
 
     codigo_http = 404
 
 
-class DatosActaInvalidosError(PluriActasError):
+class DatosActaInvalidosError(PGACError):
     """Los datos del acta son inconsistentes para el trámite solicitado (HTTP 422)."""
 
     codigo_http = 422
 
 
-class IAServicioError(PluriActasError):
+class IAServicioError(PGACError):
     """El proveedor de IA no pudo completar la solicitud (HTTP 503)."""
 
     codigo_http = 503

@@ -22,7 +22,7 @@ from sqlalchemy import text
 from app.api.v1.endpoints.actas import ENCABEZADOS_EXPUESTOS
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.exceptions import PluriActasError
+from app.core.exceptions import PGACError
 from app.db.init_db import init_db
 from app.db.session import engine, verificar_conexion_db
 
@@ -91,8 +91,8 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Manejo uniforme de errores
 # ---------------------------------------------------------------------------
-@app.exception_handler(PluriActasError)
-async def manejar_error_dominio(request: Request, exc: PluriActasError) -> JSONResponse:
+@app.exception_handler(PGACError)
+async def manejar_error_dominio(request: Request, exc: PGACError) -> JSONResponse:
     """Traduce las excepciones de negocio a respuestas JSON con su código HTTP."""
     return JSONResponse(
         status_code=exc.codigo_http,

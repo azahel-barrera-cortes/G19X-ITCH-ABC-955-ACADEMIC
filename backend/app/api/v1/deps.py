@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core import security
 from app.core.config import settings
-from app.core.exceptions import PluriActasError
 from app.db.session import get_db
 from app.models.usuario import Usuario
 from app.schemas.usuario import TokenDatos
