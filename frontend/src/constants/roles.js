@@ -99,6 +99,12 @@ export const SECCIONES_SISTEMA = [
     etiqueta: 'Guía de uso',
     descripcion: 'Flujo, API y notas legales',
   },
+  {
+    id: 'administrador',
+    minimo: 'Administrador',
+    etiqueta: 'Administrador',
+    descripcion: 'Panel de administración de la empresa',
+  },
 ]
 
 /** Ids de las secciones visibles para el rol indicado. */

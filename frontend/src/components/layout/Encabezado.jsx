@@ -12,6 +12,7 @@ const SECCIONES = [
   { id: 'empresa', etiqueta: 'Empresa', titulo: 'Información de la empresa o sociedad' },
   { id: 'ayuda', etiqueta: 'Guía', titulo: 'Guía de uso' },
   { id: 'perfil', etiqueta: 'Mi perfil', titulo: 'Mi perfil y funciones disponibles' },
+  { id: 'administrador', etiqueta: 'Administrador', titulo: 'Panel de administración' },
 ]
 
 export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = null, onCerrarSesion = null, seccionesVisibles = null }) {
