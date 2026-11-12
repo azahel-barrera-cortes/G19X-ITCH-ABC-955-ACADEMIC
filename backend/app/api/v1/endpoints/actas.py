@@ -211,11 +211,46 @@ def redactar_stream(
 )
 def generar_pdf(
     payload: ActaGenerarPdfRequest,
-    _usuario: UsuarioActual,
+    usuario_actual: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Solicita la redacción a la IA, compila el PDF con ReportLab y lo retorna."""
+    datos_antes = None
+    if payload.actualizar_acta_id:
+        acta_anterior = acta_service.obtener_acta(db, payload.actualizar_acta_id)
+        datos_antes = {
+            "folio": acta_anterior.folio,
+            "estatus": acta_anterior.estatus,
+            "version": acta_anterior.version,
+        }
     pdf, metadatos = acta_service.generar_pdf(payload, db)
+    if metadatos["guardada"]:
+        registrar_bitacora(
+            db,
+            usuario=usuario_actual,
+            accion="actualizar" if payload.actualizar_acta_id else "crear",
+            entidad="actas",
+            entidad_id=metadatos["acta_id"],
+            datos_antes=datos_antes,
+            datos_despues={
+                "folio": metadatos["folio"],
+                "version": metadatos["version"],
+                "estatus": metadatos.get("estatus") or "desconocido",
+                "proveedor_ia": metadatos["proveedor_ia"],
+            },
+        )
+    else:
+        registrar_bitacora(
+            db,
+            usuario=usuario_actual,
+            accion="generar_con_ia",
+            entidad="actas",
+            datos_despues={
+                "folio": metadatos["folio"],
+                "proveedor_ia": metadatos["proveedor_ia"],
+                "guardada": False,
+            },
+        )
     return _respuesta_pdf(pdf, metadatos)
 
 

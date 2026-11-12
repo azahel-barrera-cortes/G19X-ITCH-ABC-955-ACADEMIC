@@ -46,8 +46,13 @@ async def obtener_usuario_actual(
         raise credenciales_excepcion
 
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
-    if usuario is None or not usuario.activo:
+    if usuario is None:
         raise credenciales_excepcion
+    if not usuario.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario inactivo. Comunícate con tu administrador.",
+        )
     return usuario
 
 
@@ -95,6 +100,20 @@ def requiere_rol(rol_minimo: str):
     return _verificador
 
 
+def requiere_super_administrador():
+    """Devuelve una dependencia que exige exactamente el rol SuperAdministrador."""
+
+    def _verificador(usuario: Annotated[Usuario, Depends(obtener_usuario_actual)]) -> Usuario:
+        if usuario.rol != "SuperAdministrador":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Se requiere el rol 'SuperAdministrador'.",
+            )
+        return usuario
+
+    return _verificador
+
+
 # Dependencias reutilizables por rol.
 UsuarioActual = Annotated[Usuario, Depends(obtener_usuario_actual)]
 UsuarioOpcional = Annotated[Optional[Usuario], Depends(obtener_usuario_opcional)]
@@ -102,6 +121,9 @@ RequiereCapturista = Annotated[Usuario, Depends(requiere_rol("capturista"))]
 RequiereRevisor = Annotated[Usuario, Depends(requiere_rol("revisor"))]
 RequiereAbogado = Annotated[Usuario, Depends(requiere_rol("abogado_responsable"))]
 RequiereAdmin = Annotated[Usuario, Depends(requiere_rol("Administrador"))]
+RequiereSuperAdministrador = Annotated[
+    Usuario, Depends(requiere_super_administrador())
+]
 
 
 def registrar_bitacora(

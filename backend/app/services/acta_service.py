@@ -424,6 +424,7 @@ def generar_pdf(
         "folio": folio,
         "acta_id": getattr(acta, "id", None),
         "version": version,
+        "estatus": estatus,
         "nombre_archivo": nombre_archivo_acta(
             folio, payload.sociedad, formato.fecha_iso(payload.fecha)
         ),
