@@ -40,13 +40,66 @@ const SECCIONES = [
   },
   {
     id: 'ayuda',
-    etiqueta: 'Guía de uso',
+    etiqueta: 'Gia de uso',
     descripcion: 'Flujo, API y notas legales',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <circle cx="12" cy="12" r="9" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 9.3a2.6 2.6 0 115 1.2c-.5 1-2 1.3-2 2.5" />
         <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
+    id: 'biblioteca',
+    etiqueta: 'Biblioteca de actas',
+    descripcion: 'Historial, estatus, PDF y edición',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14v16H5z" />
+        <path strokeLinecap="round" d="M8 8h8M8 12h8M8 16h5" />
+      </svg>
+    ),
+  },
+  {
+    id: 'administracion',
+    etiqueta: 'Administracion de Actas',
+    descripcion: 'Versiones, vigencia y caducidad',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16v14H4z" />
+        <path strokeLinecap="round" d="M8 9h8M8 13h8M8 17h4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'usuarios',
+    etiqueta: 'Administrador de Usuarios',
+    descripcion: 'Gestion de usuarios del sistema',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 8 4 4 0 010-8z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 21a3 3 0 100-6m-5 6a3 3 0 100-6m-3 6a3 3 0 100-6m9-6a3 3 0 100-6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'seguridad',
+    etiqueta: 'Seguridad de Usuarios',
+    descripcion: 'Seguridad de usuarios y accesos',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4m8 0h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'vitacora',
+    etiqueta: 'Vitacora de actas',
+    descripcion: 'Vitacora de acciones del sistema',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -128,7 +181,9 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
   const secciones = esSuperAdmin
     ? SECCIONES_SUPERADMIN
     : (seccionesVisibles
-      ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
+      ? seccionesVisibles
+        .map((id) => SECCIONES.find((item) => item.id === id))
+        .filter(Boolean)
       : SECCIONES)
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">

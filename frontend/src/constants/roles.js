@@ -119,8 +119,21 @@ export const SECCIONES_SISTEMA = [
   },
 ]
 
+const MENU_CAPTURISTA = ['perfil', 'generar', 'asistente', 'administracion', 'ayuda']
+const MENU_ADMINISTRADOR = [
+  'perfil',
+  'usuarios',
+  'seguridad',
+  'administracion',
+  'biblioteca',
+  'vitacora',
+  'ayuda',
+]
+
 /** Ids de las secciones visibles para el rol indicado. */
 export function seccionesPermitidas(rol) {
+  if (rol === 'capturista') return MENU_CAPTURISTA
+  if (rol === 'Administrador') return MENU_ADMINISTRADOR
   return SECCIONES_SISTEMA.filter((seccion) => tieneAcceso(rol, seccion.minimo)).map(
     (seccion) => seccion.id,
   )

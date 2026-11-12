@@ -60,6 +60,8 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
         acciones: r.acciones || [], borrador: r.texto_borrador || null,
         sesion: r.sesion_id || null, tipos: r.tipos_acta || null,
         control: r.control_acta || null, progreso: r.progreso || null,
+        tipoSociedad: r.tipo_sociedad || null,
+        marcoNormativo: r.marco_normativo || null,
         actaId: r.acta_id || r.acta?.id || null,
       }])
     } catch (fallo) {
@@ -133,6 +135,15 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
                 {mensajes.map((m, i) => (
                   <div key={i} className={`max-w-[90%] rounded-2xl px-4 py-3.5 text-sm ${burbujaClase(m.origen)} shadow-sm border`}>
                     <p className="whitespace-pre-line leading-relaxed">{m.texto}</p>
+                    {m.marcoNormativo || m.tipoSociedad ? (
+                      <div className="mt-3 rounded-lg border border-corporativo-100 bg-corporativo-50 px-3 py-2 text-xs text-corporativo-800">
+                        <p className="font-semibold">Marco de revisión</p>
+                        <p>
+                          Sociedad: {m.tipoSociedad || 'pendiente'} · Ordenamiento:{' '}
+                          {m.marcoNormativo || 'pendiente de seleccionar'}
+                        </p>
+                      </div>
+                    ) : null}
                     {m.progreso ? <p className="mt-2 text-xs opacity-80">Progreso: {m.progreso.completados}/{m.progreso.total} datos</p> : null}
                     {m.tipos?.length ? (
                       <ul className="mt-3 space-y-2">
