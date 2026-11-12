@@ -158,3 +158,41 @@ def test_redaccion_generica_requiere_resumen() -> None:
         {"sociedad": "X", "resumen": "Se aprueba lo conducente"},
     )
     assert "Se aprueba lo conducente" in resultado["clausula_legal"]
+
+
+def test_referencias_legales_no_confunden_fracciones_de_articulo_182() -> None:
+    aumento = plantillas.obtener_plantilla(MateriaAcuerdo.AUMENTO_CAPITAL)
+    reforma = plantillas.obtener_plantilla(MateriaAcuerdo.REFORMA_ESTATUTOS)
+    domicilio = plantillas.obtener_plantilla(MateriaAcuerdo.CAMBIO_DOMICILIO)
+
+    assert "Art. 182, fracción III" in aumento.articulos
+    assert "Art. 182, fracción XI" in reforma.articulos
+    assert "Art. 182, fracción XI" in domicilio.articulos
+    assert "Art. 182, fracción II" not in aumento.articulos
+
+
+def test_reduccion_capital_no_afirma_responsabilidad_solidaria_inexistente() -> None:
+    resultado = plantillas.redactar_con_plantilla(
+        MateriaAcuerdo.REDUCCION_CAPITAL,
+        {"sociedad": "Mi Sociedad, S.A. de C.V.", "monto": "$10,000.00", "capital": "$90,000.00"},
+    )
+
+    assert "artículo 9" in resultado["clausula_legal"]
+    assert "responsabilidad solidaria" not in resultado["clausula_legal"]
+
+
+def test_cierre_no_presenta_protocolizacion_como_hecho_acreditado() -> None:
+    cierre = plantillas.TEXTOS_FIJOS["cierre"]
+
+    assert "cuando así proceda" in cierre
+    assert "se protocolizará" not in cierre
+
+
+def test_emision_de_obligaciones_usa_ordenamiento_correcto() -> None:
+    resultado = plantillas.redactar_con_plantilla(
+        MateriaAcuerdo.EMISION_TITULOS,
+        {"monto": "$100,000.00"},
+    )
+
+    assert "Ley General de Títulos y Operaciones de Crédito" in resultado["fundamento_legal"]
+    assert "Ley General de Sociedades Mercantiles" not in resultado["fundamento_legal"]

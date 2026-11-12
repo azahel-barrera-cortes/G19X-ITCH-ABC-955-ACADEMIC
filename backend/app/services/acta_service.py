@@ -242,6 +242,7 @@ def construir_documento(
         "sociedad": payload.sociedad,
         "rfc_sociedad": payload.rfc_sociedad,
         "tipo_sociedad": payload.tipo_sociedad,
+        "datos_especificos": payload.datos_especificos,
         "logo_empresa": payload.logo_empresa,
         "firma_electronica": payload.firma_electronica,
         "tipo_asamblea_texto": etiqueta_tipo_asamblea(payload.tipo_asamblea),
@@ -320,6 +321,7 @@ def _volcar_payload(
 
     # Información de la empresa / sociedad (RF-10).
     modelo.tipo_sociedad = payload.tipo_sociedad
+    modelo.datos_especificos = dict(payload.datos_especificos or {})
     modelo.logo_empresa = payload.logo_empresa
     modelo.firma_electronica = payload.firma_electronica
     modelo.usar_info_empresa = payload.usar_info_empresa

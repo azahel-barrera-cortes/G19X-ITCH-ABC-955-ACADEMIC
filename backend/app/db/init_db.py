@@ -70,6 +70,7 @@ _COLUMNAS_NUEVAS = {
         ("motivo_caducidad", "VARCHAR(300)"),
         ("creado_por", "VARCHAR(150)"),
         ("tipo_sociedad", "VARCHAR(60)"),
+        ("datos_especificos", "JSON"),
         ("logo_empresa", "TEXT"),
         ("firma_electronica", "BOOLEAN DEFAULT 0"),
         ("usar_info_empresa", "BOOLEAN DEFAULT 0"),

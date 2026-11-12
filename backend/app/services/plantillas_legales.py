@@ -63,6 +63,7 @@ class PlantillaLegal:
     titulo: str
     accion: str
     articulos: Tuple[str, ...]
+    ordenamiento: str = "Ley General de Sociedades Mercantiles"
     parrafos: Tuple[str, ...] = field(default_factory=tuple)
     parametros: Tuple[ParametroPlantilla, ...] = field(default_factory=tuple)
 
@@ -109,7 +110,7 @@ _P_CAPITAL: Dict[MateriaAcuerdo, PlantillaLegal] = {
         materia=MateriaAcuerdo.AUMENTO_CAPITAL,
         titulo="Aumento del capital social",
         accion="Se aprueba el aumento del capital social y la reforma de la cláusula relativa al capital",
-        articulos=("Art. 182, fracción II", "Art. 132", "Art. 209"),
+        articulos=("Art. 182, fracción III", "Art. 132"),
         parrafos=(
             "Se aprueba el aumento del capital social de {sociedad} en la cantidad de {monto}, quedando el capital social resultante en {capital}, con la emisión de las acciones que correspondan.",
             "Las acciones emitidas se ofrecerán a los accionistas en proporción a su tenencia accionaria, respetando el derecho de preferencia que concede el artículo 132 de la Ley General de Sociedades Mercantiles.",
@@ -125,10 +126,10 @@ _P_CAPITAL: Dict[MateriaAcuerdo, PlantillaLegal] = {
         materia=MateriaAcuerdo.REDUCCION_CAPITAL,
         titulo="Reducción del capital social",
         accion="Se aprueba la reducción del capital social y la reforma estatutaria correspondiente",
-        articulos=("Art. 134", "Art. 135", "Art. 182, fracción II"),
+        articulos=("Art. 9", "Art. 182, fracción III"),
         parrafos=(
             "Se aprueba la reducción del capital social de {sociedad} en la cantidad de {monto}, mediante reembolso a los accionistas o amortización de acciones, quedando el capital resultante en {capital}.",
-            "Se hace constar que la reducción se realiza con la responsabilidad solidaria prevista por el artículo 135 de la Ley General de Sociedades Mercantiles a cargo de los accionistas beneficiados, por el término de cinco años.",
+            "La reducción se publicará en el sistema electrónico de la Secretaría de Economía cuando corresponda, y se hace constar que los acreedores podrán oponerse en los términos del artículo 9 de la Ley General de Sociedades Mercantiles.",
             "Se aprueba la reforma del contrato social en las cláusulas relativas al capital social y a las acciones en circulación.",
         ),
         parametros=(
@@ -202,7 +203,7 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         materia=MateriaAcuerdo.REFORMA_ESTATUTOS,
         titulo="Reforma de los estatutos sociales",
         accion="Se aprueba la reforma del contrato social y de los estatutos sociales",
-        articulos=("Art. 182, fracción I", "Art. 183", "Art. 184"),
+        articulos=("Art. 182, fracción XI", "Art. 183", "Art. 184"),
         parrafos=(
             "Se aprueba la reforma del contrato social de {sociedad} en los términos del proyecto de estatutos que se tiene a la vista y que, firmado por la mesa directiva, forma parte integrante de la presente acta.",
             "La reforma cumple con los requisitos de forma y contenido previstos por el artículo 182 de la Ley General de Sociedades Mercantiles y será publicada e inscrita conforme a las disposiciones aplicables.",
@@ -216,7 +217,7 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         materia=MateriaAcuerdo.CAMBIO_DOMICILIO,
         titulo="Cambio del domicilio social",
         accion="Se aprueba el cambio del domicilio social de la sociedad",
-        articulos=("Art. 182, fracción V", "Art. 184"),
+        articulos=("Art. 182, fracción XI", "Art. 184"),
         parrafos=(
             "Se aprueba el cambio del domicilio social de {sociedad} al que se precisa en el proyecto de reforma estatutaria que forma parte de esta acta, considerándose por tanto reformada la cláusula relativa al domicilio.",
             "Se faculta a los delegados especiales para que realicen los avisos, publicaciones e inscripciones que el cambio de domicilio requiera ante las autoridades fiscales, registrales y de cualquier otra índole.",
@@ -233,7 +234,7 @@ _P_SOCIETARIAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         parrafos=(
             "Se aprueba la fusión de {sociedad} con las sociedades que se identifican en el proyecto de fusión, en el carácter de sociedad fusionante o fusionada que en el mismo se precisa, así como los estatutos de la sociedad que subsista o que se constituya.",
             "Se aprueban como bases de la fusión el balance general, el proyecto de estatutos y los demás documentos que se tienen a la vista; el acuerdo se publicará en el sistema electrónico previsto por el artículo 223 de la Ley General de Sociedades Mercantiles.",
-            "Los accionistas disidentes podrán ejercer el derecho de separación que les concede el artículo 225 de la Ley General de Sociedades Mercantiles, dentro de los quince días siguientes a la fecha de la asamblea.",
+            "La fusión surtirá efectos conforme a los artículos 223 a 225 de la Ley General de Sociedades Mercantiles, una vez realizadas las publicaciones, la inscripción y, en su caso, satisfechos los requisitos relativos a las deudas y oposiciones de los acreedores.",
         ),
         parametros=(
             ParametroPlantilla("sociedad", requerido=True, descripcion="Nombre o razón social de la sociedad"),
@@ -275,6 +276,7 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         titulo="Emisión de obligaciones o títulos de crédito",
         accion="Se aprueba la emisión de obligaciones o títulos de crédito por la sociedad",
         articulos=("Art. 208", "Art. 209", "Art. 210", "Art. 217"),
+        ordenamiento="Ley General de Títulos y Operaciones de Crédito",
         parrafos=(
             "Se aprueba la emisión de obligaciones o títulos de crédito hasta por la cantidad de {monto}, con las bases, garantías, intereses y condiciones que se hacen constar en la presente acta, conforme a los artículos 208 a 210 de la Ley General de Sociedades Mercantiles.",
             "Se designa representante común de los tenedores de obligaciones en los términos del artículo 217 de la Ley General de Sociedades Mercantiles, con las facultades que se precisan en el acta de emisión.",
@@ -317,7 +319,7 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
         articulos=("Art. 178", "Art. 179", "Art. 181"),
         parrafos=(
             "Se aprueba el asunto sometido a la consideración de la asamblea en los términos que a continuación se precisan: {resumen}",
-            "El acuerdo se adopta con base en las facultades que la Ley General de Sociedades Mercantiles concede a la asamblea de accionistas y se hace constar con la finalidad de darle plena eficacia jurídica frente a terceros.",
+            "El acuerdo se adopta con base en las facultades que la Ley General de Sociedades Mercantiles y los estatutos sociales conceden a la asamblea de accionistas, sin perjuicio de las formalidades, publicaciones, inscripciones o protocolización que resulten aplicables para su eficacia.",
             "Se facultan a los delegados especiales designados, o en su defecto al órgano de administración, para ejecutar y formalizar el presente acuerdo conforme a derecho.",
         ),
         parametros=(
@@ -326,12 +328,127 @@ _P_OTRAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
     ),
 }
 
+_P_ACTAS_CORPORATIVAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
+    materia: PlantillaLegal(
+        materia=materia,
+        titulo=titulo,
+        accion=accion,
+        articulos=articulos,
+        ordenamiento="Legislación aplicable y estatutos sociales",
+        parrafos=(
+            parrafo,
+            "El acuerdo queda sujeto a la documentación, formalización, inscripción y demás requisitos que resulten aplicables conforme al tipo societario y a los estatutos sociales.",
+        ),
+        parametros=(
+            ParametroPlantilla(
+                "sociedad",
+                requerido=True,
+                descripcion="Nombre o razón social de la sociedad",
+            ),
+        ),
+    )
+    for materia, titulo, accion, articulos, parrafo in (
+        (
+            MateriaAcuerdo.MODIFICACION_ESTATUTOS,
+            "Modificación de estatutos sociales",
+            "Se aprueba la modificación de los estatutos sociales",
+            ("Art. 182, fracción XI LGSM",),
+            "Se aprueba la modificación de los estatutos sociales de {sociedad}, conforme al texto y alcance que se hicieron del conocimiento de la asamblea.",
+        ),
+        (
+            MateriaAcuerdo.OTORGAMIENTO_PODERES,
+            "Otorgamiento de poderes",
+            "Se aprueba el otorgamiento de poderes",
+            ("Art. 10 LGSM",),
+            "Se aprueba otorgar a las personas que se identifiquen en el acuerdo los poderes y facultades que correspondan, dentro de los límites expresamente aprobados.",
+        ),
+        (
+            MateriaAcuerdo.REVOCACION_PODERES,
+            "Revocación de poderes",
+            "Se aprueba la revocación de poderes",
+            ("Art. 10 LGSM",),
+            "Se aprueba revocar los poderes previamente otorgados a las personas que se identifiquen en el acuerdo, sin perjuicio de las notificaciones y formalidades necesarias.",
+        ),
+        (
+            MateriaAcuerdo.TRANSMISION_ACCIONES,
+            "Transmisión de acciones",
+            "Se toma conocimiento y, en su caso, se aprueba la transmisión de acciones",
+            ("Art. 128 LGSM",),
+            "Se toma conocimiento de la transmisión de acciones de {sociedad} en los términos de los títulos, endosos, avisos y autorizaciones que obren en el expediente corporativo.",
+        ),
+        (
+            MateriaAcuerdo.CESION_PARTES_SOCIALES,
+            "Cesión de partes sociales",
+            "Se aprueba la cesión de partes sociales",
+            ("Art. 65 LGSM",),
+            "Se aprueba la cesión de partes sociales de {sociedad} en los términos presentados, condicionada al cumplimiento de las autorizaciones y registros corporativos aplicables.",
+        ),
+        (
+            MateriaAcuerdo.ADMISION_NUEVOS_SOCIOS,
+            "Admisión de nuevos socios",
+            "Se aprueba la admisión de nuevos socios",
+            ("Art. 65 LGSM",),
+            "Se aprueba la admisión de las personas identificadas en el acuerdo como nuevos socios de {sociedad}, una vez cumplidos los requisitos legales y estatutarios.",
+        ),
+        (
+            MateriaAcuerdo.SEPARACION_EXCLUSION_SOCIOS,
+            "Separación o exclusión de socios",
+            "Se documenta la separación o exclusión de socios",
+            ("Estatutos sociales y legislación aplicable",),
+            "Se documenta la separación o exclusión de los socios identificados, dejando constancia de los hechos, la causa y el derecho de audiencia que resulten aplicables a {sociedad}.",
+        ),
+        (
+            MateriaAcuerdo.NOMBRAMIENTO_LIQUIDADORES,
+            "Nombramiento de liquidadores",
+            "Se aprueba el nombramiento de liquidadores",
+            ("Art. 236 LGSM",),
+            "Se designa como liquidador o liquidadores de {sociedad} a las personas identificadas en el acuerdo, quienes deberán aceptar el cargo y ejercerlo conforme a la legislación aplicable.",
+        ),
+        (
+            MateriaAcuerdo.APROBACION_BALANCE_LIQUIDACION,
+            "Aprobación del balance final de liquidación",
+            "Se aprueba el balance final de liquidación",
+            ("Art. 247 LGSM",),
+            "Se aprueba el balance final de liquidación de {sociedad}, sujeto a las publicaciones, cancelaciones, inscripciones y demás formalidades que procedan.",
+        ),
+        (
+            MateriaAcuerdo.TRANSFORMACION_SOCIEDAD,
+            "Transformación de sociedad",
+            "Se aprueba la transformación de la sociedad",
+            ("Art. 227 LGSM",),
+            "Se aprueba la transformación de {sociedad} al tipo societario indicado en el acuerdo, junto con las bases, estatutos y formalidades necesarias para su eficacia.",
+        ),
+        (
+            MateriaAcuerdo.EMISION_ACCIONES,
+            "Emisión de acciones",
+            "Se aprueba la emisión de acciones",
+            ("Art. 125 LGSM",),
+            "Se aprueba la emisión de acciones de {sociedad} con las características, series, derechos, precio y condiciones que se precisan en el acuerdo y en los títulos respectivos.",
+        ),
+        (
+            MateriaAcuerdo.ASAMBLEA_ESPECIAL_ACCIONISTAS,
+            "Asamblea especial de accionistas",
+            "Se aprueba el acuerdo de la clase especial de accionistas",
+            ("Art. 195 LGSM",),
+            "La clase de accionistas identificada resuelve sobre el asunto que afecta sus derechos particulares dentro de {sociedad}, con el quórum y mayoría aplicables.",
+        ),
+        (
+            MateriaAcuerdo.SESION_VIGILANCIA_COMISARIOS,
+            "Sesión del órgano de vigilancia o comisarios",
+            "Se hacen constar las actuaciones del órgano de vigilancia",
+            ("Art. 164 LGSM",),
+            "El órgano de vigilancia o los comisarios de {sociedad} hacen constar sus actuaciones, observaciones y, en su caso, recomendaciones en los términos del acuerdo.",
+        ),
+    )
+}
+
 # Diccionario consolidado de plantillas legales disponibles.
 PLANTILLAS: Dict[MateriaAcuerdo, PlantillaLegal] = {
     **_P_CAPITAL,
     **_P_ADMIN_Y_FINANZAS,
     **_P_SOCIETARIAS,
     **_P_OTRAS,
+    **_P_ACTAS_CORPORATIVAS,
 }
 
 # ---------------------------------------------------------------------------
@@ -418,6 +535,22 @@ _MATERIA_POR_TIPO: Dict[str, MateriaAcuerdo] = {
     TipoAsamblea.FUSION.value: MateriaAcuerdo.FUSION,
     TipoAsamblea.ESCISION.value: MateriaAcuerdo.ESCISION,
     TipoAsamblea.DISOLUCION_LIQUIDACION.value: MateriaAcuerdo.DISOLUCION_LIQUIDACION,
+    TipoAsamblea.MODIFICACION_ESTATUTOS.value: MateriaAcuerdo.MODIFICACION_ESTATUTOS,
+    TipoAsamblea.NOMBRAMIENTO_ADMINISTRADOR.value: MateriaAcuerdo.NOMBRAMIENTO_ADMINISTRADORES,
+    TipoAsamblea.REMOCION_ADMINISTRADOR.value: MateriaAcuerdo.REMOCION_ADMINISTRADORES,
+    TipoAsamblea.OTORGAMIENTO_PODERES.value: MateriaAcuerdo.OTORGAMIENTO_PODERES,
+    TipoAsamblea.REVOCACION_PODERES.value: MateriaAcuerdo.REVOCACION_PODERES,
+    TipoAsamblea.TRANSMISION_ACCIONES.value: MateriaAcuerdo.TRANSMISION_ACCIONES,
+    TipoAsamblea.CESION_PARTES_SOCIALES.value: MateriaAcuerdo.CESION_PARTES_SOCIALES,
+    TipoAsamblea.ADMISION_NUEVOS_SOCIOS.value: MateriaAcuerdo.ADMISION_NUEVOS_SOCIOS,
+    TipoAsamblea.SEPARACION_EXCLUSION_SOCIOS.value: MateriaAcuerdo.SEPARACION_EXCLUSION_SOCIOS,
+    TipoAsamblea.NOMBRAMIENTO_LIQUIDADORES.value: MateriaAcuerdo.NOMBRAMIENTO_LIQUIDADORES,
+    TipoAsamblea.APROBACION_BALANCE_LIQUIDACION.value: MateriaAcuerdo.APROBACION_BALANCE_LIQUIDACION,
+    TipoAsamblea.TRANSFORMACION_SOCIEDAD.value: MateriaAcuerdo.TRANSFORMACION_SOCIEDAD,
+    TipoAsamblea.EMISION_ACCIONES.value: MateriaAcuerdo.EMISION_ACCIONES,
+    TipoAsamblea.APROBACION_ESTADOS_FINANCIEROS.value: MateriaAcuerdo.APROBACION_ESTADOS_FINANCIEROS,
+    TipoAsamblea.ASAMBLEA_ESPECIAL_ACCIONISTAS.value: MateriaAcuerdo.ASAMBLEA_ESPECIAL_ACCIONISTAS,
+    TipoAsamblea.SESION_VIGILANCIA_COMISARIOS.value: MateriaAcuerdo.SESION_VIGILANCIA_COMISARIOS,
 }
 
 
@@ -473,7 +606,8 @@ class _ContextoSeguro(dict):
 def plantillas_para_prompt() -> List[str]:
     """Resumen textual de las plantillas, usado como contexto del *prompt* de IA."""
     return [
-        f"- {plantilla.titulo}: {plantilla.accion} (fundamento: {', '.join(plantilla.articulos)})."
+        f"- {plantilla.titulo}: {plantilla.accion} (fundamento: {', '.join(plantilla.articulos)} "
+        f"de la {plantilla.ordenamiento})."
         for plantilla in PLANTILLAS.values()
     ]
 
@@ -565,7 +699,7 @@ def redactar_con_plantilla(
         "titulo": plantilla.titulo,
         "clausula_legal": f"{cuerpo}{votacion}",
         "fundamento_legal": ", ".join(plantilla.articulos)
-        + " de la Ley General de Sociedades Mercantiles",
+        + f" de la {plantilla.ordenamiento}",
     }
 
 
@@ -594,8 +728,8 @@ TEXTOS_FIJOS: Dict[str, str] = {
         "No habiendo otro asunto que tratar, el Presidente dio por terminada la asamblea y se "
         "levantó la presente acta, que firman los asistentes que en la hoja de firmas se indican, "
         "haciéndose constar que los acuerdos se tienen por aprobados en los términos precisados y "
-        "que la misma se protocolizará ante fedatario público para su inscripción en el Registro "
-        "Público de Comercio cuando así proceda."
+        "que, cuando así proceda, deberá formalizarse ante fedatario público y presentarse para "
+        "su inscripción en el Registro Público de Comercio."
     ),
     "declaracion_protocolizacion": (
         "Se faculta a los delegados especiales de la asamblea, así como al órgano de administración "

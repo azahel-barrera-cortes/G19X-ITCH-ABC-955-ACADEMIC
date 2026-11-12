@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.catalogos import acta_aplicable
 from app.models.enums import (
     CaracterAsistente,
     EstatusActa,
@@ -19,6 +20,7 @@ from app.models.enums import (
     ProveedorIA,
     SeveridadHallazgo,
     TipoAsamblea,
+    TipoSociedad,
     TipoMayoria,
 )
 
@@ -122,7 +124,11 @@ class ActaBase(BaseSchema):
     creado_por: Optional[str] = Field(default=None, max_length=150)
 
     # --- Información de la empresa / sociedad (RF-10) ---
-    tipo_sociedad: Optional[str] = Field(default=None, max_length=60)
+    tipo_sociedad: Optional[TipoSociedad] = None
+    datos_especificos: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Datos jurídicos específicos del tipo de acta; requieren revisión profesional.",
+    )
     logo_empresa: Optional[str] = Field(default=None, description="Logo de la empresa como data URL (base64), para el encabezado del PDF")
     firma_electronica: bool = Field(default=False, description="Incluir leyenda de firma electrónica en el acta")
     usar_info_empresa: bool = Field(default=False, description="Usar automáticamente tipo_sociedad, logo_empresa y firma_electronica al generar el acta")
@@ -200,6 +206,13 @@ class ActaBase(BaseSchema):
             raise ValueError(
                 "La suma de los porcentajes de capital de los asistentes "
                 f"({total_porcentaje:.2f}%) excede el 100% del capital social."
+            )
+
+        tipo_acta = getattr(self.tipo_asamblea, "value", self.tipo_asamblea)
+        if self.tipo_sociedad and not acta_aplicable(self.tipo_sociedad, str(tipo_acta)):
+            raise ValueError(
+                f"El acta «{self.tipo_asamblea}» no está disponible para el tipo societario "
+                f"«{self.tipo_sociedad}» en el catálogo actual."
             )
         return self
 
@@ -360,11 +373,15 @@ class CatalogOpcion(BaseSchema):
     descripcion: Optional[str] = None
     articulos: Optional[List[str]] = None
     porcentaje_requerido: Optional[float] = None
+    abreviatura: Optional[str] = None
+    ordenamiento: Optional[str] = None
 
 
 class CatalogosResponse(BaseSchema):
     """Conjunto completo de catálogos consumidos por el frontend."""
 
+    tipos_sociedad: List[CatalogOpcion] = Field(default_factory=list)
+    actas_corporativas: List[CatalogOpcion] = Field(default_factory=list)
     tipos_asamblea: List[CatalogOpcion] = Field(default_factory=list)
     tipos_mayoria: List[CatalogOpcion] = Field(default_factory=list)
     caracteres_asistente: List[CatalogOpcion] = Field(default_factory=list)
