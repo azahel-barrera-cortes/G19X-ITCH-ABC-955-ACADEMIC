@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import BarraLateral from './components/layout/BarraLateral.jsx'
+import BarraLateralAdmin from './components/layout/BarraLateralAdmin.jsx'
 import Encabezado from './components/layout/Encabezado.jsx'
 import AdministracionActas from './pages/AdministracionActas.jsx'
 import Administrador from './pages/Administrador.jsx'
-import SuperAdministrador from './pages/SuperAdministrador.jsx'
 import AsistenteChat from './components/asistente/AsistenteChat.jsx'
 import Ayuda from './pages/Ayuda.jsx'
 import BibliotecaActas from './pages/BibliotecaActas.jsx'
@@ -197,12 +197,25 @@ function Aplicacion() {
 
   return (
     <div className="flex min-h-full">
-      <BarraLateral
-        seccion={seccion}
-        onCambiarSeccion={cambiarSeccion}
-        onCerrarSesion={manejarCerrarSesion}
-        seccionesVisibles={seccionesVisibles}
-      />
+      {usuario?.rol === 'SuperAdministrador' ? null : (
+        <>
+          {usuario?.rol === 'Administrador' && (
+            <BarraLateralAdmin
+              seccion={seccion}
+              onCambiarSeccion={cambiarSeccion}
+              onCerrarSesion={manejarCerrarSesion}
+            />
+          )}
+          {(usuario?.rol !== 'Administrador' && usuario?.rol !== 'SuperAdministrador') && (
+            <BarraLateral
+              seccion={seccion}
+              onCambiarSeccion={cambiarSeccion}
+              onCerrarSesion={manejarCerrarSesion}
+              seccionesVisibles={seccionesVisibles}
+            />
+          )}
+        </>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Encabezado
@@ -249,7 +262,6 @@ function Aplicacion() {
           ) : null}
           {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
           {seccion === 'administrador' ? <Administrador /> : null}
-          {seccion === 'superadministrador' ? <SuperAdministrador /> : null}
         </main>
 
         <footer className="border-t border-slate-200 bg-white">
