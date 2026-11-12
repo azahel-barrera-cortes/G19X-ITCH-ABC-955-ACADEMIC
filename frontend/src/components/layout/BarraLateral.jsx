@@ -128,8 +128,8 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
   const secciones = esSuperAdmin
     ? SECCIONES_SUPERADMIN
     : (seccionesVisibles
-        ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
-        : SECCIONES)
+      ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
+      : SECCIONES)
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
@@ -155,16 +155,14 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
               type="button"
               onClick={() => onCambiarSeccion(item.id)}
               aria-current={activa ? 'page' : undefined}
-              className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                activa
-                  ? 'bg-corporativo-50 text-corporativo-700 ring-1 ring-inset ring-corporativo-200'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
+              className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition ${activa
+                ? 'bg-corporativo-50 text-corporativo-700 ring-1 ring-inset ring-corporativo-200'
+                : 'text-slate-600 hover:bg-slate-100'
+                }`}
             >
               <span
-                className={`mt-0.5 h-5 w-5 shrink-0 ${
-                  activa ? 'text-corporativo-600' : 'text-slate-400'
-                }`}
+                className={`mt-0.5 h-5 w-5 shrink-0 ${activa ? 'text-corporativo-600' : 'text-slate-400'
+                  }`}
               >
                 {item.icono}
               </span>
@@ -179,14 +177,14 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
         })}
       </nav>
 
-      <div className="flex-1" />
+      <div className="h-16" />
 
       <div className="border-t border-slate-200 px-5 py-3 space-y-3">
         {onCerrarSesion && (
           <button
             type="button"
             onClick={() => onCerrarSesion()}
-            className="w-full rounded-xl px-3 py-2.5 text-left text-red-600 font-medium hover:bg-red-50 transition border border-red-100"
+            className="w-full rounded-xl px-3 py-2.5 text-left text-red-600 font-medium border border-red-100 background-color: red "
           >
             Cerrar sesión
           </button>

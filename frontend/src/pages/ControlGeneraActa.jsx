@@ -72,6 +72,24 @@ export default function ControlGeneraActa({ onGenerarNueva, onGenerarConIA, onUs
         <h1 className="text-lg font-semibold text-corporativo-700">Generar acta</h1>
         <p className="text-sm text-slate-500">Elige una plantilla frecuente o inicia desde cero: manual o con IA.</p>
       </header>
+
+      <Tarjeta>
+        <TarjetaEncabezado titulo="Crear acta" descripcion="Elige como empezar tu documento" />
+        <TarjetaCuerpo>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex flex-col rounded-xl border border-corporativo-200 bg-corporativo-50/60 p-4">
+              <h3 className="text-sm font-semibold text-corporativo-700">Formulario manual</h3>
+              <p className="mt-1 flex-1 text-xs text-slate-500">Captura por pasos con validacion y PDF.</p>
+              <Boton variante="primario" tamano="lg" className="mt-3 w-full" onClick={() => irFormulario(null)}>Generar nueva acta</Boton>
+            </div>
+            <div className="flex flex-col rounded-xl border border-acento-400/50 bg-acento-100/40 p-4">
+              <h3 className="text-sm font-semibold text-corporativo-700">Redaccion asistida</h3>
+              <p className="mt-1 flex-1 text-xs text-slate-500">Describe tu asamblea y la IA propone el borrador.</p>
+              <Boton variante="acento" tamano="lg" className="mt-3 w-full" onClick={() => onGenerarConIA && onGenerarConIA()}>Generar acta con IA</Boton>
+            </div>
+          </div>
+        </TarjetaCuerpo>
+      </Tarjeta>
       <Tarjeta>
         <TarjetaEncabezado titulo="Plantillas de actas" descripcion="Las actas establecidas en el proyecto mas usadas." acciones={<Etiqueta tono="info">6 plantillas frecuentes</Etiqueta>} />
         <TarjetaCuerpo>
@@ -96,23 +114,7 @@ export default function ControlGeneraActa({ onGenerarNueva, onGenerarConIA, onUs
           </ul>
         </TarjetaCuerpo>
       </Tarjeta>
-      <Tarjeta>
-        <TarjetaEncabezado titulo="Crear acta" descripcion="Elige como empezar tu documento" />
-        <TarjetaCuerpo>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="flex flex-col rounded-xl border border-corporativo-200 bg-corporativo-50/60 p-4">
-              <h3 className="text-sm font-semibold text-corporativo-700">Formulario manual</h3>
-              <p className="mt-1 flex-1 text-xs text-slate-500">Captura por pasos con validacion y PDF.</p>
-              <Boton variante="primario" tamano="lg" className="mt-3 w-full" onClick={() => irFormulario(null)}>Generar nueva acta</Boton>
-            </div>
-            <div className="flex flex-col rounded-xl border border-acento-400/50 bg-acento-100/40 p-4">
-              <h3 className="text-sm font-semibold text-corporativo-700">Redaccion asistida</h3>
-              <p className="mt-1 flex-1 text-xs text-slate-500">Describe tu asamblea y la IA propone el borrador.</p>
-              <Boton variante="acento" tamano="lg" className="mt-3 w-full" onClick={() => onGenerarConIA && onGenerarConIA()}>Generar acta con IA</Boton>
-            </div>
-          </div>
-        </TarjetaCuerpo>
-      </Tarjeta>
+
     </div>
   )
 }

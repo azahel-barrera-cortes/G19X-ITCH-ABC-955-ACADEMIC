@@ -97,13 +97,7 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
               {usuario?.nombre_completo || usuario?.email}
               {usuario?.rol && <span className="ml-1 text-slate-400">({usuario.rol})</span>}
             </span>
-            <button
-              type="button"
-              onClick={() => onCerrarSesion && onCerrarSesion()}
-              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-            >
-              Cerrar sesión
-            </button>
+
           </div>
         </div>
       </div>

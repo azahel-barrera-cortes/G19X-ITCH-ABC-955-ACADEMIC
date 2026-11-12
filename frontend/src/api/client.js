@@ -245,6 +245,12 @@ export async function consultarEstado() {
   return data
 }
 
+/** Lista la bitácora de acciones con filtros opcionales (revisor+). */
+export async function listarBitacora(filtros = {}) {
+  const { data } = await http.get('/bitacora', { params: filtros })
+  return data
+}
+
 // ---------------------------------------------------------------------------
 // Administración de actas: versiones, caducidad y estadísticas
 // ---------------------------------------------------------------------------
@@ -327,4 +333,32 @@ function nombreDesdeCabeceras(headers) {
   if (coincidencia) return decodeURIComponent(coincidencia[1])
   const simple = /filename="([^"]+)"/i.exec(disposicion)
   return simple ? simple[1] : ''
+}
+
+// ---------------------------------------------------------------------------.
+// Administración de usuarios (SuperAdmin / Administrador)
+// ---------------------------------------------------------------------------.
+
+/** Lista todos los usuarios registrados en el sistema. */
+export async function listarUsuarios() {
+  const { data } = await http.get('/auth/users')
+  return data
+}
+
+/** Crea un usuario desde el panel de administración. */
+export async function crearUsuario(datos) {
+  const { data } = await http.post('/auth/registro', datos)
+  return data
+}
+
+/** Actualiza un usuario existente: rol, activo, nombre_completo y/o password. */
+export async function actualizarUsuario(userId, cambios) {
+  const { data } = await http.put(`/auth/users/${userId}`, cambios)
+  return data
+}
+
+/** Elimina un usuario existente desde el panel de administración. */
+export async function eliminarUsuario(userId) {
+  const { data } = await http.delete(`/auth/users/${userId}`)
+  return data
 }
