@@ -4,6 +4,8 @@ import Campo from '../components/ui/Campo.jsx'
 import Alerta from '../components/ui/Alerta.jsx'
 import Tarjeta from '../components/ui/Tarjeta.jsx'
 import { TIPOS_SOCIEDAD } from '../constants/catalogos.js'
+import { actualizarInfoEmpresa, obtenerInfoEmpresa } from '../api/auth.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const CLAVE_LOCALSTORAGE = 'pgac_info_empresa'
 
@@ -22,15 +24,36 @@ export default function InformacionEmpresa({
   onUsarInfo = null,
   puedeEditar = false,
 }) {
+  const { token } = useAuth()
   const [info, setInfo] = useState(INFO_VACIA)
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
-    const almacenada = infoGuardada ?? cargarDesdeLocalStorage()
-    if (almacenada) setInfo(almacenada)
-  }, [infoGuardada])
+    if (!token) return undefined
+    let montado = true
+    setError(null)
+    obtenerInfoEmpresa(token)
+      .then((datos) => {
+        if (!montado) return
+        setInfo({ ...INFO_VACIA, ...datos })
+      })
+      .catch((fallo) => {
+        if (!montado) return
+        const endpointNoDisponible =
+          fallo.message === 'Not Found' || fallo.message.includes('404')
+        if (endpointNoDisponible) {
+          const almacenada = infoGuardada ?? cargarDesdeLocalStorage()
+          if (almacenada) setInfo({ ...INFO_VACIA, ...almacenada })
+          return
+        }
+        setError(fallo.message || 'No se pudo cargar la información empresarial.')
+      })
+    return () => {
+      montado = false
+    }
+  }, [token, infoGuardada])
 
   const cargarDesdeLocalStorage = () => {
     try {
@@ -91,14 +114,24 @@ export default function InformacionEmpresa({
       setError('Solo el Administrador puede modificar la información de la empresa o sociedad.')
       return
     }
+    if (!String(info.nombre_sociedad || '').trim() || !String(info.tipo_sociedad || '').trim()) {
+      setError('Completa la razón social y el tipo de sociedad antes de guardar.')
+      return
+    }
     setCargando(true)
     setError(null)
     try {
-      guardarEnLocalStorage(info)
+      const actualizada = await actualizarInfoEmpresa(token, info)
+      guardarEnLocalStorage(actualizada)
+      setInfo({ ...INFO_VACIA, ...actualizada })
       setAviso('Información de la sociedad guardada correctamente.')
-      if (onGuardar) onGuardar(info)
+      if (onGuardar) onGuardar(actualizada)
     } catch (fallo) {
-      setError('No se pudo guardar la información de la sociedad.')
+      if (fallo.message === 'Not Found' || fallo.message.includes('404')) {
+        setError('El backend en ejecución no tiene habilitado el guardado empresarial. Reinicia el servidor backend.')
+      } else {
+        setError(fallo.message || 'No se pudo guardar la información de la sociedad.')
+      }
     } finally {
       setCargando(false)
     }
@@ -107,6 +140,13 @@ export default function InformacionEmpresa({
   const tipoSeleccionado = TIPOS_SOCIEDAD.find((t) => t.valor === info.tipo_sociedad)
 
   if (!puedeEditar) {
+    const hayInformacionEmpresarial = Boolean(
+      info.nombre_sociedad ||
+      info.rfc_sociedad ||
+      info.tipo_sociedad ||
+      info.logo_empresa,
+    )
+
     return (
       <div className="space-y-5">
         <header className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-tarjeta">
@@ -125,8 +165,13 @@ export default function InformacionEmpresa({
           </div>
         </header>
 
-        {error && <Alerta tono="error" titulo="Error" mensaje={error} />}
-        {aviso && <Alerta tono="exito" mensaje={aviso} />}
+        {error && <Alerta tono="error" titulo="Error">{error}</Alerta>}
+        {aviso && <Alerta tono="exito">{aviso}</Alerta>}
+        {!hayInformacionEmpresarial && (
+          <Alerta tono="info" titulo="Información empresarial">
+            No especificada. El Administrador aún no ha guardado los datos de la sociedad.
+          </Alerta>
+        )}
 
         <Tarjeta className="space-y-5 p-5">
           <section className="rounded-xl border border-slate-200 bg-slate-50/40 p-5">
@@ -223,8 +268,14 @@ export default function InformacionEmpresa({
         </div>
       </header>
 
-      {error && <Alerta tono="error" titulo="Error" mensaje={error} />}
-      {aviso && <Alerta tono="exito" mensaje={aviso} />}
+      {error && <Alerta tono="error" titulo="Error">{error}</Alerta>}
+      {aviso && <Alerta tono="exito">{aviso}</Alerta>}
+      {(!info.nombre_sociedad || !info.tipo_sociedad) && (
+        <Alerta tono="info" titulo="Completa los datos de la sociedad">
+          Captura la razón social y el tipo de sociedad para compartir esta información
+          con los usuarios vinculados mediante tu código de empresa.
+        </Alerta>
+      )}
 
       <Tarjeta className="space-y-5 p-5">
         <fieldset className="rounded-xl border border-slate-200 bg-slate-50/40 p-5">
@@ -239,6 +290,7 @@ export default function InformacionEmpresa({
                   value={info.nombre_sociedad}
                   onChange={(e) => actualizarCampo('nombre_sociedad', e.target.value)}
                   placeholder="Comercializadora del Norte, S.A. de C.V."
+                  required
                   disabled={!puedeEditar}
                 />
             </Campo>
@@ -261,6 +313,7 @@ export default function InformacionEmpresa({
                   className="campo"
                   value={info.tipo_sociedad}
                   onChange={(e) => actualizarCampo('tipo_sociedad', e.target.value)}
+                  required
                   disabled={!puedeEditar}
                 >
                   <option value="">Selecciona un tipo de sociedad</option>

@@ -9,11 +9,18 @@ const BASE = import.meta.env.VITE_API_URL || ''
 async function peticion(path, { method = 'GET', headers = {}, body, token } = {}) {
   const cabeceras = { 'Content-Type': 'application/json', ...headers }
   if (token) cabeceras.Authorization = `Bearer ${token}`
-  const respuesta = await fetch(`${BASE}/api/v1${path}`, {
-    method,
-    headers: cabeceras,
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  let respuesta
+  try {
+    respuesta = await fetch(`${BASE}/api/v1${path}`, {
+      method,
+      headers: cabeceras,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error(
+      'No se pudo conectar con el backend. Verifica que la API esté ejecutándose en el puerto 8000.',
+    )
+  }
   if (!respuesta.ok) {
     const texto = await respuesta.text()
     let detalle
@@ -28,8 +35,11 @@ async function peticion(path, { method = 'GET', headers = {}, body, token } = {}
 }
 
 /* ── Registro / Login ─────────────────────────────────────────────── */
-export async function registrar({ email, nombre_completo, rol, password }) {
-  return peticion('/auth/registro', { method: 'POST', body: { email, nombre_completo, rol, password } })
+export async function registrar({ email, nombre_completo, rol, password, codigo_empresa }) {
+  return peticion('/auth/registro', {
+    method: 'POST',
+    body: { email, nombre_completo, rol, password, codigo_empresa },
+  })
 }
 
 export async function iniciarSesion({ email, password }) {
@@ -47,6 +57,14 @@ export async function obtenerPerfil(token) {
 
 export async function obtenerCodigoEmpresa(token) {
   return peticion('/auth/me/codigo-empresa', { method: 'POST', token })
+}
+
+export async function obtenerInfoEmpresa(token) {
+  return peticion('/auth/me/empresa', { token })
+}
+
+export async function actualizarInfoEmpresa(token, cambios) {
+  return peticion('/auth/me/empresa', { method: 'PUT', token, body: cambios })
 }
 
 export async function actualizarPerfil(token, cambios) {

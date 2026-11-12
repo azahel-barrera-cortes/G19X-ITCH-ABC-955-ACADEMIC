@@ -19,6 +19,7 @@ import SeguridadSuperAdmin from './pages/SeguridadSuperAdmin.jsx'
 import GuiaSuperAdmin from './pages/GuiaSuperAdmin.jsx'
 import UsuarioInactivo from './pages/UsuarioInactivo.jsx'
 import { obtenerCatalogos } from './api/client.js'
+import { obtenerInfoEmpresa } from './api/auth.js'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { seccionesPermitidas, SECCIONES_SISTEMA } from './constants/roles.js'
 
@@ -54,7 +55,7 @@ function seccionDesdeHash() {
  *
  * La compuerta de acceso vive en `Aplicacion`: sin sesión iniciada solo se
  * muestra la interfaz de acceso (`Acceso`), completamente separada del sistema
- * de actas; con sesión se abre el perfil del usuario y la navegación queda
+ * de actas; con sesión se abre el panel inicial correspondiente al rol y la navegación queda
  * limitada a las funciones permitidas por su rol.
  */
 export default function App() {
@@ -66,7 +67,7 @@ export default function App() {
 }
 
 function Aplicacion() {
-  const { autenticado, usuario, cerrarSesion } = useAuth()
+  const { autenticado, usuario, token, cerrarSesion } = useAuth()
   const [seccion, setSeccion] = useState(() => {
     const desdeHash = seccionDesdeHash()
     if (desdeHash) return desdeHash
@@ -114,11 +115,38 @@ function Aplicacion() {
     }
   }, [autenticado])
 
+  useEffect(() => {
+    if (!autenticado || !token) return undefined
+    let activo = true
+    obtenerInfoEmpresa(token)
+      .then((datos) => {
+        if (!activo) return
+        setInfoEmpresa(datos)
+        try {
+          localStorage.setItem(CLAVE_INFO_EMPRESA, JSON.stringify(datos))
+        } catch {
+          /* El backend sigue siendo la fuente de verdad. */
+        }
+      })
+      .catch((fallo) => {
+        console.error('No se pudo cargar la información empresarial:', fallo)
+      })
+    return () => {
+      activo = false
+    }
+  }, [autenticado, token])
+
   // Guarda de navegación: si la sección activa no está permitida para el rol,
   // se regresa al perfil (p. ej. un capturista no puede quedarse en Biblioteca).
   const esSuperAdmin = usuario?.rol === 'SuperAdministrador'
 
   useEffect(() => {
+    if (autenticado && esSuperAdmin && seccion === 'perfil') {
+      setSeccion('usuarios')
+      setVistaGenerar('panel')
+      return
+    }
+
     const seccionPermitida =
       seccionesVisibles.includes(seccion) ||
       (esSuperAdmin && SECCIONES_SUPERADMIN_IDS.includes(seccion))
@@ -193,11 +221,11 @@ function Aplicacion() {
     setSeccion('generar')
   }, [])
 
-  /** Tras un acceso correcto se abre el perfil del usuario. */
+  /** Tras un acceso correcto se abre el panel inicial correspondiente al rol. */
   const manejarAccesoExitoso = useCallback(() => {
     volverAlPanel()
-    setSeccion('perfil')
-  }, [volverAlPanel])
+    setSeccion(usuario?.rol === 'SuperAdministrador' ? 'usuarios' : 'perfil')
+  }, [usuario?.rol, volverAlPanel])
 
   /** Cerrar sesión limpia el token; la compuerta vuelve a mostrar `Acceso`. */
   const manejarCerrarSesion = useCallback(async () => {
@@ -273,7 +301,7 @@ function Aplicacion() {
               puedeEditar={usuario?.rol === 'Administrador'}
             />
           ) : null}
-          {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
+          {seccion === 'perfil' && !esSuperAdmin ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
           {seccion === 'administrador' ? <Administrador /> : null}
           {seccion === 'usuarios' && <UsuariosSuperAdmin />}
           {seccion === 'vitacora' && <VitacoraSuperAdmin />}
