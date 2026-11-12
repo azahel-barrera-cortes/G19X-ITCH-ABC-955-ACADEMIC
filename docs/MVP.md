@@ -15,14 +15,14 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ### Backend (Python + FastAPI)
 | Módulo | Qué incluye |
 |--------|-------------|
-| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, rol, password_hash, activo, reset_token) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
+| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, nombre, rol, password_hash, activo, `codigo_empresa`, reset_token) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
 | Plantillas legales parametrizadas | `PlantillaLegal` + `ParametroPlantilla` con validación de parámetros requeridos, valores por defecto, `obtener_parametros_plantilla()`, `parametros_requeridos_por_materia()`, `DatosPlantillaIncompletosError` — 15 materias cubiertas con fundamentos LGSM |
 | IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible (Ollama, Groq, DeepSeek, LM Studio, vLLM); si falla, degrada a plantillas deterministas |
 | ReportLab | `build_acta_pdf(data) -> bytes` con encabezados, márgenes, firmas, numeración de páginas |
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
-| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = SuperAdministrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol, semilla inicial de Super Administrador via variables de entorno; **generación de un único `Administrador` de empresa emitido con un código/clabe única desde el panel `UsuariosSuperAdmin`, vinculando revisores, capturistas y abogados responsables a esa empresa** |
+| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = SuperAdministrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol, semilla inicial de Super Administrador vía variables de entorno; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
@@ -33,17 +33,18 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Componente | Qué incluye |
 |------------|-------------|
 | Interfaz de acceso (separada) | `Acceso.jsx`: `Login`, `Registro` y `RecuperarPassword` con marca institucional — **sin barra lateral ni funciones de actas**. Tras un acceso correcto se abre `Perfil`. |
-| Perfil con funciones por rol | `Perfil.jsx`: muestra el rol del usuario y las secciones habilitadas (`seccionesConAcceso`); se protege la navegación por rol en `App.jsx`, `BarraLateral` y `Encabezado`. |
+| Perfil y permisos por rol | `Perfil.jsx`: muestra nombre, correo y rol; permite cambiar contraseña, presenta el código empresarial al `Administrador`, limita la edición del nombre al `SuperAdministrador` y muestra la información de empresa en modo lectura para capturista, revisor y abogado responsable. |
 | Wizard de 4 pasos | 1. Datos generales → 2. Asistentes y quórum → 3. Orden del día y acuerdos → 4. Revisión y PDF |
 | Generación | Botón «Generar borrador con IA» y «Descargar PDF final» |
 | Biblioteca de actas | Listar actas con filtros, descarga de PDF, edición, cambio de estatus, revalidación y eliminación (revisor+ para listar/delete) |
 | Administración de actas | Resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad (revisor+ consulta; capturista+ mutaciones) |
 | Asistente IA | Chat conversacional para creación guiada de actas, validación, consulta de estatus y descarga de PDF (usuario autenticado) |
-| Autenticación | Login, registro automático al crear cuenta, perfil, cambiar contraseña, recuperación (token muestra por `DEBUG`) |
+| Autenticación | Login, registro automático al crear cuenta, perfil, cambio de contraseña, recuperación (token muestra por `DEBUG`), control de cuentas inactivas y administración global de usuarios |
+| Administración global | `UsuariosSuperAdmin.jsx`, `VitacoraSuperAdmin.jsx` y `UsuarioInactivo.jsx`: gestión de usuarios, bitácora para SuperAdministrador y pantalla de bloqueo para cuentas inactivas |
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
 
 ### Pruebas
-- 87 pruebas automatizadas pasando, desglose por archivo:
+- Suite de pruebas automatizadas, con desglose por archivo:
   - `test_administracion.py`: 11
   - `test_ai_service.py`: 23
   - `test_api_actas.py`: 9
@@ -52,7 +53,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
   - `test_flujo_creacion.py`: 3
   - `test_pdf_generator.py`: 5
   - `test_plantillas_legales.py`: 17
-  - Total: 85
+  - Total histórico documentado: 85
 - Build del frontend exitoso (Vite)
 
 ---
@@ -63,7 +64,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 |------|----------------|--------|
 | **Autenticación y roles** | ✅ Entregado (JWT + RBAC + interfaz de acceso separada + perfil por rol) | Requisito RF-11 de la versión entregada |
 | **Firma electrónica** | Firma electrónica avanzada, hash + sellado de tiempo | Requiere infraestructura adicional y validez legal específica |
-| **Multiempresa** | Aislamiento de datos por sociedad/cliente | El MVP asume una sola instancia; el backend no expone organización/empresa al usuario |
+| **Multiempresa completa** | Aislamiento de datos por sociedad/cliente y vinculación automática de empleados mediante código | El MVP genera y muestra el código empresarial del Administrador, pero todavía no implementa el aislamiento multiempresa ni el registro público con código |
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
 | **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |
 | **Servicio de correo** | Envío del token de recuperación por email | El token se muestra en la respuesta solo en modo DEBUG |
@@ -74,13 +75,13 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 
 - [ ] Se instala y arranca la aplicación: backend con PostgreSQL o SQLite, frontend en Vite.
 - [ ] El **primer usuario** se registra (o lo crea el administrador) y accede por login; **sin sesión iniciada solo se muestra la interfaz de acceso**: ninguna sección del sistema de actas visible.
-- [ ] Tras un acceso correcto se abre **Mi perfil** con las funciones permitidas por el rol: capturista (generar actas, asistente, empresa), revisor+ (biblioteca, administración, bitácora, API notarial), abogado responsable+ (estatus, validación, aprobación), Administrador (total, gestión de usuarios de la empresa) y SuperAdministrador (panel global de superadministración del sistema).
+- [ ] Tras un acceso correcto se abre **Mi perfil** con las funciones permitidas por el rol: capturista (generar actas, asistente y empresa en modo lectura), revisor+ (biblioteca, administración, bitácora y API notarial), abogado responsable+ (estatus y validación), Administrador (gestión de información de empresa) y SuperAdministrador (panel global de superadministración del sistema).
 - [ ] El acta se valida en consistencia (quórum, mayorías, fundamentos legales)
 - [ ] Las actas se pueden listar, editar, cambiar de estatus y eliminar
 - [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)
 - [ ] El asistente IA guía la creación de actas mediante conversación
 - [ ] La información de la empresa/sociedad se captura y se usa automáticamente al generar actas
-- [ ] Las 87 pruebas de backend pasan; el frontend builda sin errores.
+- [ ] La suite de backend pasa; el frontend builda sin errores.
 - [ ] Build del frontend exitoso
 
 ---
@@ -88,7 +89,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ## 5. Limitaciones conocidas del MVP
 
 - ✅ Autenticación y roles (JWT + RBAC + interfaz de acceso separada + perfil
-  por rol) y bitácora de cambios: **entregados en esta versión**.
+  por rol), cuentas inactivas y bitácora de cambios: **entregados en esta versión**.
 - SQLite por defecto: apto para desarrollo y demostración; para producción se
   recomienda PostgreSQL con migraciones (Alembic).
 - El número de acciones e importes se almacenan como `float`; para precisión

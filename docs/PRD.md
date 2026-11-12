@@ -67,20 +67,21 @@ El sistema debe permitir capturar y persistir los datos de la sociedad que compa
 
 ### RF-11: Autenticación y control de acceso por roles (RBAC)
 El sistema debe exigir autenticación para toda operación del dominio:
-- El primer usuario registrado se crea como `Administrador`; los registros
-   públicos posteriores se asignan forzosamente como `capturista` (Cada
-   usuario puede cambiar su nombre y su contraseña desde `PUT /api/v1/auth/me`;
-   sólo un Administrador cambia roles o activa cuentas desde
-   `PUT /api/v1/auth/users/{id}`).
+- El primer usuario registrado se crea como `SuperAdministrador`; los registros
+  públicos posteriores se asignan forzosamente como `capturista`.
+- El nombre del perfil solo puede ser actualizado por el
+  `SuperAdministrador`; todos los usuarios pueden cambiar su contraseña desde
+  `PUT /api/v1/auth/me`.
 - Inicio de sesión con email y contraseña (bcrypt); devolución de un JWT
   firmado (HS256) con expiración configurada.
 - Roles con privilegios crecientes: `capturista` (1) < `revisor` (2) <
-  `abogado_responsable` (3) < `Administrador` (4). Cada operación declara el
-  rol mínimo requerido y el backend responde 401 si no hay token y 403 si el
-  rol es insuficiente.
-- Perfil del usuario autenticado: consulta y actualización de nombre y
-  contraseña; gestión de usuarios (listar, cambiar rol, activar/desactivar)
-  reservada al Administrador.
+  `abogado_responsable` (3) < `Administrador` (4) <
+  `SuperAdministrador` (5). Cada operación declara el rol mínimo requerido y
+  el backend responde 401 si no hay token y 403 si el rol es insuficiente.
+- Perfil del usuario autenticado: consulta de nombre, correo y rol; cambio de
+  contraseña; el código empresarial se muestra al `Administrador`.
+  La gestión de usuarios (listar, cambiar rol, activar/desactivar, eliminar y
+  restablecer contraseña) está reservada al `SuperAdministrador`.
 - Recuperación de contraseña mediante token temporal de un solo uso (1 hora).
 
 ### RF-12: Interfaz de acceso separada y perfil por rol
@@ -95,6 +96,11 @@ El sistema debe exigir autenticación para toda operación del dominio:
 - La separación por rol también protege los datos: un capturista no puede
   listar ni eliminar actas, ni ver la bitácora ni la administración, incluso
   si intenta llamar directamente a los endpoints.
+- Las cuentas desactivadas no pueden iniciar sesión y reciben una pantalla
+  informativa para cerrar sesión. La información de empresa es editable por el
+  `Administrador`; capturista, revisor y abogado responsable solo consultan
+  razón social, tipo de sociedad, logo y estados de firma electrónica y uso en
+  generación de actas.
 
 ### RF-13: Bitácora de cambios (auditoría)
 El sistema debe registrar automáticamente quién realizó cada acción sensible
@@ -144,7 +150,8 @@ El backend persiste la información en tres tablas principales (portables entre 
 | `id` (PK) | Autoincremental |
 | `email` (único) | Credencial de login |
 | `nombre_completo` | Nombre visible |
-| `rol` | `capturista`, `revisor`, `abogado_responsable`, `Administrador` |
+| `rol` | `SuperAdministrador`, `Administrador`, `capturista`, `revisor`, `abogado_responsable` |
+| `codigo_empresa` | Código empresarial generado únicamente para usuarios con rol `Administrador` |
 | `password_hash` | bcrypt, nunca expuesto por la API |
 | `activo` | Habilita/deshabilita la cuenta |
 | `reset_token`, `reset_token_expires` | Token de recuperación (1 hora) |
@@ -193,7 +200,7 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
 | Servicio de correo | Envío del token de recuperación por email (hoy solo en `DEBUG`) |
-| Panel de gestión de usuarios en UI | El alta/cambio de roles se hace por API; el frontend no incluye un panel de usuarios |
+| Vinculación multiempresa completa | El MVP no aísla datos por sociedad ni registra empleados mediante código empresarial |
 
 ---
 
@@ -207,8 +214,8 @@ La plataforma implementa autenticación JWT con control de acceso por roles
   responden 401 y con rol insuficiente 403.
 - El registro es público pero el servidor fuerza el rol `capturista`; el
   primer usuario del sistema arranca como `SuperAdministrador` (acceso
-  absoluto). Un SuperAdministrador o Administrador puede asignar cualquier
-  rol válido a usuarios posteriores.
+  absoluto). Solo el `SuperAdministrador` puede asignar roles válidos,
+  activar/desactivar o eliminar usuarios desde `UsuariosSuperAdmin`.
 - Las contraseñas se guardan con bcrypt y la recuperación se hace con un
   token temporal de un solo uso de 1 hora (en `DEBUG` el token viaja en la
   respuesta para poder probar el flujo de extremo a extremo).
@@ -228,7 +235,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 
 ## 7. Métricas de éxito del MVP
 
-- 87 pruebas de backend pasando
+- Suite de pruebas de backend pasando
 - Build del frontend sin errores
 - PDF generado: ≥ 1 página, con encabezado, quórum y firmas
 - Validación de consistencia: puntaje visible y hallazgos listados

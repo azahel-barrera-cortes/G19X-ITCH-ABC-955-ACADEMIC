@@ -29,7 +29,7 @@ PGAC/
 │   │                              verificar_api_e2e.py, verificar_admin_e2e.py, verificar_ia_e2e.py,
 │   │                              diagnosticar_pdf.py
 │   ├── ejemplos/               acta_ejemplo.pdf y acta_e2e.pdf (PDF generados de muestra)
-│   ├── tests/                  87 pruebas automatizadas
+│   ├── tests/                  Suite de pruebas automatizadas
 │   └── app/
 │       ├── main.py                 FastAPI, CORS, manejadores de errores, /health
 │       ├── core/                   config, catálogos LGSM, formato, excepciones, security (bcrypt + JWT)
@@ -56,7 +56,7 @@ PGAC/
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil (funciones por rol), GenerarActa, BibliotecaActas, AdministracionActas, InformacionEmpresa, Ayuda
+        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil (permisos y datos de empresa), GenerarActa, BibliotecaActas, AdministracionActas, InformacionEmpresa, UsuariosSuperAdmin, VitacoraSuperAdmin, UsuarioInactivo, Ayuda
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -155,9 +155,10 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    ni ninguna función de actas, así que nadie puede ver ni modificar nada sin
    entrar. El **primer usuario registrado** se crea como `SuperAdministrador`
    (arranque del sistema); los autoregistros posteriores quedan siempre como
-    `capturista`; Cada usuario puede cambiar su nombre y su contraseña desde
-    `PUT /api/v1/auth/me`; sólo un SuperAdministrador o Administrador cambia
-    roles o activa cuentas desde `PUT /api/v1/auth/users/{id}`.
+   `capturista`. El nombre del perfil solo lo puede modificar el
+   `SuperAdministrador`; todos los usuarios pueden cambiar su contraseña desde
+   `PUT /api/v1/auth/me`. La administración de usuarios se reserva al
+   `SuperAdministrador` desde `UsuariosSuperAdmin`.
    Tras un acceso correcto se abre **Mi perfil**, que muestra las funciones
    permitidas según el rol; la barra lateral y la navegación móvil solo
    presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca ni
@@ -177,28 +178,18 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 
 | Rol | Pantalla de entrada | Secciones visibles en la barra lateral | Acciones principales |
 |-----|---------------------|----------------------------------------|----------------------|
-| **Capturista** | Mi perfil (funciones de su rol) | Generar acta, Asistente IA, Información de la empresa o sociedad, Guía de uso | Crear y editar actas, redactar con IA, generar PDF, exportar expediente ZIP |
-| **Revisor** | Mi perfil (funciones de su rol) | Todo lo del capturista, además: Biblioteca de actas, Administración | Listar y consultar actas, descargar PDF guardado, administración (resumen, vigencia, versiones, caducidad), bitácora de cambios, API de notaría |
-| **Abogado responsable** | Mi perfil (funciones de su rol) | Todo lo del revisor | Cambiar estatus de actas, aprobar, validar y revalidar consistencia |
-| **Administrador** | Mi perfil (funciones de su rol) | Todas las secciones | Acceso total: gestionar usuarios (listar, cambiar rol, activar/desactivar), eliminar actas, todo lo anterior |
+| **Capturista** | Mi perfil | Generar acta, Asistente IA, Información de la empresa o sociedad, Guía de uso | Crear y editar actas, redactar con IA, generar PDF y exportar expediente ZIP |
+| **Revisor** | Mi perfil | Todo lo del capturista, además: Biblioteca de actas y Administración | Listar y consultar actas, descargar PDF guardado, consultar administración, bitácora de cambios y API de notaría |
+| **Abogado responsable** | Mi perfil | Todo lo del revisor | Cambiar estatus, aprobar y revalidar actas |
+| **Administrador** | Mi perfil | Todas las secciones operativas | Gestionar la información de empresa o sociedad y usar las funciones de actas |
+| **SuperAdministrador** | Mi perfil | Todas las secciones, incluida la administración global | Crear, editar, activar, desactivar y eliminar usuarios; asignar roles y consultar la bitácora global |
 
-> El primer usuario registrado se crea automáticamente como `SuperAdministrador`.
-> Los autoregistros posteriores quedan siempre como `capturista`; Cada usuario
-> puede cambiar su nombre y su contraseña desde `PUT /api/v1/auth/me`; sólo un
-> SuperAdministrador o Administrador cambia roles o activa cuentas desde
-> `PUT /api/v1/auth/users/{id}`.
-| **Administrador de empresa** | Mi perfil (funciones de su rol) | Todas las secciones, vinculadas a una empresa/sociedad | Gestiona usuarios (capturista, revisor, abogado responsable) vinculados por **código o clabe única**; expide ese código desde el panel `UsuariosSuperAdmin` (solo se puede generar un `Administrador` por empresa). |
-
-
-> **Generación de `Administrador de empresa` (desde `SuperAdministrador`):**
-> Desde el rol `SuperAdministrador`, en el panel de **`UsuariosSuperAdmin`**,
-> en el formulario de registro de un usuario, se expide un **código o clabe
-> única** que identifica a la empresa/sociedad. Cuando un revisor, un
-> capturista o un abogado responde ese código en su formulario de registro,
-> el sistema los une automáticamente a ese `Administrador de empresa`.
-> Solo puede existir **un `Administrador` por empresa/sociedad**; el sistema
-> evita crear un segundo después de la primera generación. El código se
-> utiliza como vínculo de pertenencia y no como credencial de acceso.
+> El código empresarial se genera automáticamente para cada usuario con rol
+> `Administrador` cuando se registra o cuando el `SuperAdministrador` le asigna
+> ese rol. Se muestra únicamente en el perfil del `Administrador`; no se
+> muestra al `SuperAdministrador` ni a los roles subordinados. Actualmente el
+> registro público crea únicamente cuentas `capturista`, por lo que la
+> vinculación de empleados mediante ese código requiere una ampliación posterior.
 
 ## 5. Endpoints de la API
 
@@ -218,7 +209,7 @@ token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/v1/auth/registro` | Registro (público: rol `capturista`; el primer usuario, `SuperAdministrador`; un SuperAdministrador o Administrador asigna cualquier rol) |
+| `POST` | `/api/v1/auth/registro` | Registro (público: rol `capturista`; el primer usuario, `SuperAdministrador`; el `SuperAdministrador` asigna otros roles desde `UsuariosSuperAdmin`) |
 | `POST` | `/api/v1/auth/login` | Iniciar sesión; devuelve el JWT de acceso |
 | `GET` `PUT` | `/api/v1/auth/me` | Perfil del usuario autenticado (consulta y actualización) |
 | `POST` | `/api/v1/auth/reset-password` | Solicita token de recuperación (público; en `DEBUG` lo devuelve en `detalle`) |
@@ -242,8 +233,10 @@ token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 | `GET` | `/api/v1/administracion/versiones/{id}/{n}` | Instantánea completa de una versión |
 | `POST` | `/api/v1/administracion/versiones/{id}/{n}/restaurar` | Restaura y emite una versión nueva |
 | `PUT` | `/api/v1/administracion/caducidad/{id}` | Fija, amplía o elimina la fecha de caducidad |
-| `GET` | `/api/v1/auth/users` | Lista de usuarios (Administrador) |
-| `PUT` | `/api/v1/auth/users/{id}` | Cambiar rol, activar/desactivar o restablecer contraseña (Administrador) |
+| `GET` | `/api/v1/auth/users` | Lista de usuarios (SuperAdministrador) |
+| `PUT` | `/api/v1/auth/users/{id}` | Cambiar rol, activar/desactivar o restablecer contraseña (SuperAdministrador) |
+| `DELETE` | `/api/v1/auth/users/{id}` | Eliminar un usuario (SuperAdministrador) |
+| `GET` | `/api/v1/auth/me/codigo-empresa` | Consulta o genera el código empresarial del Administrador autenticado |
 | `GET` | `/api/v1/bitacora` | Bitácora de cambios con filtros `accion` y `entidad` (revisor+) |
 | `GET` | `/api/v1/bitacora/{id}` | Entrada concreta de la bitácora (revisor+) |
 | `GET` | `/api/v1/expediente/{id}/zip` | Expediente ZIP: PDF del acta + `metadatos.json` (capturista+) |
@@ -303,7 +296,8 @@ para ser portables entre PostgreSQL y SQLite.
 | `id` (PK) | Identificador autoincremental |
 | `email` (único) | Correo de acceso (credencial de `login`) |
 | `nombre_completo` | Nombre visible del usuario |
-| `rol` | `capturista`, `revisor`, `abogado_responsable` o `Administrador` |
+| `rol` | `SuperAdministrador`, `Administrador`, `capturista`, `revisor` o `abogado_responsable` |
+| `codigo_empresa` | Código empresarial generado únicamente para usuarios con rol `Administrador` |
 | `password_hash` | Contraseña hasheada con bcrypt; **nunca se expone** por la API |
 | `activo` | Desactivar la cuenta sin borrarla |
 | `reset_token`, `reset_token_expires` | Token temporal de recuperación (1 hora, de solo lectura) |
@@ -471,7 +465,7 @@ cd backend
 | `tests/test_asistente.py` | Chat del asistente IA, validación, estatus, versiones y resumen por estatus (pasa con usuario autenticado) |
 | `tests/test_flujo_creacion.py` | Flujo guiado de creación, PDF y control del acta generada (pasa con usuario autenticado) |
 | `tests/test_administracion.py` | Resumen del repositorio, clasificación de vigencia, historial de versiones, restauración y caducidad |
-| `tests/test_auth.py` | Registro público (1er usuario = `Administrador`, el resto = `capturista`), login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
+| `tests/test_auth.py` | Registro público (1er usuario = `SuperAdministrador`, el resto = `capturista`), generación de código empresarial, login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
 
 ### Resultados obtenidos en esta máquina
 
