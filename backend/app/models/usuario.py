@@ -26,6 +26,10 @@ class Usuario(Base):
     rol: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    # Código que el Administrador de la empresa comparte con sus empleados.
+    codigo_empresa: Mapped[Optional[str]] = mapped_column(
+        String(32), unique=True, nullable=True, index=True
+    )
 
     # Token de recuperación de contraseña (válido 1 hora)
     reset_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
@@ -78,6 +82,16 @@ class BitacoraCambios(Base):
     )
 
     usuario: Mapped[Optional["Usuario"]] = relationship(back_populates="bitacora")
+
+    @property
+    def usuario_nombre(self) -> Optional[str]:
+        """Nombre conservado para presentar la trazabilidad sin otra consulta."""
+        return self.usuario.nombre_completo if self.usuario else None
+
+    @property
+    def usuario_rol(self) -> Optional[str]:
+        """Rol vigente del usuario que originó la acción."""
+        return self.usuario.rol if self.usuario else None
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<BitacoraCambios id={self.id} accion={self.accion!r} entidad={self.entidad!r}>"

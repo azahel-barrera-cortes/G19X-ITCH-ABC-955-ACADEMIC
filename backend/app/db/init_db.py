@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from app.db.base import Base
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
 from app.core.config import settings
 from app.core import security
 from app.models.usuario import Usuario
@@ -80,6 +80,7 @@ _COLUMNAS_NUEVAS = {
     "usuarios": (
         ("reset_token", "VARCHAR(128)"),
         ("reset_token_expires", "DATETIME"),
+        ("codigo_empresa", "VARCHAR(32)"),
     ),
 }
 
@@ -96,3 +97,25 @@ def _aplicar_migraciones_ligeras() -> None:
                 if nombre not in existentes:
                     conexion.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}"))
                     logger.info("Columna %s.%s agregada por migración ligera", tabla, nombre)
+
+    _asignar_codigos_empresa()
+
+
+def _asignar_codigos_empresa() -> None:
+    """Completa códigos para Administradores creados antes de esta migración."""
+    from app.services.auth_service import generar_codigo_empresa
+
+    db = SessionLocal()
+    try:
+        administradores = (
+            db.query(Usuario)
+            .filter(Usuario.rol == "Administrador", Usuario.codigo_empresa.is_(None))
+            .all()
+        )
+        for administrador in administradores:
+            administrador.codigo_empresa = generar_codigo_empresa(db)
+        if administradores:
+            db.commit()
+            logger.info("Códigos de empresa asignados: %d", len(administradores))
+    finally:
+        db.close()

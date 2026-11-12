@@ -108,8 +108,108 @@ def test_admin_autenticado_puede_asignar_cualquier_rol(cliente_autenticado, sesi
         )
         assert respuesta.status_code == 201, respuesta.text
         assert respuesta.json()["rol"] == "revisor"
+        assert respuesta.json()["codigo_empresa"] is None
     finally:
         _borrar_usuario(sesion, "revisor@pgac.com")
+
+
+def test_registro_de_administrador_genera_codigo_empresa(cliente_autenticado, sesion) -> None:
+    try:
+        respuesta = cliente_autenticado.post(
+            "/api/v1/auth/registro",
+            json={
+                "email": "admin-empresa@pgac.com",
+                "nombre_completo": "Administrador de Empresa",
+                "rol": "Administrador",
+                "password": "secreto-1",
+            },
+        )
+        assert respuesta.status_code == 201, respuesta.text
+        codigo = respuesta.json()["codigo_empresa"]
+        assert codigo.startswith("PGAC-")
+        assert len(codigo) == 15
+    finally:
+        _borrar_usuario(sesion, "admin-empresa@pgac.com")
+
+
+def test_superadministrador_creando_administrador_genera_codigo(
+    cliente_anonimo, sesion
+) -> None:
+    super_usuario = _crear_usuario(
+        sesion, "super-crea-admin@pgac.com", "SuperAdministrador"
+    )
+    try:
+        login = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": super_usuario.email, "password": "secreto-1"},
+        )
+        assert login.status_code == 200, login.text
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/registro",
+            json={
+                "email": "admin-desde-super@pgac.com",
+                "nombre_completo": "Administrador desde SuperAdmin",
+                "rol": "Administrador",
+                "password": "secreto-1",
+            },
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+        )
+        assert respuesta.status_code == 201, respuesta.text
+        assert respuesta.json()["codigo_empresa"].startswith("PGAC-")
+    finally:
+        _borrar_usuario(sesion, "admin-desde-super@pgac.com")
+        _borrar_usuario(sesion, "super-crea-admin@pgac.com")
+
+
+def test_gestion_usuarios_solo_para_superadministrador(cliente_anonimo, sesion) -> None:
+    """El administrador común no puede consultar ni modificar usuarios."""
+    admin_email = "admin-usuarios@pgac.com"
+    super_email = "super-usuarios@pgac.com"
+    admin_usuario = _crear_usuario(sesion, admin_email, "Administrador", "secreto-1")
+    super_usuario = _crear_usuario(sesion, super_email, "SuperAdministrador", "secreto-1")
+
+    try:
+        admin_login = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": admin_email, "password": "secreto-1"},
+        )
+        super_login = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": super_email, "password": "secreto-1"},
+        )
+        admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
+        super_headers = {"Authorization": f"Bearer {super_login.json()['access_token']}"}
+
+        listado_admin = cliente_anonimo.get("/api/v1/auth/users", headers=admin_headers)
+        listado_super = cliente_anonimo.get("/api/v1/auth/users", headers=super_headers)
+        actualizacion_admin = cliente_anonimo.put(
+            f"/api/v1/auth/users/{admin_usuario.id}",
+            json={"activo": False},
+            headers=admin_headers,
+        )
+        asignacion_super_admin = cliente_anonimo.put(
+            f"/api/v1/auth/users/{admin_usuario.id}",
+            json={"rol": "SuperAdministrador"},
+            headers=super_headers,
+        )
+        cambio_super_admin_actual = cliente_anonimo.put(
+            f"/api/v1/auth/users/{super_usuario.id}",
+            json={"rol": "Administrador"},
+            headers=super_headers,
+        )
+
+        assert listado_admin.status_code == 403
+        assert listado_super.status_code == 200
+        assert {usuario["email"] for usuario in listado_super.json()} >= {
+            admin_email,
+            super_email,
+        }
+        assert actualizacion_admin.status_code == 403
+        assert asignacion_super_admin.status_code == 422
+        assert cambio_super_admin_actual.status_code == 422
+    finally:
+        _borrar_usuario(sesion, admin_email)
+        _borrar_usuario(sesion, super_email)
 
 
 def test_registro_con_email_duplicado_devuelve_422(cliente_anonimo, cliente_autenticado) -> None:

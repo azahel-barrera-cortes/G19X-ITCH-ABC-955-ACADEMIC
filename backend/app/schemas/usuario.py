@@ -20,6 +20,7 @@ class UsuarioBase(BaseModel):
         description="Rol del usuario: Administrador, capturista, revisor o abogado_responsable.",
     )
     activo: bool = True
+    codigo_empresa: Optional[str] = None
 
 
 class UsuarioCrear(UsuarioBase):
@@ -94,6 +95,8 @@ class BitacoraCambiosRespuesta(BaseModel):
 
     id: int
     usuario_id: Optional[int]
+    usuario_nombre: Optional[str] = None
+    usuario_rol: Optional[str] = None
     accion: str
     entidad: str
     entidad_id: Optional[int]

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import secrets
+import string
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -12,6 +14,19 @@ from app.core.config import settings
 from app.core.exceptions import DatosActaInvalidosError
 from app.models.usuario import Usuario
 from app.schemas.usuario import UsuarioCrear, UsuarioRespuesta
+
+
+def generar_codigo_empresa(db: Session) -> str:
+    """Genera un código corto y único para un Administrador de empresa."""
+    caracteres = string.ascii_uppercase + string.digits
+    for _ in range(10):
+        codigo = "PGAC-" + "".join(secrets.choice(caracteres) for _ in range(10))
+        if not db.query(Usuario).filter(Usuario.codigo_empresa == codigo).first():
+            return codigo
+    raise DatosActaInvalidosError(
+        "No se pudo generar el código de la empresa.",
+        detalle="Se agotaron los intentos para generar un código único.",
+    )
 
 
 def autenticar_usuario(db: Session, email: str, password: str) -> Optional[Usuario]:
@@ -43,6 +58,7 @@ def crear_usuario(db: Session, datos: UsuarioCrear) -> Usuario:
         rol=datos.rol,
         password_hash=security.hash_password(datos.password),
         activo=datos.activo,
+        codigo_empresa=generar_codigo_empresa(db) if datos.rol == "Administrador" else None,
     )
     db.add(usuario)
     db.commit()
