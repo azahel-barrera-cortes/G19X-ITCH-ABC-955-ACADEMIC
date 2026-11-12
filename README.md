@@ -37,7 +37,7 @@ PGAC/
 │       ├── models/                 `Acta` + enums de dominio, `Usuario` y `BitacoraCambios`
 │       ├── schemas/                contratos Pydantic (acta, usuario/auth)
 │       ├── services/
-│       │   ├── plantillas_legales.py   15 materias con fundamentos de la LGSM
+│       │   ├── plantillas_legales.py   26 materias con fundamentos normativos
 │       │   ├── ai_service.py           LLM + reglas + degradación a plantillas
 │       │   ├── pdf_generator.py        build_acta_pdf(data: dict) -> bytes
 │       │   ├── auth_service.py         registro, login y recuperación de contraseña
@@ -56,7 +56,7 @@ PGAC/
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil (permisos y datos de empresa), GenerarActa, BibliotecaActas, AdministracionActas, InformacionEmpresa, UsuariosSuperAdmin, VitacoraSuperAdmin, UsuarioInactivo, Ayuda
+        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil, ControlGeneraActa (plantillas y modos de creación), GenerarActa, GenerarActaConIA, BibliotecaActas, AdministracionActas, InformacionEmpresa, Administrador, UsuariosSuperAdmin, VitacoraSuperAdmin, EstadisticasSuperAdmin, SeguridadSuperAdmin, GuiaSuperAdmin, UsuarioInactivo, Ayuda
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -181,14 +181,20 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    Tras un acceso correcto se abre **Mi perfil** para los usuarios operativos;
    el `SuperAdministrador` entra directamente a **UsuariosSuperAdmin** y no
    muestra Perfil. La barra lateral y la navegación móvil solo
-   presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca ni
-   Administración, y el backend responde 403 si las invoca directamente).
-1. **Generar acta** → Paso 1 *Datos generales* → Paso 2 *Asistentes y quórum* →
+   presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca y
+   solo accede a las operaciones de Administración permitidas; el backend
+   responde 403 si intenta invocar una operación reservada).
+1. **Generar acta** → panel de inicio con plantillas frecuentes, formulario manual
+   o redacción asistida por IA → Paso 1 *Datos generales* → Paso 2 *Asistentes y quórum* →
    Paso 3 *Orden del día y acuerdos* → Paso 4 *Revisión y PDF*.
 2. En el paso 4: **«Generar borrador con IA»** devuelve cláusulas + validación;
    **«Descargar PDF final»** compila el PDF (`Blob`) y lo descarga, mostrando
    folio, versión, páginas y proveedor de IA leídos de los encabezados `X-Acta-*`.
-3. **Biblioteca de actas** → filtros por folio/sociedad, tipo y estatus;
+3. La **información de la empresa o sociedad** se consulta desde el backend y,
+   para el Administrador, permite editar razón social, RFC, tipo societario,
+   logo, firma electrónica y el toggle de uso automático. Al activarse, estos
+   datos se incorporan al wizard, al asistente, a la redacción y al PDF.
+4. **Biblioteca de actas** → filtros por folio/sociedad, tipo y estatus;
    descarga, edición, revalidación, cambio de estatus y eliminación.
 
 ### ¿Qué ve cada usuario al iniciar sesión?
@@ -198,18 +204,18 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 
 | Rol | Pantalla de entrada | Secciones visibles en la barra lateral | Acciones principales |
 |-----|---------------------|----------------------------------------|----------------------|
-| **Capturista** | Mi perfil | Generar acta, Asistente IA, Información de la empresa o sociedad, Guía de uso | Crear y editar actas, redactar con IA, generar PDF y exportar expediente ZIP |
+| **Capturista** | Mi perfil | Generar acta, Asistente IA, Información de la empresa o sociedad, Administración (operaciones permitidas), Guía de uso | Crear y editar actas, redactar con IA, generar PDF y exportar expediente ZIP |
 | **Revisor** | Mi perfil | Todo lo del capturista, además: Biblioteca de actas y Administración | Listar y consultar actas, descargar PDF guardado, consultar administración, bitácora de cambios y API de notaría |
 | **Abogado responsable** | Mi perfil | Todo lo del revisor | Cambiar estatus, aprobar y revalidar actas |
 | **Administrador** | Mi perfil | Todas las secciones operativas | Gestionar la información de empresa o sociedad y usar las funciones de actas |
-| **SuperAdministrador** | UsuariosSuperAdmin | Todas las secciones, incluida la administración global | Crear, editar, activar, desactivar y eliminar usuarios; asignar roles y consultar la bitácora global |
+| **SuperAdministrador** | UsuariosSuperAdmin | Usuarios, bitácora, estadísticas, seguridad y guía global, además de las funciones operativas | Crear, editar, activar, desactivar y eliminar usuarios; asignar roles, revisar estadísticas, seguridad y bitácora global |
 
 > El código empresarial se genera automáticamente para cada usuario con rol
-> `Administrador` cuando se registra o cuando el `SuperAdministrador` le asigna
-> ese rol. Se muestra únicamente en el perfil del `Administrador`; no se
-> muestra al `SuperAdministrador` ni a los roles subordinados. Actualmente el
-> registro público crea únicamente cuentas `capturista`, por lo que la
-> vinculación de empleados mediante ese código requiere una ampliación posterior.
+> `Administrador`. El registro público permite seleccionar `capturista`,
+> `revisor` o `abogado_responsable` y exige un código válido para vincular la
+> cuenta con la empresa; la información empresarial se hereda automáticamente.
+> El `SuperAdministrador` administra usuarios, roles, activación, seguridad,
+> estadísticas y bitácora global.
 
 ## 5. Endpoints de la API
 

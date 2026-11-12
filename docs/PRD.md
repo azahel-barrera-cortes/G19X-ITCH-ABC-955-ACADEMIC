@@ -61,7 +61,7 @@ El sistema debe incluir un asistente de IA basado en chat que guíe al usuario e
 
 ### RF-10: Información de la empresa o sociedad
 El sistema debe permitir capturar y persistir los datos de la sociedad que comparece en las actas:
-- Razón social, R.F.C., tipo de sociedad (7 opciones), logo de la empresa y firma electrónica opcional.
+- Razón social, R.F.C., tipo de sociedad (13 opciones del catálogo), logo de la empresa y firma electrónica opcional.
 - Toggle «Usar esta información al generar el acta»: al activarse, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada, y la IA puede incorporar estos datos al redactar cláusulas y el encabezado del PDF.
 - Persistencia en el backend: los datos de la sociedad se guardan con cada acta (campos `tipo_sociedad` y `logo_empresa` del modelo `Acta`) y están disponibles para el usuario autenticado; el frontend también conserva una copia en `localStorage` para uso inmediato.
 
@@ -128,6 +128,16 @@ Endpoints de solo lectura y metadatos (`/api/v1/notaria/actas` y
 ### RF-16: Redacción en vivo por streaming (SSE)
 El sistema debe ofrecer un endpoint `POST /api/v1/actas/redactar-stream` que transmita la cláusula del primer acuerdo fragmento a fragmento (`inicio` → `fragmento`… → `fin`) mediante `text/event-stream`, permitiendo al frontend mostrar la redacción mientras se genera. Requiere autenticación y rol capturista+.
 
+### RF-17: Navegación y paneles por rol
+La interfaz debe mostrar únicamente las secciones permitidas por el rol y conservar
+la sección activa mediante hash y `sessionStorage`:
+- El panel **Generar acta** ofrece plantillas frecuentes, formulario manual y modo IA.
+- El **Administrador** dispone de paneles de perfil, información empresarial,
+  usuarios y seguridad.
+- El **SuperAdministrador** dispone de gestión global de usuarios, bitácora,
+  estadísticas, seguridad y guía operativa.
+- Las restricciones visuales deben estar respaldadas por el RBAC del backend.
+
 ---
 
 ## Modelo de datos
@@ -144,7 +154,6 @@ El backend persiste la información en tres tablas principales (portables entre 
 | Mesa directiva | `presidente`, `secretario` |
 | Cuerpo (JSON) | `asistentes`, `orden_del_dia`, `acuerdos`, `clausulas`, `validacion_ia` |
 | Documento | `texto_legal`, `observaciones` |
-| Empresa | `tipo_sociedad`, `logo_empresa`, `firma_electronica`, `usar_info_empresa` |
 | Empresa | `tipo_sociedad`, `logo_empresa`, `firma_electronica`, `usar_info_empresa` |
 | Trazabilidad | `proveedor_ia`, `estatus`, `created_at`, `updated_at` |
 
@@ -192,7 +201,7 @@ Los catálogos (`tipo_asamblea`, `estatus`) se almacenan como `VARCHAR + CHECK` 
 ## 5. Alcance del MVP vs. Post-MVP
 
 ### ✅ Entra en el MVP (ver `docs/MVP.md`) y en la versión entregada
-RF-01 a RF-10 (MVP original) más RF-11 a RF-16 de esta versión:
+RF-01 a RF-10 (MVP original) más RF-11 a RF-17 de esta versión:
 autenticación con roles (JWT + RBAC), interfaz de acceso separada y perfil por
 rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vivo por streaming (SSE).
 
@@ -204,7 +213,7 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
 | Servicio de correo | Envío del token de recuperación por email (hoy solo en `DEBUG`) |
-| Vinculación multiempresa completa | El MVP no aísla datos por sociedad ni registra empleados mediante código empresarial |
+| Vinculación multiempresa completa | El MVP vincula usuarios y datos empresariales mediante código, pero aún no aísla completamente las actas por sociedad |
 
 ---
 
@@ -217,7 +226,7 @@ La plataforma implementa autenticación JWT con control de acceso por roles
   expediente, notaría) requieren `Authorization: Bearer <JWT>`; sin token
   responden 401 y con rol insuficiente 403.
 - El registro público permite `capturista`, `revisor` o `abogado_responsable`
-  mediante un código de empresa válido. El SuperAdministrador inicial se crea
+  mediante un código de empresa válido y vincula la información empresarial. El SuperAdministrador inicial se crea
   con `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NOMBRE` (acceso
   absoluto). Solo el `SuperAdministrador` puede asignar roles válidos,
   activar/desactivar o eliminar usuarios desde `UsuariosSuperAdmin`.
@@ -251,10 +260,10 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 ## 8. Hoja de ruta sugerida (post-MVP)
 
 1. Servicio de correo para la recuperación de contraseña
-2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades
+2. Migraciones con Alembic y aislamiento completo por sociedad
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances)
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo)
-5. Multiusuario/logotipos por sociedad y gestión de usuarios en el frontend
+5. Multiusuario/logotipos por sociedad con aislamiento de datos y permisos por empresa
 
 ---
 

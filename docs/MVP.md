@@ -16,7 +16,8 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Módulo | Qué incluye |
 |--------|-------------|
 | Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, nombre, rol, password_hash, activo, `codigo_empresa`, reset_token) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
-| Plantillas legales parametrizadas | `PlantillaLegal` + `ParametroPlantilla` con validación de parámetros requeridos, valores por defecto, `obtener_parametros_plantilla()`, `parametros_requeridos_por_materia()`, `DatosPlantillaIncompletosError` — 15 materias cubiertas con fundamentos LGSM |
+| Catálogos jurídicos | 26 tipos de acta y 13 tipos societarios, con requisitos específicos por materia y fundamentos normativos |
+| Plantillas legales parametrizadas | `PlantillaLegal` + `ParametroPlantilla` con validación de parámetros requeridos, valores por defecto, `obtener_parametros_plantilla()`, `parametros_requeridos_por_materia()` y `DatosPlantillaIncompletosError` |
 | IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible (Ollama, Groq, DeepSeek, LM Studio, vLLM); si falla, degrada a plantillas deterministas |
 | ReportLab | `build_acta_pdf(data) -> bytes` con encabezados, márgenes, firmas, numeración de páginas |
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
@@ -32,7 +33,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ### Frontend (React 18 + Vite + Tailwind)
 | Componente | Qué incluye |
 |------------|-------------|
-| Interfaz de acceso (separada) | `Acceso.jsx`: `Login`, `Registro` y `RecuperarPassword` con marca institucional — **sin barra lateral ni funciones de actas**. Tras un acceso correcto se abre `Perfil` para usuarios operativos y `UsuariosSuperAdmin` para el SuperAdministrador. |
+| Interfaz de acceso (separada) | `Acceso.jsx`: `Login`, `Registro` y `RecuperarPassword` con marca institucional — **sin barra lateral ni funciones de actas**. El registro vincula la cuenta a una empresa mediante código; tras el acceso se abre `Perfil` o el panel global del SuperAdministrador. |
 | Perfil y permisos por rol | `Perfil.jsx`: muestra nombre, correo y rol; permite cambiar contraseña, presenta el código empresarial al `Administrador`, limita la edición del nombre al `SuperAdministrador` y muestra la información de empresa en modo lectura para capturista, revisor y abogado responsable. |
 | Wizard de 4 pasos | 1. Datos generales → 2. Asistentes y quórum → 3. Orden del día y acuerdos → 4. Revisión y PDF |
 | Generación | Botón «Generar borrador con IA» y «Descargar PDF final» |
@@ -42,6 +43,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Autenticación | Login, registro automático al crear cuenta, perfil, cambio de contraseña, recuperación (token muestra por `DEBUG`), control de cuentas inactivas y administración global de usuarios |
 | Administración global | `UsuariosSuperAdmin.jsx`, `VitacoraSuperAdmin.jsx` y `UsuarioInactivo.jsx`: gestión de usuarios, bitácora para SuperAdministrador y pantalla de bloqueo para cuentas inactivas |
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
+| Navegación y administración | Menú filtrado por rol, rutas con hash persistidas, panel de generación con plantillas frecuentes, panel de Administrador (perfil, empresa, usuarios y seguridad) y panel global del SuperAdministrador (usuarios, bitácora, estadísticas, seguridad y guía) |
 
 ### Pruebas
 - Suite de pruebas automatizadas, con desglose por archivo:
@@ -64,7 +66,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 |------|----------------|--------|
 | **Autenticación y roles** | ✅ Entregado (JWT + RBAC + interfaz de acceso separada + perfil por rol + SuperAdministrador inicial por variables de entorno) | Requisito RF-11 de la versión entregada |
 | **Firma electrónica** | Firma electrónica avanzada, hash + sellado de tiempo | Requiere infraestructura adicional y validez legal específica |
-| **Multiempresa completa** | Aislamiento de datos por sociedad/cliente y vinculación automática de empleados mediante código | El MVP genera y muestra el código empresarial del Administrador, pero todavía no implementa el aislamiento multiempresa ni el registro público con código |
+| **Aislamiento multiempresa completo** | Separación estricta de datos por sociedad/cliente | El MVP ya vincula usuarios y configuración empresarial mediante código, pero aún no aplica aislamiento completo de todas las actas |
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
 | **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |
 | **Servicio de correo** | Envío del token de recuperación por email | El token se muestra en la respuesta solo en modo DEBUG |
@@ -89,7 +91,9 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ## 5. Limitaciones conocidas del MVP
 
 - ✅ Autenticación y roles (JWT + RBAC + interfaz de acceso separada + perfil
-  por rol), cuentas inactivas y bitácora de cambios: **entregados en esta versión**.
+  por rol), registro vinculado por código empresarial, navegación filtrada,
+  paneles de administración, cuentas inactivas y bitácora de cambios:
+  **entregados en esta versión**.
 - SQLite por defecto: apto para desarrollo y demostración; para producción se
   recomienda PostgreSQL con migraciones (Alembic).
 - El número de acciones e importes se almacenan como `float`; para precisión
