@@ -197,24 +197,19 @@ function Aplicacion() {
 
   return (
     <div className="flex min-h-full">
-      {usuario?.rol === 'SuperAdministrador' ? null : (
-        <>
-          {usuario?.rol === 'Administrador' && (
-            <BarraLateralAdmin
-              seccion={seccion}
-              onCambiarSeccion={cambiarSeccion}
-              onCerrarSesion={manejarCerrarSesion}
-            />
-          )}
-          {(usuario?.rol !== 'Administrador' && usuario?.rol !== 'SuperAdministrador') && (
-            <BarraLateral
-              seccion={seccion}
-              onCambiarSeccion={cambiarSeccion}
-              onCerrarSesion={manejarCerrarSesion}
-              seccionesVisibles={seccionesVisibles}
-            />
-          )}
-        </>
+      {usuario?.rol === 'Administrador' ? (
+        <BarraLateralAdmin
+          seccion={seccion}
+          onCambiarSeccion={cambiarSeccion}
+          onCerrarSesion={manejarCerrarSesion}
+        />
+      ) : (
+        <BarraLateral
+          seccion={seccion}
+          onCambiarSeccion={cambiarSeccion}
+          onCerrarSesion={manejarCerrarSesion}
+          seccionesVisibles={seccionesVisibles}
+        />
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
