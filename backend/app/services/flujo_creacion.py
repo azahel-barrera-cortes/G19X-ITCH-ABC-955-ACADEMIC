@@ -3,16 +3,25 @@ from __future__ import annotations
 import re, uuid, unicodedata
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
-from app.core.catalogos import TIPOS_ASAMBLEA
+from app.core.catalogos import (
+    TIPOS_ASAMBLEA,
+    TIPOS_SOCIEDAD,
+    acta_aplicable,
+    requisitos_acta,
+)
 __all__ = ["TIPOS_GUIA", "CAMPOS_REQUERIDOS", "crear_sesion", "obtener_sesion",
  "reiniciar_sesion", "detectar_tipo_en_texto", "siguiente_faltante",
  "extraer_datos", "sesion_lista", "construir_payload_desde_sesion",
- "texto_catalogo_tipos"]
+ "texto_catalogo_tipos", "detectar_tipo_sociedad_en_texto",
+ "campos_requeridos_para_sesion"]
 TIPOS_GUIA: List[Dict[str, Any]] = [
  {"valor": i["valor"], "etiqueta": i["etiqueta"],
   "descripcion": i.get("descripcion", ""),
   "articulos": list(i.get("articulos") or [])} for i in TIPOS_ASAMBLEA]
 CAMPOS_REQUERIDOS: List[Dict[str, str]] = [
+ {"clave": "tipo_sociedad", "etiqueta": "tipo de sociedad",
+  "pregunta": "Que tipo de sociedad es? Elige una de las 13 formas societarias soportadas (Ej. Sociedad Anónima de Capital Variable).",
+  "ejemplo": "sociedad_anonima_capital_variable"},
  {"clave": "sociedad", "etiqueta": "sociedad (razon social)",
   "pregunta": "Cual es la razon social completa? Ej. Comercializadora del Norte, S.A. de C.V.",
   "ejemplo": "Comercializadora del Norte, S.A. de C.V."},
@@ -67,6 +76,17 @@ def detectar_tipo_en_texto(texto: str) -> Optional[str]:
   if any(_norm(f) in n for f in fs):
    return v
  return None
+
+def detectar_tipo_sociedad_en_texto(texto: str) -> Optional[str]:
+ n = _norm(texto or "")
+ for it in TIPOS_SOCIEDAD:
+  if (
+   _norm(it["valor"]).replace("_", " ") in n
+   or _norm(it["etiqueta"]) in n
+   or _norm(it.get("abreviatura", "")) in n
+  ):
+   return str(it["valor"])
+ return None
 def crear_sesion(tipo=None) -> Dict[str, Any]:
  sid = uuid.uuid4().hex[:12]
  s = {"sesion_id": sid, "tipo_asamblea": tipo, "datos": {},
@@ -81,11 +101,27 @@ def reiniciar_sesion(sid: Optional[str]) -> None:
   del _SESIONES[sid]
 def siguiente_faltante(sesion: Dict[str, Any]) -> Optional[Dict[str, str]]:
  datos = sesion.get("datos", {})
- for c in CAMPOS_REQUERIDOS:
+ for c in campos_requeridos_para_sesion(sesion):
   v = datos.get(c["clave"])
   if v in (None, "", [], {}):
    return c
  return None
+
+def campos_requeridos_para_sesion(sesion: Dict[str, Any]) -> List[Dict[str, str]]:
+ """Combina captura común y requisitos del acta/sociedad seleccionados."""
+ tipo = str(sesion.get("tipo_asamblea") or "ordinaria")
+ sociedad = sesion.get("datos", {}).get("tipo_sociedad")
+ comunes = list(CAMPOS_REQUERIDOS)
+ especificos = [
+     {
+         "clave": requisito["clave"],
+         "etiqueta": requisito["etiqueta"],
+         "pregunta": requisito["pregunta"],
+         "ejemplo": "Proporciona el dato completo y verificable.",
+     }
+     for requisito in requisitos_acta(tipo, sociedad)
+ ]
+ return comunes + especificos
 def sesion_lista(sesion: Dict[str, Any]) -> bool:
  return bool(sesion.get("tipo_asamblea")) and siguiente_faltante(sesion) is None
 def _extraer_fecha(t: str):
@@ -131,6 +167,9 @@ def extraer_datos(texto: str, clave: Optional[str] = None) -> Dict[str, Any]:
   return {}
  if clave == "sociedad" and len(t) >= 3:
   return {"sociedad": t}
+ if clave == "tipo_sociedad":
+  tipo = detectar_tipo_sociedad_en_texto(t)
+  return {"tipo_sociedad": tipo} if tipo else {}
  if clave == "fecha":
   f = _extraer_fecha(t)
   return {"fecha": f} if f else {}
@@ -144,6 +183,8 @@ def extraer_datos(texto: str, clave: Optional[str] = None) -> Dict[str, Any]:
   return {"asistentes": a} if a else {}
  if clave == "orden_y_acuerdos" and len(t) >= 5:
   return {"orden_y_acuerdos": t}
+ if clave and clave not in {campo["clave"] for campo in CAMPOS_REQUERIDOS} and len(t) >= 3:
+  return {clave: t}
  f = _extraer_fecha(t)
  return {"fecha": f} if f else {}
 def _acuerdos_desde_texto(texto: str):
@@ -170,21 +211,30 @@ def construir_payload_desde_sesion(sesion: Dict[str, Any]) -> Dict[str, Any]:
  crudos = datos.get("asistentes") or []
  asist = []
  for i, a in enumerate(crudos):
-  asist.append({"nombre": a.get("nombre", f"Asistente {i+1}"),
+  asist.append({"nombre": a.get("nombre", ""),
    "caracter": "presidente" if i == 0 else ("secretario" if i == 1 else "propietario"),
    "acciones": float(a.get("acciones") or 0),
    "es_presidente": i == 0, "es_secretario": i == 1})
- total = sum(float(a.get("acciones") or 0) for a in asist) or 1000.0
- orden, ac = _acuerdos_desde_texto(str(datos.get("orden_y_acuerdos") or "Asuntos generales"))
- hoy = date.today().isoformat()
- pres = str(datos.get("presidente") or (asist[0]["nombre"] if asist else "Presidente designado"))
- sec = str(datos.get("secretario") or (asist[1]["nombre"] if len(asist) > 1 else "Secretario designado"))
- return {"sociedad": str(datos.get("sociedad") or "Sociedad sin nombre"),
+ total = sum(float(a.get("acciones") or 0) for a in asist)
+ orden, ac = _acuerdos_desde_texto(str(datos.get("orden_y_acuerdos") or ""))
+ pres = str(datos.get("presidente") or "")
+ sec = str(datos.get("secretario") or "")
+ return {"sociedad": str(datos.get("sociedad") or ""),
   "tipo_asamblea": tipo,
+  "tipo_sociedad": datos.get("tipo_sociedad"),
   "titulo": f"Acta de {tipo.replace('_', ' ')} - {datos.get('sociedad', '')}"[:200],
-  "fecha": datos.get("fecha") or hoy, "lugar": str(datos.get("lugar") or "Domicilio social"),
+  "fecha": datos.get("fecha"), "lugar": str(datos.get("lugar") or ""),
   "presidente": pres, "secretario": sec, "asistentes": asist,
   "orden_del_dia": orden, "acuerdos": ac,
-  "capital_social": total, "acciones_totales": total, "capital_presente": total,
-  "observaciones": f"Acta creada con acompanamiento del asistente (sesion {sesion.get('sesion_id')}).",
+  "capital_social": total or None, "acciones_totales": total or None,
+  "datos_especificos": {
+      clave: valor
+      for clave, valor in datos.items()
+      if clave not in {campo["clave"] for campo in CAMPOS_REQUERIDOS}
+      and valor not in (None, "", [], {})
+   },
+   "observaciones": (
+       "Borrador creado con acompañamiento del asistente. "
+       "Requiere revisión de abogado o notario antes de firma, protocolización o inscripción."
+   ),
   "guardar": True}

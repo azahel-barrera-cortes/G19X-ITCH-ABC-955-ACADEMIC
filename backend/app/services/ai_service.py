@@ -28,6 +28,7 @@ from app.core.catalogos import (
     articulo_quorum,
     etiqueta_mayoria,
     etiqueta_tipo_asamblea,
+    ordenamiento_sociedad,
     porcentaje_requerido_mayoria,
 )
 from app.core.config import Settings, settings as settings_global
@@ -80,7 +81,7 @@ PROMPT_SISTEMA_REDACCION = f"""Eres un abogado corporativo mexicano, especialist
 Reglas obligatorias:
 1. Redacta en español jurídico formal, en tercera persona, sin viñetas ni markdown.
 2. Divide el texto en párrafos numerados con ordinales: PRIMERO.-, SEGUNDO.-, TERCERO.- ...
-3. Cita los artículos aplicables de la Ley General de Sociedades Mercantiles.
+3. Cita únicamente los artículos y ordenamientos aplicables al tipo societario indicado en el contexto; no asumas que siempre rige la LGSM.
 4. NO inventes hechos, montos, fechas, nombres ni cifras: utiliza únicamente los datos del contexto.
 5. Conserva íntegro el contenido sustantivo del resumen del acuerdo proporcionado por el usuario.
 6. No agregues comentarios, notas ni aclaraciones fuera del JSON solicitado.
@@ -333,6 +334,9 @@ class AIService:
             "sociedad": acta.sociedad,
             "rfc_sociedad": acta.rfc_sociedad or "",
             "tipo_sociedad": acta.tipo_sociedad or "",
+            "datos_especificos": json.dumps(
+                acta.datos_especificos or {}, ensure_ascii=False, sort_keys=True
+            ),
             "tipo_asamblea": str(acta.tipo_asamblea),
             "tipo_asamblea_texto": etiqueta_tipo_asamblea(acta.tipo_asamblea),
             "fecha": formato.fecha_larga(acta.fecha),
@@ -365,6 +369,7 @@ class AIService:
         plantilla = plantillas.obtener_plantilla(
             acuerdo.materia or plantillas.detectar_materia(f"{acuerdo.titulo} {acuerdo.resumen}")
         )
+        ordenamiento = ordenamiento_sociedad(contexto.get("tipo_sociedad"))
         votacion = acuerdo.votacion
         if votacion:
             detalle_votacion = (
@@ -379,7 +384,10 @@ class AIService:
         lineas = [
             "DATOS DE LA ASAMBLEA",
             f"- Sociedad: {contexto['sociedad']} (RFC: {contexto['rfc_sociedad'] or 'no proporcionado'})",
+            f"- Tipo societario y marco normativo principal: {contexto['tipo_sociedad'] or 'no indicado'}; "
+            f"{ordenamiento}",
             f"- Tipo de asamblea: {contexto['tipo_asamblea_texto']}",
+            f"- Datos jurídicos específicos capturados: {contexto['datos_especificos']}",
             f"- Fecha y hora: {contexto['fecha_larga']}, {contexto['hora']}",
             f"- Lugar: {contexto['lugar']}",
             f"- Capital social: {contexto['capital']}; acciones representadas: {contexto['acciones_presentes']}",
@@ -393,7 +401,8 @@ class AIService:
             "",
             "REDACCIÓN DE REFERENCIA (puedes mejorarla, respetando el contenido sustantivo)",
             f"- Acción aprobada: {plantilla.accion}",
-            f"- Fundamento sugerido: {', '.join(plantilla.articulos)} de la Ley General de Sociedades Mercantiles",
+            f"- Fundamento sugerido: {', '.join(plantilla.articulos)} ({plantilla.ordenamiento or ordenamiento}); "
+            f"verifica su aplicación al tipo societario {contexto.get('tipo_sociedad') or 'no indicado'}",
             "",
             "OTRAS MATERIAS DISPONIBLES (referencia de estilo y fundamentos)",
             *plantillas.plantillas_para_prompt(),
@@ -428,6 +437,8 @@ class AIService:
                 "DATOS DEL ACTA A REVISAR",
                 f"- Sociedad: {acta.sociedad} (RFC: {acta.rfc_sociedad or 'no proporcionado'})",
                 f"- Tipo de asamblea: {etiqueta_tipo_asamblea(acta.tipo_asamblea)}",
+                f"- Datos jurídicos específicos capturados: "
+                f"{json.dumps(acta.datos_especificos or {}, ensure_ascii=False, sort_keys=True)}",
                 f"- Fecha y hora: {formato.fecha_con_dia(acta.fecha)}, {formato.hora_larga(acta.hora)}",
                 f"- Lugar: {acta.lugar}",
                 f"- Convocatoria: {formato.fecha_larga(acta.convocatoria_fecha)} por "

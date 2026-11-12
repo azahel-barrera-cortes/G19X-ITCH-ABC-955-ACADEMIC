@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import UsuarioActual, get_db
 from app.db.session import get_db
+from app.services.auth_service import obtener_administrador_empresa
 from app.services import asistente as motor
 
 router = APIRouter(prefix="/asistente", tags=["Asistente IA"])
@@ -70,9 +71,24 @@ def chatear(
     db: Session = Depends(get_db),
 ) -> AsistenteChatResponse:
     """Procesa un mensaje: creación guiada, validación, estatus y versiones."""
+    administrador = (
+        obtener_administrador_empresa(db, _usuario.empresa_codigo)
+        if _usuario.empresa_codigo
+        else None
+    )
+    empresa = None
+    if administrador:
+        empresa = {
+            "sociedad": administrador.nombre_sociedad,
+            "rfc_sociedad": administrador.rfc_sociedad,
+            "tipo_sociedad": administrador.tipo_sociedad,
+            "logo_empresa": administrador.logo_empresa,
+            "firma_electronica": administrador.firma_electronica,
+            "usar_info_empresa": administrador.usar_info_empresa,
+        }
     resultado = motor.procesar_mensaje(
         db, payload.mensaje, payload.folio, payload.acta_id,
-        payload.sesion_id, usuario=_usuario,
+        payload.sesion_id, usuario=_usuario, empresa=empresa,
     )
     return AsistenteChatResponse(**resultado)
 

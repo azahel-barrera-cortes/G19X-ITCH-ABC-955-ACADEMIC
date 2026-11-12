@@ -20,7 +20,12 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.catalogos import etiqueta_tipo_asamblea
+from app.core.catalogos import (
+    acta_aplicable,
+    etiqueta_tipo_asamblea,
+    ordenamiento_sociedad,
+    requisitos_acta,
+)
 from app.core import security
 from app.models.acta import Acta
 from app.models.enums import EstatusActa
@@ -35,6 +40,7 @@ from app.services.acta_service import (
 from app.services.flujo_creacion import (
     TIPOS_GUIA,
     construir_payload_desde_sesion,
+    campos_requeridos_para_sesion,
     crear_sesion,
     detectar_tipo_en_texto,
     extraer_datos,
@@ -234,10 +240,25 @@ def _respuesta_sesion(sesion, texto, faltante_extra=None):
     falt = faltante_extra or siguiente_faltante(sesion)
     datos = sesion.get("datos", {})
     hechos = sum(1 for v in datos.values() if v not in (None, "", [], {}))
+    campos = campos_requeridos_para_sesion(sesion)
+    marco = ordenamiento_sociedad(datos.get("tipo_sociedad"))
+    requisitos = requisitos_acta(
+        str(sesion.get("tipo_asamblea") or "ordinaria"),
+        datos.get("tipo_sociedad"),
+    )
+    if falt and falt["clave"] in {requisito["clave"] for requisito in requisitos}:
+        texto = (
+            f"{texto}\n\nMarco referencial: {marco}. "
+            f"El acta será un borrador documental y debe revisarse con un abogado o notario "
+            f"antes de firmarse, protocolizarse o inscribirse."
+        )
     base = {"respuesta": texto, "intencion": "crear", "tema_valido": True,
             "sesion_id": sesion["sesion_id"],
             "tipo_asamblea": sesion.get("tipo_asamblea"),
-            "datos_recolectados": datos, "progreso": {"completados": hechos, "total": 7}}
+            "tipo_sociedad": datos.get("tipo_sociedad"),
+            "marco_normativo": marco,
+            "datos_recolectados": datos,
+            "progreso": {"completados": hechos, "total": len(campos)}}
     if falt is not None:
         base["campo_solicitado"] = falt["clave"]
     return base
@@ -264,7 +285,9 @@ def _cerrar_y_generar(db, sesion, autor):
         texto_org = str(getattr(acta, "texto_legal", "") or "")[:4000] if acta is not None else ""
         tipo_txt = etiqueta_tipo_asamblea(payload_dict.get("tipo_asamblea") or "")
         respuesta = ("Acta %s generada!\nCONTROL: folio %s | fecha %s | creada %s | por %s | "
-                     "caducidad %s (%s) | v%s | PDF %s (%s pags) -> GET %s\n\nTEXTO:\n%s"
+                     "caducidad %s (%s) | v%s | PDF %s (%s pags) -> GET %s\n\nTEXTO:\n%s\n\n"
+                     "AVISO: este documento es un borrador de apoyo y debe ser revisado por "
+                     "un abogado o notario antes de firmarse, protocolizarse o inscribirse."
                      % (tipo_txt, control["folio"], control["fecha_acta"], control["fecha_creacion"],
                         control["creado_por"], control["fecha_caducidad"] or "sin fecha",
                         control["estado_caducidad"], control["version"],
@@ -348,9 +371,13 @@ def _redactar_libre(mensaje: str) -> Dict[str, Any]:
             "titulo_sugerido": plantilla.titulo}
 
 
-def _flujo_creacion(db, texto, sesion_id, autor):
+def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
     ses = obtener_sesion(sesion_id) if sesion_id else None
     if ses is not None:
+        if empresa and empresa.get("usar_info_empresa"):
+            ses.setdefault("datos", {}).update({
+                clave: valor for clave, valor in empresa.items() if valor not in (None, "")
+            })
         # Si aún no hay tipo (venía del catálogo), el mensaje es la elección.
         if not ses.get("tipo_asamblea"):
             elegido = detectar_tipo_en_texto(texto)
@@ -372,6 +399,15 @@ def _flujo_creacion(db, texto, sesion_id, autor):
         if falt is not None:
             nuevos = extraer_datos(texto, falt["clave"])
             if nuevos:
+                if falt["clave"] == "tipo_sociedad" and not acta_aplicable(
+                    nuevos["tipo_sociedad"], ses.get("tipo_asamblea") or "ordinaria"
+                ):
+                    return _respuesta_sesion(
+                        ses,
+                        "Ese tipo societario no permite el acta seleccionada en el catálogo jurídico. "
+                        "Elige otro tipo de sociedad compatible o cancela para seleccionar otra acta.",
+                        falt,
+                    )
                 ses["datos"].update(nuevos)
                 falt2 = siguiente_faltante(ses)
                 if falt2 is None:
@@ -386,10 +422,18 @@ def _flujo_creacion(db, texto, sesion_id, autor):
     if tipo is None:
         # No sabe qué acta crear (o no dijo el tipo) -> catálogo con descripciones.
         ses2 = crear_sesion(None)
+        if empresa and empresa.get("usar_info_empresa"):
+            ses2["datos"].update({
+                clave: valor for clave, valor in empresa.items() if valor not in (None, "")
+            })
         return {"respuesta": texto_catalogo_tipos() + "\nSesion %s: dime cual crear." % ses2["sesion_id"],
                 "intencion": "catalogo_tipos", "tema_valido": True,
                 "sesion_id": ses2["sesion_id"], "tipos_acta": TIPOS_GUIA}
     ses3 = crear_sesion(tipo or "ordinaria")
+    if empresa and empresa.get("usar_info_empresa"):
+        ses3["datos"].update({
+            clave: valor for clave, valor in empresa.items() if valor not in (None, "")
+        })
     etiqueta = etiqueta_tipo_asamblea(tipo or "ordinaria")
     falt = siguiente_faltante(ses3)
     return _respuesta_sesion(ses3, "Creamos %s paso a paso. Sesion %s.\n\n%s"
@@ -398,12 +442,18 @@ def _flujo_creacion(db, texto, sesion_id, autor):
 
 def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                       acta_id: Optional[int] = None, sesion_id: Optional[str] = None,
-                      autor: Optional[str] = None, usuario=None) -> Dict[str, Any]:
+                      autor: Optional[str] = None, usuario=None, empresa=None) -> Dict[str, Any]:
     texto = (mensaje or "").strip()
+    if empresa is None and detectar_intencion(texto) == "crear":
+        return {
+            "respuesta": "No se ha asignado empresa",
+            "intencion": "crear",
+            "tema_valido": True,
+        }
     # Sesión de creación en curso (incluye catálogo->elección de tipo).
     if sesion_id and obtener_sesion(sesion_id) is not None:
         autor_efectivo = (usuario.email if usuario is not None else None) or autor
-        return _flujo_creacion(db, texto, sesion_id, autor_efectivo)
+        return _flujo_creacion(db, texto, sesion_id, autor_efectivo, empresa)
     if not es_tema_valido(texto):
         return {"respuesta": MENSAJE_FUERA, "intencion": "fuera_de_tema",
                 "tema_valido": False,
@@ -415,7 +465,7 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                 reiniciar_sesion(sesion_id)
             return {"respuesta": "Creación cancelada. Dime «Quiero crear un acta» cuando quieras empezar.",
                     "intencion": "cancelar_creacion", "tema_valido": True}
-        return _flujo_creacion(db, texto, sesion_id, autor)
+        return _flujo_creacion(db, texto, sesion_id, autor, empresa)
     fol = folio or extraer_folio(texto)
     aid = acta_id if acta_id is not None else extraer_id(texto)
     if inten == "ayuda":
