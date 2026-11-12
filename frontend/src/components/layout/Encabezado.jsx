@@ -10,9 +10,12 @@ const SECCIONES = [
   { id: 'biblioteca', etiqueta: 'Biblioteca', titulo: 'Biblioteca de actas' },
   { id: 'administracion', etiqueta: 'Administración', titulo: 'Administración de actas' },
   { id: 'empresa', etiqueta: 'Empresa', titulo: 'Información de la empresa o sociedad' },
-  { id: 'ayuda', etiqueta: 'Guía', titulo: 'Guía de uso' },
+  { id: 'ayuda', etiqueta: 'Gia', titulo: 'Gia de uso' },
   { id: 'perfil', etiqueta: 'Mi perfil', titulo: 'Mi perfil y funciones disponibles' },
   { id: 'administrador', etiqueta: 'Administrador', titulo: 'Panel de administración' },
+  { id: 'usuarios', etiqueta: 'Administrador de Usuarios', titulo: 'Administrador de Usuarios' },
+  { id: 'seguridad', etiqueta: 'Seguridad de Usuarios', titulo: 'Seguridad de Usuarios' },
+  { id: 'vitacora', etiqueta: 'Vitacora de actas', titulo: 'Vitacora de actas' },
 ]
 
 export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = null, onCerrarSesion = null, seccionesVisibles = null }) {
@@ -22,7 +25,9 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
 
   // Navegación móvil filtrada por las secciones permitidas al rol.
   const seccionesNav = seccionesVisibles
-    ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
+    ? seccionesVisibles
+      .map((id) => SECCIONES.find((item) => item.id === id))
+      .filter(Boolean)
     : SECCIONES
 
   useEffect(() => {
