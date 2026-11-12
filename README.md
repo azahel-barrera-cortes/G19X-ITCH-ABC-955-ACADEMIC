@@ -105,6 +105,23 @@ copy .env.example .env
 - API interactiva: <http://127.0.0.1:8000/docs> · ReDoc: <http://127.0.0.1:8000/redoc>
 - Estado: `GET /health` y `GET /api/v1/sistema/estado`
 
+### Acceso al SuperAdministrador
+
+El acceso al rol `SuperAdministrador` se realiza desde el formulario normal de
+inicio de sesión usando el correo y la contraseña definidos en `backend/.env`:
+
+```dotenv
+SEED_ADMIN_EMAIL=admin@pgac.com
+SEED_ADMIN_PASSWORD=Admin123!seguro
+```
+
+Estos son únicamente los valores por defecto de desarrollo documentados en
+`.env.example`; en producción deben cambiarse antes de iniciar la aplicación.
+Al arrancar con `AUTO_CREATE_TABLES=true`, PGAC crea ese usuario si la base de
+datos está vacía. Si ya existe un usuario con ese correo, el script
+`backend/scripts/crear_super_admin.py` puede promoverlo a
+`SuperAdministrador` sin borrar datos.
+
 ### Variables de entorno principales (`backend/.env`)
 
 | Variable | Valor por defecto | Descripción |
@@ -124,6 +141,8 @@ copy .env.example .env
 | `SECRET_KEY` | *(cambiar)* | Clave de firma de los JWT. **Obligatorio cambiarla en producción** |
 | `ALGORITHM` | `HS256` | Algoritmo de firma de los JWT |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Vigencia del token de acceso (7 días) |
+| `SEED_ADMIN_EMAIL` | `admin@pgac.com` | Correo del SuperAdministrador inicial |
+| `SEED_ADMIN_PASSWORD` | `Admin123!seguro` | Contraseña inicial del SuperAdministrador |
 
 ## 4. Puesta en marcha del frontend
 
@@ -153,14 +172,15 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    aplicación solo muestra la pantalla de acceso: **Iniciar sesión**,
    **Crear cuenta** o **Recuperar contraseña**. No se muestra la barra lateral
    ni ninguna función de actas, así que nadie puede ver ni modificar nada sin
-   entrar. El **primer usuario registrado** se crea como `SuperAdministrador`
-   (arranque del sistema); los autoregistros posteriores quedan siempre como
-   `capturista`. El nombre del perfil solo lo puede modificar el
+   entrar. El SuperAdministrador inicial se crea con las credenciales
+   `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`; los autoregistros posteriores
+   solo pueden usar los roles vinculados a una empresa. El nombre del perfil solo lo puede modificar el
    `SuperAdministrador`; todos los usuarios pueden cambiar su contraseña desde
    `PUT /api/v1/auth/me`. La administración de usuarios se reserva al
    `SuperAdministrador` desde `UsuariosSuperAdmin`.
-   Tras un acceso correcto se abre **Mi perfil**, que muestra las funciones
-   permitidas según el rol; la barra lateral y la navegación móvil solo
+   Tras un acceso correcto se abre **Mi perfil** para los usuarios operativos;
+   el `SuperAdministrador` entra directamente a **UsuariosSuperAdmin** y no
+   muestra Perfil. La barra lateral y la navegación móvil solo
    presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca ni
    Administración, y el backend responde 403 si las invoca directamente).
 1. **Generar acta** → Paso 1 *Datos generales* → Paso 2 *Asistentes y quórum* →
@@ -182,7 +202,7 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 | **Revisor** | Mi perfil | Todo lo del capturista, además: Biblioteca de actas y Administración | Listar y consultar actas, descargar PDF guardado, consultar administración, bitácora de cambios y API de notaría |
 | **Abogado responsable** | Mi perfil | Todo lo del revisor | Cambiar estatus, aprobar y revalidar actas |
 | **Administrador** | Mi perfil | Todas las secciones operativas | Gestionar la información de empresa o sociedad y usar las funciones de actas |
-| **SuperAdministrador** | Mi perfil | Todas las secciones, incluida la administración global | Crear, editar, activar, desactivar y eliminar usuarios; asignar roles y consultar la bitácora global |
+| **SuperAdministrador** | UsuariosSuperAdmin | Todas las secciones, incluida la administración global | Crear, editar, activar, desactivar y eliminar usuarios; asignar roles y consultar la bitácora global |
 
 > El código empresarial se genera automáticamente para cada usuario con rol
 > `Administrador` cuando se registra o cuando el `SuperAdministrador` le asigna
@@ -209,7 +229,7 @@ token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/v1/auth/registro` | Registro (público: rol `capturista`; el primer usuario, `SuperAdministrador`; el `SuperAdministrador` asigna otros roles desde `UsuariosSuperAdmin`) |
+| `POST` | `/api/v1/auth/registro` | Registro público vinculado a empresa (`capturista`, `revisor` o `abogado_responsable`); el `SuperAdministrador` asigna otros roles desde `UsuariosSuperAdmin` |
 | `POST` | `/api/v1/auth/login` | Iniciar sesión; devuelve el JWT de acceso |
 | `GET` `PUT` | `/api/v1/auth/me` | Perfil del usuario autenticado (consulta y actualización) |
 | `POST` | `/api/v1/auth/reset-password` | Solicita token de recuperación (público; en `DEBUG` lo devuelve en `detalle`) |
@@ -465,7 +485,7 @@ cd backend
 | `tests/test_asistente.py` | Chat del asistente IA, validación, estatus, versiones y resumen por estatus (pasa con usuario autenticado) |
 | `tests/test_flujo_creacion.py` | Flujo guiado de creación, PDF y control del acta generada (pasa con usuario autenticado) |
 | `tests/test_administracion.py` | Resumen del repositorio, clasificación de vigencia, historial de versiones, restauración y caducidad |
-| `tests/test_auth.py` | Registro público (1er usuario = `SuperAdministrador`, el resto = `capturista`), generación de código empresarial, login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
+| `tests/test_auth.py` | Semilla de SuperAdministrador, registro público vinculado a empresa, generación de código empresarial, login y perfil, RBAC (401 sin token, 403 por rol), recuperación de contraseña de extremo a extremo |
 
 ### Resultados obtenidos en esta máquina
 

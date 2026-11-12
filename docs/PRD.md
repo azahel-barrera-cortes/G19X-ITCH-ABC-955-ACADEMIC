@@ -67,8 +67,11 @@ El sistema debe permitir capturar y persistir los datos de la sociedad que compa
 
 ### RF-11: Autenticación y control de acceso por roles (RBAC)
 El sistema debe exigir autenticación para toda operación del dominio:
-- El primer usuario registrado se crea como `SuperAdministrador`; los registros
-  públicos posteriores se asignan forzosamente como `capturista`.
+- El SuperAdministrador inicial se crea con las variables
+  `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NOMBRE` al inicializar
+  la base de datos. Se accede mediante el formulario normal de login con ese
+  correo y contraseña; los registros públicos posteriores no pueden crear ese
+  rol.
 - El nombre del perfil solo puede ser actualizado por el
   `SuperAdministrador`; todos los usuarios pueden cambiar su contraseña desde
   `PUT /api/v1/auth/me`.
@@ -88,9 +91,10 @@ El sistema debe exigir autenticación para toda operación del dominio:
 - Sin sesión iniciada, la aplicación muestra únicamente la interfaz de acceso
   (inicio de sesión, creación de cuenta, recuperación de contraseña): ninguna
   sección del sistema de actas es visible ni accesible.
-- Tras un acceso correcto se abre el perfil del usuario, que enumera las
-  funciones permitidas por su rol; la navegación (barra lateral y móvil) solo
-  presenta esas secciones.
+- Tras un acceso correcto se abre el perfil del usuario operativo, que enumera
+  las funciones permitidas por su rol; la navegación (barra lateral y móvil)
+  solo presenta esas secciones. El `SuperAdministrador` entra directamente a
+  `UsuariosSuperAdmin` y no muestra la interfaz de Perfil.
 - El frontend adjunta el JWT en cada llamada a la API (interceptor axios y
   cabecera en el flujo SSE de redacción en vivo).
 - La separación por rol también protege los datos: un capturista no puede
@@ -212,8 +216,9 @@ La plataforma implementa autenticación JWT con control de acceso por roles
 - Todas las operaciones sensibles (actas, administración, asistente, bitácora,
   expediente, notaría) requieren `Authorization: Bearer <JWT>`; sin token
   responden 401 y con rol insuficiente 403.
-- El registro es público pero el servidor fuerza el rol `capturista`; el
-  primer usuario del sistema arranca como `SuperAdministrador` (acceso
+- El registro público permite `capturista`, `revisor` o `abogado_responsable`
+  mediante un código de empresa válido. El SuperAdministrador inicial se crea
+  con `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NOMBRE` (acceso
   absoluto). Solo el `SuperAdministrador` puede asignar roles válidos,
   activar/desactivar o eliminar usuarios desde `UsuariosSuperAdmin`.
 - Las contraseñas se guardan con bcrypt y la recuperación se hace con un

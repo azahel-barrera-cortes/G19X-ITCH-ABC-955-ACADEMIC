@@ -22,7 +22,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
-| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = SuperAdministrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol, semilla inicial de Super Administrador vía variables de entorno; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
+| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: semilla inicial de SuperAdministrador vía `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`, registro público vinculado a empresa para capturista/revisor/abogado responsable, JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
@@ -32,7 +32,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ### Frontend (React 18 + Vite + Tailwind)
 | Componente | Qué incluye |
 |------------|-------------|
-| Interfaz de acceso (separada) | `Acceso.jsx`: `Login`, `Registro` y `RecuperarPassword` con marca institucional — **sin barra lateral ni funciones de actas**. Tras un acceso correcto se abre `Perfil`. |
+| Interfaz de acceso (separada) | `Acceso.jsx`: `Login`, `Registro` y `RecuperarPassword` con marca institucional — **sin barra lateral ni funciones de actas**. Tras un acceso correcto se abre `Perfil` para usuarios operativos y `UsuariosSuperAdmin` para el SuperAdministrador. |
 | Perfil y permisos por rol | `Perfil.jsx`: muestra nombre, correo y rol; permite cambiar contraseña, presenta el código empresarial al `Administrador`, limita la edición del nombre al `SuperAdministrador` y muestra la información de empresa en modo lectura para capturista, revisor y abogado responsable. |
 | Wizard de 4 pasos | 1. Datos generales → 2. Asistentes y quórum → 3. Orden del día y acuerdos → 4. Revisión y PDF |
 | Generación | Botón «Generar borrador con IA» y «Descargar PDF final» |
@@ -62,7 +62,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 
 | Área | Qué queda fuera | Motivo |
 |------|----------------|--------|
-| **Autenticación y roles** | ✅ Entregado (JWT + RBAC + interfaz de acceso separada + perfil por rol) | Requisito RF-11 de la versión entregada |
+| **Autenticación y roles** | ✅ Entregado (JWT + RBAC + interfaz de acceso separada + perfil por rol + SuperAdministrador inicial por variables de entorno) | Requisito RF-11 de la versión entregada |
 | **Firma electrónica** | Firma electrónica avanzada, hash + sellado de tiempo | Requiere infraestructura adicional y validez legal específica |
 | **Multiempresa completa** | Aislamiento de datos por sociedad/cliente y vinculación automática de empleados mediante código | El MVP genera y muestra el código empresarial del Administrador, pero todavía no implementa el aislamiento multiempresa ni el registro público con código |
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
@@ -74,8 +74,8 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ## 4. Criterios de aceptación del MVP
 
 - [ ] Se instala y arranca la aplicación: backend con PostgreSQL o SQLite, frontend en Vite.
-- [ ] El **primer usuario** se registra (o lo crea el administrador) y accede por login; **sin sesión iniciada solo se muestra la interfaz de acceso**: ninguna sección del sistema de actas visible.
-- [ ] Tras un acceso correcto se abre **Mi perfil** con las funciones permitidas por el rol: capturista (generar actas, asistente y empresa en modo lectura), revisor+ (biblioteca, administración, bitácora y API notarial), abogado responsable+ (estatus y validación), Administrador (gestión de información de empresa) y SuperAdministrador (panel global de superadministración del sistema).
+- [ ] El SuperAdministrador inicial accede por login con las credenciales de `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`; **sin sesión iniciada solo se muestra la interfaz de acceso**: ninguna sección del sistema de actas visible.
+- [ ] Tras un acceso correcto se abre **Mi perfil** para usuarios operativos con las funciones permitidas por el rol: capturista (generar actas, asistente y empresa en modo lectura), revisor+ (biblioteca, administración, bitácora y API notarial), abogado responsable+ (estatus y validación) y Administrador (gestión de información de empresa). El SuperAdministrador entra directamente al panel global de superadministración del sistema.
 - [ ] El acta se valida en consistencia (quórum, mayorías, fundamentos legales)
 - [ ] Las actas se pueden listar, editar, cambiar de estatus y eliminar
 - [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)
