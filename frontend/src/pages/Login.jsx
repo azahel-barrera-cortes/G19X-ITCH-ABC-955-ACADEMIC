@@ -35,11 +35,17 @@ export default function Login({ onCambiarVista = null }) {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-slate-50 py-12 px-4">
-      <Tarjeta className="w-full max-w-md">
-        <header className="mb-6 text-center">
-          <h1 className="text-xl font-semibold text-corporativo-700">Iniciar sesión</h1>
-          <p className="text-sm text-slate-500">Accede a tu cuenta de PGAC</p>
+    <div className="flex min-h-full items-center justify-center px-4 py-8 sm:px-8">
+      <Tarjeta className="w-full max-w-lg border-slate-200/80 bg-white/95 p-7 shadow-[0_20px_60px_rgba(2,63,48,0.12)] sm:p-10">
+        <header className="mb-8">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-corporativo-700 text-sm font-bold text-white shadow-lg shadow-corporativo-700/20">
+            PG
+          </div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-corporativo-500">
+            Acceso al sistema
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-800">Iniciar sesión</h1>
+          <p className="mt-2 text-sm text-slate-500">Accede a tu cuenta de PGAC para continuar.</p>
         </header>
 
         {error && (
@@ -75,26 +81,26 @@ export default function Login({ onCambiarVista = null }) {
             />
           </Campo>
 
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-col-reverse items-stretch gap-4 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={() => onCambiarVista && onCambiarVista('recuperar')}
-              className="text-corporativo-600 hover:underline"
+              className="text-left text-sm font-medium text-corporativo-600 transition hover:text-corporativo-700 hover:underline"
             >
               ¿Olvidaste tu contraseña?
             </button>
-            <Boton type="submit" variante="primario" cargando={cargando}>
+            <Boton type="submit" variante="primario" tamano="lg" cargando={cargando} className="sm:min-w-28">
               Entrar
             </Boton>
           </div>
         </form>
 
-        <p className="mt-4 text-center text-xs text-slate-500">
+        <p className="mt-8 border-t border-slate-100 pt-6 text-center text-sm text-slate-500">
           ¿No tienes cuenta?{' '}
           <button
             type="button"
             onClick={() => onCambiarVista && onCambiarVista('registro')}
-            className="text-corporativo-600 hover:underline"
+            className="font-semibold text-corporativo-600 transition hover:text-corporativo-700 hover:underline"
           >
             Regístrate
           </button>

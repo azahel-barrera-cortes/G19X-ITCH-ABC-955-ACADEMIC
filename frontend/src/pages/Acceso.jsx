@@ -69,7 +69,9 @@ export default function Acceso({ onAccesoExitoso }) {
       </aside>
 
       {/* Panel de credenciales. */}
-      <main className="flex flex-1 items-center justify-center px-4 py-10">
+      <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-white to-corporativo-50/70 px-4 py-10">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-corporativo-100/60 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 left-1/4 h-80 w-80 rounded-full bg-slate-200/50 blur-3xl" />
         <div className="w-full max-w-md">
           <div className="mb-6 text-center lg:hidden">
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-corporativo-700 text-sm font-bold text-white">
