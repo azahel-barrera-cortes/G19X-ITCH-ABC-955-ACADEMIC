@@ -22,7 +22,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
-| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = SuperAdministrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol, semilla inicial de Super Administrador via variables de entorno |
+| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: registro (1er usuario = SuperAdministrador, el resto = capturista), JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol, semilla inicial de Super Administrador via variables de entorno; **generación de un único `Administrador` de empresa emitido con un código/clabe única desde el panel `UsuariosSuperAdmin`, vinculando revisores, capturistas y abogados responsables a esa empresa** |
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |

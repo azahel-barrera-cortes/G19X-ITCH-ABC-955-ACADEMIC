@@ -187,6 +187,18 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 > puede cambiar su nombre y su contraseña desde `PUT /api/v1/auth/me`; sólo un
 > SuperAdministrador o Administrador cambia roles o activa cuentas desde
 > `PUT /api/v1/auth/users/{id}`.
+| **Administrador de empresa** | Mi perfil (funciones de su rol) | Todas las secciones, vinculadas a una empresa/sociedad | Gestiona usuarios (capturista, revisor, abogado responsable) vinculados por **código o clabe única**; expide ese código desde el panel `UsuariosSuperAdmin` (solo se puede generar un `Administrador` por empresa). |
+
+
+> **Generación de `Administrador de empresa` (desde `SuperAdministrador`):**
+> Desde el rol `SuperAdministrador`, en el panel de **`UsuariosSuperAdmin`**,
+> en el formulario de registro de un usuario, se expide un **código o clabe
+> única** que identifica a la empresa/sociedad. Cuando un revisor, un
+> capturista o un abogado responde ese código en su formulario de registro,
+> el sistema los une automáticamente a ese `Administrador de empresa`.
+> Solo puede existir **un `Administrador` por empresa/sociedad**; el sistema
+> evita crear un segundo después de la primera generación. El código se
+> utiliza como vínculo de pertenencia y no como credencial de acceso.
 
 ## 5. Endpoints de la API
 
