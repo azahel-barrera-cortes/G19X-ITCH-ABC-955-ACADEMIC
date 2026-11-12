@@ -1,0 +1,28 @@
+export default function GuiaSuperUsuarioAdmin() {
+  return (
+    <div className="min-h-full bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 md:px-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-semibold text-corporativo-600">
+              Guía de Usuario
+            </p>
+            <h1 className="text-xl font-bold text-slate-900">Guía de Uso de Super Usuario</h1>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-7xl gap-6 px-4 py-6 md:px-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Guía de Uso de Super Usuario</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Información sobre flujo, API, notas y seguridad del super usuario.
+          </p>
+          <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+            En construcción.
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}

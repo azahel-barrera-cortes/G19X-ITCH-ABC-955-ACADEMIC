@@ -13,6 +13,11 @@ import GenerarActaConIA from './pages/GenerarActaConIA.jsx'
 import InformacionEmpresa from './pages/InformacionEmpresa.jsx'
 import Acceso from './pages/Acceso.jsx'
 import Perfil from './pages/Perfil.jsx'
+import UsuariosAdmin from './pages/UsuariosAdmin.jsx'
+import VitacoraSuperAdmin from './pages/VitacoraSuperAdmin.jsx'
+import EstadisticasSuperAdmin from './pages/EstadisticasSuperAdmin.jsx'
+import SeguridadSuperAdmin from './pages/SeguridadSuperAdmin.jsx'
+import GuiaSuperUsuarioAdmin from './pages/GuiaSuperUsuarioAdmin.jsx'
 import { obtenerCatalogos } from './api/client.js'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { seccionesPermitidas, SECCIONES_SISTEMA } from './constants/roles.js'
@@ -257,6 +262,15 @@ function Aplicacion() {
           ) : null}
           {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
           {seccion === 'administrador' ? <Administrador /> : null}
+          {seccion === 'superadministrador' && (
+            <>
+              {seccion === 'usuarios' && <UsuariosAdmin />}
+              {seccion === 'vitacora' && <VitacoraSuperAdmin />}
+              {seccion === 'estadisticas' && <EstadisticasSuperAdmin />}
+              {seccion === 'seguridad' && <SeguridadSuperAdmin />}
+              {seccion === 'guia-super-usuario' && <GuiaSuperUsuarioAdmin />}
+            </>
+          )}
         </main>
 
         <footer className="border-t border-slate-200 bg-white">
