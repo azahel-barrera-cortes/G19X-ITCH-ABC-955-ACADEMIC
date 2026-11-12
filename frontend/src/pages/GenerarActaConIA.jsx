@@ -1,8 +1,10 @@
 import Boton from '../components/ui/Boton.jsx'
 import AsistenteChat from '../components/asistente/AsistenteChat.jsx'
+import Alerta from '../components/ui/Alerta.jsx'
 import { Tarjeta, TarjetaCuerpo, TarjetaEncabezado } from '../components/ui/Tarjeta.jsx'
 
-export default function GenerarActaConIA({ onVolver = null }) {
+export default function GenerarActaConIA({ onVolver = null, infoEmpresa = null }) {
+  const empresaAsignada = Boolean(infoEmpresa?.nombre_sociedad && infoEmpresa?.tipo_sociedad)
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
@@ -14,6 +16,9 @@ export default function GenerarActaConIA({ onVolver = null }) {
       </header>
 
       <div className="space-y-4">
+        {!empresaAsignada ? (
+          <Alerta tono="error" titulo="Empresa requerida">No se ha asignado empresa</Alerta>
+        ) : (
         <Tarjeta className="rounded-xl border border-corporativo-100 bg-white p-6 shadow-sm">
           <TarjetaEncabezado
             titulo="Asistente de redacción"
@@ -23,8 +28,9 @@ export default function GenerarActaConIA({ onVolver = null }) {
             <AsistenteChat modo="compacto" titulo="Generar acta con IA" />
           </TarjetaCuerpo>
         </Tarjeta>
+        )}
 
-        <Tarjeta className="rounded-xl border border-amber-100 bg-amber-50 p-6 shadow-sm">
+        {empresaAsignada ? <Tarjeta className="rounded-xl border border-amber-100 bg-amber-50 p-6 shadow-sm">
           <TarjetaEncabezado
             titulo="Consejo importante"
             descripcion="Revisión humana obligatoria antes de firmar"
@@ -38,7 +44,7 @@ export default function GenerarActaConIA({ onVolver = null }) {
               </p>
             </div>
           </TarjetaCuerpo>
-        </Tarjeta>
+        </Tarjeta> : null}
       </div>
     </div>
   )

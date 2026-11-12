@@ -9,6 +9,12 @@ import {
   validarPaso,
 } from '../hooks/useActaWizard.js'
 import {
+  actaAplicable,
+  requisitosParaActa,
+  TIPOS_ASAMBLEA,
+  TIPOS_SOCIEDAD,
+} from '../constants/catalogos.js'
+import {
   generarPdf,
   mensajeDeError,
   redactarActa,
@@ -45,7 +51,7 @@ function payloadParaPdf(estado, borrador, actaInicial) {
 
 /** Página «Generar acta»: formulario por pasos + borrador con IA + PDF final. */
 export default function GenerarActa({ actaInicial = null, plantillaTipo = null, infoEmpresa = null, onVolver = null, onCerrarEdicion = null }) {
-  const { estado, despachar, actualizarCampo, reiniciar, cargarActa, calculos, pasos } =
+  const { estado, despachar, actualizarCampo, actualizarCampos, reiniciar, cargarActa, calculos, pasos } =
     useActaWizard(actaInicial ? estadoDesdeActa(actaInicial) : undefined)
 
   const [pasoActual, setPasoActual] = useState(1)
@@ -58,6 +64,30 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
   const [cargandoRedaccion, setCargandoRedaccion] = useState(false)
   const [cargandoPdf, setCargandoPdf] = useState(false)
   const [redaccionEnVivo, setRedaccionEnVivo] = useState(null)
+  const empresaAsignada = Boolean(infoEmpresa?.nombre_sociedad && infoEmpresa?.tipo_sociedad)
+  const usaInfoEmpresa = Boolean(infoEmpresa?.usar_info_empresa)
+  const contextoActa = useMemo(() => {
+    const tipo = TIPOS_ASAMBLEA.find((item) => item.valor === estado.tipo_asamblea)
+    const sociedad = TIPOS_SOCIEDAD.find((item) => item.valor === estado.tipo_sociedad)
+    return {
+      acta: tipo,
+      sociedad,
+      requisitos: requisitosParaActa(estado.tipo_asamblea),
+      aplicable: actaAplicable(estado.tipo_sociedad, estado.tipo_asamblea),
+    }
+  }, [estado.tipo_asamblea, estado.tipo_sociedad])
+
+  useEffect(() => {
+    if (!empresaAsignada || !usaInfoEmpresa) return
+    actualizarCampos({
+      sociedad: infoEmpresa.nombre_sociedad,
+      rfc_sociedad: infoEmpresa.rfc_sociedad || '',
+      tipo_sociedad: infoEmpresa.tipo_sociedad,
+      logo_empresa: infoEmpresa.logo_empresa || '',
+      firma_electronica: Boolean(infoEmpresa.firma_electronica),
+      usar_info_empresa: true,
+    })
+  }, [actualizarCampos, empresaAsignada, infoEmpresa, usaInfoEmpresa])
 
   // Cuando se elige un acta en la biblioteca, se carga en el formulario.
   useEffect(() => {
@@ -101,6 +131,10 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
   /** Navegación: valida los pasos intermedios antes de avanzar. */
   const irAPaso = useCallback(
     (destino) => {
+      if (!empresaAsignada) {
+        setError('No se ha asignado empresa')
+        return
+      }
       const objetivo = Math.min(Math.max(destino, 1), pasos.length)
       if (objetivo > pasoActual) {
         for (let numero = pasoActual; numero < objetivo; numero += 1) {
@@ -115,11 +149,15 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
       setErrores({})
       setPasoActual(objetivo)
     },
-    [pasoActual, pasos.length, estado],
+    [empresaAsignada, pasoActual, pasos.length, estado],
   )
 
   /** «Generar borrador con IA»: POST /actas/redactar (no persiste ni exporta). */
   const handleRedactar = async () => {
+    if (!empresaAsignada) {
+      setError('No se ha asignado empresa')
+      return
+    }
     setCargandoRedaccion(true)
     setError(null)
     try {
@@ -136,6 +174,10 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
 
   /** «Ver redacción en vivo»: POST /actas/redactar-stream (SSE, primer acuerdo). */
   const handleRedactarEnVivo = async () => {
+    if (!empresaAsignada) {
+      setError('No se ha asignado empresa')
+      return
+    }
     if (!estado.acuerdos.length) {
       setError('Agrega al menos un acuerdo en el paso 3 antes de generar la redacción.')
       setPasoActual(3)
@@ -175,6 +217,10 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
 
   /** «Descargar PDF final»: POST /actas/generar-pdf -> Blob + metadatos. */
   const handleDescargarPdf = async () => {
+    if (!empresaAsignada) {
+      setError('No se ha asignado empresa')
+      return
+    }
     for (const numero of PASOS_A_EXPORTAR) {
       const fallos = validarPaso(numero, estado)
       if (Object.keys(fallos).length) {
@@ -233,6 +279,36 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
           ) : null}
         </div>
       </header>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <div className="tarjeta border-l-4 border-l-corporativo-500 p-4 md:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+            Configuración jurídica activa
+          </p>
+          <h2 className="mt-1 text-base font-semibold text-slate-800">
+            {contextoActa.acta?.etiqueta || 'Selecciona un tipo de acta'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {contextoActa.sociedad?.etiqueta || 'Selecciona el tipo societario para aplicar sus reglas.'}
+          </p>
+          {!contextoActa.aplicable ? (
+            <p className="mt-2 text-sm font-medium text-red-600">
+              Esta combinación no es aplicable. Selecciona otra acta o sociedad.
+            </p>
+          ) : null}
+        </div>
+        <div className="tarjeta p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+            Información requerida
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-slate-800">
+            {contextoActa.requisitos.length}
+          </p>
+          <p className="text-xs text-slate-500">
+            campos jurídicos específicos que deben documentarse antes de emitir el acta.
+          </p>
+        </div>
+      </section>
 
       {actaInicial ? (
         <Alerta tono="info" titulo="Modo edición">

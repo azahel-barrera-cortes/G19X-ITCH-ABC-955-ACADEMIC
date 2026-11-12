@@ -29,6 +29,7 @@ export default function InformacionEmpresa({
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [cargando, setCargando] = useState(false)
+  const [actualizandoUso, setActualizandoUso] = useState(false)
 
   useEffect(() => {
     if (!token) return undefined
@@ -37,7 +38,9 @@ export default function InformacionEmpresa({
     obtenerInfoEmpresa(token)
       .then((datos) => {
         if (!montado) return
-        setInfo({ ...INFO_VACIA, ...datos })
+        const completa = { ...INFO_VACIA, ...datos }
+        setInfo(completa)
+        if (onGuardar) onGuardar(completa)
       })
       .catch((fallo) => {
         if (!montado) return
@@ -45,7 +48,11 @@ export default function InformacionEmpresa({
           fallo.message === 'Not Found' || fallo.message.includes('404')
         if (endpointNoDisponible) {
           const almacenada = infoGuardada ?? cargarDesdeLocalStorage()
-          if (almacenada) setInfo({ ...INFO_VACIA, ...almacenada })
+          if (almacenada) {
+            const completa = { ...INFO_VACIA, ...almacenada }
+            setInfo(completa)
+            if (onGuardar) onGuardar(completa)
+          }
           return
         }
         setError(fallo.message || 'No se pudo cargar la información empresarial.')
@@ -77,15 +84,33 @@ export default function InformacionEmpresa({
     setInfo((previo) => ({ ...previo, [campo]: valor }))
   }, [puedeEditar])
 
-  const toggleFirmaElectronica = useCallback(() => {
-    if (!puedeEditar) return
-    setInfo((previo) => ({ ...previo, firma_electronica: !previo.firma_electronica }))
-  }, [puedeEditar])
-
-  const toggleUsarInfo = useCallback(() => {
-    if (!puedeEditar) return
-    setInfo((previo) => ({ ...previo, usar_info_empresa: !previo.usar_info_empresa }))
-  }, [puedeEditar])
+  const toggleUsarInfo = useCallback(async () => {
+    if (!puedeEditar || actualizandoUso) return
+    const siguiente = !info.usar_info_empresa
+    if (!String(info.nombre_sociedad || '').trim() || !String(info.tipo_sociedad || '').trim()) {
+      setError('Completa la razón social y el tipo de sociedad antes de activar esta opción.')
+      return
+    }
+    setActualizandoUso(true)
+    setError(null)
+    try {
+      const actualizada = await actualizarInfoEmpresa(token, {
+        ...info,
+        usar_info_empresa: siguiente,
+      })
+      const completa = { ...INFO_VACIA, ...actualizada }
+      setInfo(completa)
+      guardarEnLocalStorage(completa)
+      if (onGuardar) onGuardar(completa)
+      setAviso(siguiente
+        ? 'La información de la empresa se usará automáticamente en las actas.'
+        : 'La información de la empresa ya no se usará automáticamente en las actas.')
+    } catch (fallo) {
+      setError(fallo.message || 'No se pudo actualizar el uso de la información empresarial.')
+    } finally {
+      setActualizandoUso(false)
+    }
+  }, [actualizandoUso, info, onGuardar, puedeEditar, token])
 
   const manejarLogo = useCallback((evento) => {
     if (!puedeEditar) return
@@ -349,40 +374,6 @@ export default function InformacionEmpresa({
           </div>
         </fieldset>
 
-        <fieldset className="rounded-xl border border-slate-200 bg-white p-5 transition-colors">
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.5 5.5 18.5 8.5M4 20l4.8-1 9.9-9.9a2.12 2.12 0 0 0-3-3L5.8 16 4 20Z" />
-                <path strokeLinecap="round" d="M13 18h7" />
-              </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-800">Firma electrónica</h3>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Opcional</p>
-                </div>
-                <input
-                  id="firma_electronica"
-                  type="checkbox"
-                  checked={info.firma_electronica}
-                  onChange={toggleFirmaElectronica}
-                  className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-corporativo-600 disabled:cursor-not-allowed"
-                  disabled={!puedeEditar}
-                />
-              </div>
-              <label htmlFor="firma_electronica" className="mt-4 block cursor-pointer text-sm font-medium leading-5 text-slate-700">
-                Incluir leyenda de firma electrónica en el PDF
-              </label>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Si se activa, el PDF del acta incluirá una leyenda de firma electrónica.
-                Puedes habilitarla o deshabilitarla por acta.
-              </p>
-            </div>
-          </div>
-        </fieldset>
-
         <fieldset className={`rounded-xl border p-5 transition-colors ${
           info.usar_info_empresa
             ? 'border-corporativo-300 bg-corporativo-50'
@@ -402,21 +393,19 @@ export default function InformacionEmpresa({
                   <h3 className="text-sm font-semibold text-corporativo-700">Usar en la generación de actas</h3>
                   <p className="mt-1 text-xs font-medium text-corporativo-600">Configuración automática</p>
                 </div>
-                <input
-                  id="usar_info_empresa"
-                  type="checkbox"
-                  checked={info.usar_info_empresa}
-                  onChange={toggleUsarInfo}
-                  className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-corporativo-600 disabled:cursor-not-allowed"
-                  disabled={!puedeEditar}
-                />
+                <Boton
+                  variante={info.usar_info_empresa ? 'secundario' : 'primario'}
+                  tamano="sm"
+                  onClick={toggleUsarInfo}
+                  cargando={actualizandoUso}
+                  disabled={!puedeEditar || actualizandoUso}
+                >
+                  {info.usar_info_empresa ? 'Desactivar' : 'Activar'}
+                </Boton>
               </div>
-              <label htmlFor="usar_info_empresa" className="mt-4 block cursor-pointer text-sm font-medium leading-5 text-corporativo-700">
-                ¿Usar esta información al generar el acta?
-              </label>
               <p className="mt-2 text-xs leading-5 text-slate-600">
-                La sociedad, el tipo, el logo y la firma electrónica se incluirán
-                automáticamente en cada acta que generes.
+                La sociedad, el tipo y el logo se incluirán automáticamente en cada acta
+                cuando esta opción esté activa. El cambio se guarda inmediatamente.
               </p>
             </div>
           </div>

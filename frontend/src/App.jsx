@@ -101,6 +101,21 @@ function Aplicacion() {
   }, [])
 
   useEffect(() => {
+    if (!autenticado || !token) return undefined
+    let activo = true
+    obtenerInfoEmpresa(token)
+      .then((datos) => {
+        if (activo) setInfoEmpresa(datos || null)
+      })
+      .catch(() => {
+        // El valor local solo se usa como respaldo si el endpoint no está disponible.
+      })
+    return () => {
+      activo = false
+    }
+  }, [autenticado, token])
+
+  useEffect(() => {
     if (!autenticado) return undefined
     let activo = true
     obtenerCatalogos()
@@ -139,6 +154,7 @@ function Aplicacion() {
   // Guarda de navegación: si la sección activa no está permitida para el rol,
   // se regresa al perfil (p. ej. un capturista no puede quedarse en Biblioteca).
   const esSuperAdmin = usuario?.rol === 'SuperAdministrador'
+  const esAdministrador = usuario?.rol === 'Administrador'
 
   useEffect(() => {
     if (autenticado && esSuperAdmin && seccion === 'perfil') {
@@ -149,7 +165,7 @@ function Aplicacion() {
 
     const seccionPermitida =
       seccionesVisibles.includes(seccion) ||
-      (esSuperAdmin && SECCIONES_SUPERADMIN_IDS.includes(seccion))
+      ((esSuperAdmin || esAdministrador) && SECCIONES_SUPERADMIN_IDS.includes(seccion))
     if (autenticado && seccion !== 'perfil' && !seccionPermitida) {
       setSeccion('perfil')
       setVistaGenerar('panel')
@@ -254,7 +270,7 @@ function Aplicacion() {
         onCambiarSeccion={cambiarSeccion}
         onCerrarSesion={manejarCerrarSesion}
         seccionesVisibles={seccionesVisibles}
-        esSuperAdmin={usuario?.rol === 'SuperAdministrador'}
+        esSuperAdmin={esSuperAdmin}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -276,7 +292,7 @@ function Aplicacion() {
           ) : null}
           {seccion === 'generar' && (vistaGenerar !== 'panel' || actaEnEdicion) ? (
             vistaGenerar === 'ia' && !actaEnEdicion ? (
-              <GenerarActaConIA onVolver={volverAlPanel} />
+              <GenerarActaConIA infoEmpresa={infoEmpresa} onVolver={volverAlPanel} />
             ) : (
               <GenerarActa
                 key={actaEnEdicion ? 'edicion-' + actaEnEdicion.id : 'plantilla-' + (plantillaTipo || 'nueva')}
@@ -301,7 +317,7 @@ function Aplicacion() {
               puedeEditar={usuario?.rol === 'Administrador'}
             />
           ) : null}
-          {seccion === 'perfil' && !esSuperAdmin ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
+          {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
           {seccion === 'administrador' ? <Administrador /> : null}
           {seccion === 'usuarios' && <UsuariosSuperAdmin />}
           {seccion === 'vitacora' && <VitacoraSuperAdmin />}

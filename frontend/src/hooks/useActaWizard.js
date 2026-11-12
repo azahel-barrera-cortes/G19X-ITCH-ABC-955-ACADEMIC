@@ -6,7 +6,7 @@
  * enviarlo a la API (`construirPayload`).
  */
 import { useCallback, useMemo, useReducer } from 'react'
-import { ACTA_VACIA } from '../constants/catalogos.js'
+import { actaAplicable, ACTA_VACIA, requisitosParaActa } from '../constants/catalogos.js'
 
 /** Pasos del asistente de captura. */
 export const PASOS = [
@@ -181,6 +181,7 @@ export function construirPayload(estado) {
     convocatoria_quien: textoONulo(estado.convocatoria_quien),
     /** Información de la empresa / sociedad (sección lateral independiente). */
     tipo_sociedad: textoONulo(estado.tipo_sociedad),
+    datos_especificos: estado.datos_especificos || {},
     logo_empresa: textoONulo(estado.logo_empresa),
     firma_electronica: Boolean(estado.firma_electronica),
     usar_info_empresa: Boolean(estado.usar_info_empresa),
@@ -232,7 +233,16 @@ export function construirPayload(estado) {
           : null,
       })),
     observaciones: textoONulo(estado.observaciones),
-    instrucciones_adicionales: textoONulo(estado.instrucciones_adicionales),
+    instrucciones_adicionales: textoONulo(
+      [
+        estado.instrucciones_adicionales,
+        Object.keys(estado.datos_especificos || {}).length
+          ? `Datos jurídicos específicos capturados: ${JSON.stringify(estado.datos_especificos)}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    ),
     guardar: estado.guardar !== false,
     generar_clausulas: estado.generar_clausulas !== false,
     incluir_validacion: estado.incluir_validacion !== false,
@@ -258,6 +268,7 @@ export function estadoDesdeActa(acta) {
     convocatoria_medio: acta.convocatoria_medio || '',
     convocatoria_quien: acta.convocatoria_quien || '',
     tipo_sociedad: acta.tipo_sociedad || '',
+    datos_especificos: acta.datos_especificos || {},
     logo_empresa: acta.logo_empresa || '',
     firma_electronica: acta.firma_electronica !== false,
     usar_info_empresa: acta.usar_info_empresa === true,
@@ -298,11 +309,22 @@ export function validarPaso(paso, estado) {
       errores.sociedad = 'Indica la razón social de la sociedad (mínimo 3 caracteres).'
     }
     if (!estado.fecha) errores.fecha = 'La fecha de celebración es obligatoria.'
+    if (!estado.tipo_sociedad) {
+      errores.tipo_sociedad = 'Selecciona el tipo societario para aplicar las reglas del acta.'
+    } else if (!actaAplicable(estado.tipo_sociedad, estado.tipo_asamblea)) {
+      errores.tipo_asamblea = 'El tipo de acta no corresponde al tipo societario seleccionado.'
+    }
     if (String(estado.lugar || '').trim().length < 3) {
       errores.lugar = 'Indica el lugar donde se celebró la asamblea.'
     }
     if (estado.convocatoria_fecha && estado.fecha && estado.convocatoria_fecha > estado.fecha) {
       errores.convocatoria_fecha = 'La convocatoria no puede ser posterior a la fecha de la asamblea.'
+    }
+    for (const requisito of requisitosParaActa(estado.tipo_asamblea)) {
+      const valor = String(estado.datos_especificos?.[requisito.clave] || '').trim()
+      if (requisito.requerido && !valor) {
+        errores[`datos_especificos.${requisito.clave}`] = `Completa: ${requisito.etiqueta}.`
+      }
     }
   }
 

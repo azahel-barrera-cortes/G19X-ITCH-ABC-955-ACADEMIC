@@ -1,13 +1,24 @@
 import Campo from '../ui/Campo.jsx'
-import { TIPOS_ASAMBLEA, TIPOS_SOCIEDAD } from '../../constants/catalogos.js'
+import {
+  actaAplicable,
+  requisitosParaActa,
+  TIPOS_ASAMBLEA,
+  TIPOS_SOCIEDAD,
+} from '../../constants/catalogos.js'
 import { fechaLarga, moneda } from '../../utils/formato.js'
 
-/** Paso 1 del formulario: empresa, fecha, hora y tipo de asamblea. */
+/** Paso 1 del formulario: empresa, fecha, hora y tipo de acta corporativa. */
 export default function PasoDatosGenerales({ estado, actualizarCampo, errores = {}, infoEmpresa = null }) {
   const tipoSeleccionado = TIPOS_ASAMBLEA.find((tipo) => tipo.valor === estado.tipo_asamblea)
   const tipoSociedadSeleccionado = TIPOS_SOCIEDAD.find((t) => t.valor === (estado.tipo_sociedad || (infoEmpresa?.tipo_sociedad || '')))
-  const hayInfoGuardada = infoEmpresa && infoEmpresa.nombre_sociedad
-  const usaInfo = Boolean(estado.usar_info_empresa)
+  const tipoSociedad = estado.tipo_sociedad || infoEmpresa?.tipo_sociedad || ''
+  const actasDisponibles = TIPOS_ASAMBLEA.filter((tipo) => actaAplicable(tipoSociedad, tipo.valor))
+  const requisitos = requisitosParaActa(estado.tipo_asamblea)
+  const hayInfoGuardada = Boolean(
+    infoEmpresa?.nombre_sociedad && infoEmpresa?.tipo_sociedad,
+  )
+  const empresaAsignada = Boolean(infoEmpresa && hayInfoGuardada)
+  const usaInfo = Boolean(infoEmpresa?.usar_info_empresa)
 
   return (
     <div className="space-y-5">
@@ -23,8 +34,11 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
             id="sociedad"
             className="campo"
             value={estado.sociedad}
-            onChange={(evento) => actualizarCampo('sociedad', evento.target.value)}
+            onChange={(evento) => {
+              if (!usaInfo) actualizarCampo('sociedad', evento.target.value)
+            }}
             placeholder="Comercializadora del Norte, S.A. de C.V."
+            readOnly={usaInfo}
           />
         </Campo>
 
@@ -34,57 +48,40 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
             className="campo uppercase"
             maxLength={13}
             value={estado.rfc_sociedad}
-            onChange={(evento) => actualizarCampo('rfc_sociedad', evento.target.value.toUpperCase())}
+            onChange={(evento) => {
+              if (!usaInfo) actualizarCampo('rfc_sociedad', evento.target.value.toUpperCase())
+            }}
             placeholder="CDN950101ABC"
+            readOnly={usaInfo}
           />
         </Campo>
 
-        {hayInfoGuardada && !usaInfo && (
-          <div className="rounded-xl border border-corporativo-200 bg-corporativo-50 p-4">
-            <p className="text-sm font-medium text-corporativo-700">¿Usar información de la sociedad guardada?</p>
-            <p className="text-xs text-slate-600 mt-1">
-              Se encontró información guardada en «Información de la empresa o sociedad»:
-              <strong className="text-corporativo-700">{infoEmpresa.nombre_sociedad}</strong>
-              ({tipoSociedadSeleccionado?.etiqueta || 'tipo no especificado'}).
-              ¿Desea usarla para esta acta? La IA y el PDF podrán incluirla automáticamente.
+        {empresaAsignada && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-medium text-emerald-700">Datos de la empresa asignados por el administrador.</p>
+            <p className="text-xs text-emerald-700 mt-1">
+              {usaInfo
+                ? <>Se usarán automáticamente para esta acta: <strong>{infoEmpresa.nombre_sociedad}</strong>.</>
+                : 'El administrador decidió no usar esta información automáticamente para las actas.'}
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <input
-                id="usar_info_empresa"
-                type="checkbox"
-                checked={usaInfo}
-                onChange={() => {
-                  actualizarCampo('usar_info_empresa', !usaInfo)
-                  if (infoEmpresa) {
-                    actualizarCampo('sociedad', infoEmpresa.nombre_sociedad || '')
-                    actualizarCampo('rfc_sociedad', infoEmpresa.rfc_sociedad || '')
-                    actualizarCampo('tipo_sociedad', infoEmpresa.tipo_sociedad || '')
-                    actualizarCampo('logo_empresa', infoEmpresa.logo_empresa || '')
-                    actualizarCampo('firma_electronica', Boolean(infoEmpresa.firma_electronica))
-                  }
-                }}
-                className="campo"
-              />
-              <label htmlFor="usar_info_empresa" className="text-sm font-medium text-corporativo-700">
-                Sí, usar esta información para generar el acta
-              </label>
-            </div>
+            <p className="text-xs text-emerald-700 mt-1">El administrador de la empresa puede modificar esta configuración desde su perfil.</p>
           </div>
         )}
 
-        {usaInfo && hayInfoGuardada && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-sm font-medium text-emerald-700">
-              ✓ Usando información de la sociedad guardada: <strong>{infoEmpresa.nombre_sociedad}</strong>
-            </p>
-            <p className="text-xs text-emerald-600 mt-1">
-              Se aplicará al encabezado, al tipo de sociedad y al logo del acta. Puedes desactivarlo en «Información de la empresa o sociedad».
-            </p>
+        {!empresaAsignada && (
+          <div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+            No se ha asignado empresa
           </div>
         )}
 
         {!usaInfo && (
-          <Campo etiqueta="Tipo de sociedad" ayuda="Tipo de sociedad mercantil (determina qué actas corporativas pueden generarse)." htmlFor="tipo_sociedad_wizard">
+          <Campo
+            etiqueta="Tipo de sociedad"
+            requerido
+            error={errores.tipo_sociedad}
+            ayuda="Determina la legislación y las actas corporativas que pueden generarse."
+            htmlFor="tipo_sociedad_wizard"
+          >
             <select
               id="tipo_sociedad_wizard"
               className="campo"
@@ -102,8 +99,9 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
         )}
 
         <Campo
-          etiqueta="Tipo de asamblea"
+          etiqueta="Tipo de acta corporativa"
           requerido
+          error={errores.tipo_asamblea}
           ayuda={tipoSeleccionado?.descripcion}
           htmlFor="tipo_asamblea"
         >
@@ -113,13 +111,63 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
             value={estado.tipo_asamblea}
             onChange={(evento) => actualizarCampo('tipo_asamblea', evento.target.value)}
           >
-            {TIPOS_ASAMBLEA.map((tipo) => (
+            {actasDisponibles.map((tipo) => (
               <option key={tipo.valor} value={tipo.valor}>
                 {tipo.etiqueta}
               </option>
             ))}
           </select>
         </Campo>
+
+        <div className="md:col-span-2 rounded-xl border border-corporativo-100 bg-corporativo-50/50 p-4">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-corporativo-700">Datos jurídicos del acta</h3>
+            <p className="mt-1 text-xs text-slate-600">
+              Estos datos son necesarios para que la redacción y la validación correspondan al
+              tipo de acta seleccionado. La plataforma no los sustituye con valores predeterminados.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {requisitos.map((requisito) => (
+              <Campo
+                key={requisito.clave}
+                etiqueta={requisito.etiqueta}
+                requerido={requisito.requerido}
+                ayuda={requisito.ayuda}
+                error={errores[`datos_especificos.${requisito.clave}`]}
+                className={requisito.tipo === 'textarea' ? 'md:col-span-2' : ''}
+              >
+                {requisito.tipo === 'textarea' ? (
+                  <textarea
+                    className="campo"
+                    rows={3}
+                    value={estado.datos_especificos?.[requisito.clave] || ''}
+                    onChange={(evento) =>
+                      actualizarCampo('datos_especificos', {
+                        ...(estado.datos_especificos || {}),
+                        [requisito.clave]: evento.target.value,
+                      })
+                    }
+                    placeholder={requisito.placeholder}
+                  />
+                ) : (
+                  <input
+                    className="campo"
+                    type={requisito.tipo}
+                    value={estado.datos_especificos?.[requisito.clave] || ''}
+                    onChange={(evento) =>
+                      actualizarCampo('datos_especificos', {
+                        ...(estado.datos_especificos || {}),
+                        [requisito.clave]: evento.target.value,
+                      })
+                    }
+                    placeholder={requisito.placeholder}
+                  />
+                )}
+              </Campo>
+            ))}
+          </div>
+        </div>
 
         <Campo
           etiqueta="Asunto principal"
