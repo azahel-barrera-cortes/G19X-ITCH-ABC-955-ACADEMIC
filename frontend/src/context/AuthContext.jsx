@@ -5,6 +5,7 @@
  * changePassword y resetPassword.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { obtenerPerfil, registrarCierreSesion } from '../api/auth.js'
 
 const CLAVE_TOKEN = 'pgac_token'
 const CLAVE_USUARIO = 'pgac_usuario'
@@ -24,6 +25,32 @@ export function AuthProvider({ children }) {
 
   const cargando = false
 
+  // Detecta si un administrador desactivó una sesión que ya estaba abierta.
+  useEffect(() => {
+    if (!token) return undefined
+    let montado = true
+
+    const comprobarEstado = async () => {
+      try {
+        const perfil = await obtenerPerfil(token)
+        if (!montado) return
+        setUsuario(perfil)
+        localStorage.setItem(CLAVE_USUARIO, JSON.stringify(perfil))
+      } catch (fallo) {
+        if (montado && fallo.message?.toLowerCase().includes('inactivo')) {
+          setUsuario((previo) => (previo ? { ...previo, activo: false } : previo))
+        }
+      }
+    }
+
+    comprobarEstado()
+    const intervalo = window.setInterval(comprobarEstado, 15000)
+    return () => {
+      montado = false
+      window.clearInterval(intervalo)
+    }
+  }, [token])
+
   /** Guarda token y usuario en localStorage y en el estado. */
   const guardarSesion = useCallback((tokenJwt, datosUsuario) => {
     localStorage.setItem(CLAVE_TOKEN, tokenJwt)
@@ -32,12 +59,19 @@ export function AuthProvider({ children }) {
     setUsuario(datosUsuario)
   }, [])
 
-  /** Cierra sesión limpiando localStorage y estado. */
-  const cerrarSesion = useCallback(() => {
-    localStorage.removeItem(CLAVE_TOKEN)
-    localStorage.removeItem(CLAVE_USUARIO)
-    setToken(null)
-    setUsuario(null)
+  /** Registra y cierra la sesión, sin bloquear la salida si el backend no responde. */
+  const cerrarSesion = useCallback(async () => {
+    const tokenActual = localStorage.getItem(CLAVE_TOKEN)
+    try {
+      if (tokenActual) await registrarCierreSesion(tokenActual)
+    } catch (fallo) {
+      console.error('No se pudo registrar el cierre de sesión:', fallo)
+    } finally {
+      localStorage.removeItem(CLAVE_TOKEN)
+      localStorage.removeItem(CLAVE_USUARIO)
+      setToken(null)
+      setUsuario(null)
+    }
   }, [])
 
   /** Actualiza el usuario local (tras editar perfil). */

@@ -17,6 +17,7 @@ import VitacoraSuperAdmin from './pages/VitacoraSuperAdmin.jsx'
 import EstadisticasSuperAdmin from './pages/EstadisticasSuperAdmin.jsx'
 import SeguridadSuperAdmin from './pages/SeguridadSuperAdmin.jsx'
 import GuiaSuperAdmin from './pages/GuiaSuperAdmin.jsx'
+import UsuarioInactivo from './pages/UsuarioInactivo.jsx'
 import { obtenerCatalogos } from './api/client.js'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { seccionesPermitidas, SECCIONES_SISTEMA } from './constants/roles.js'
@@ -199,8 +200,8 @@ function Aplicacion() {
   }, [volverAlPanel])
 
   /** Cerrar sesión limpia el token; la compuerta vuelve a mostrar `Acceso`. */
-  const manejarCerrarSesion = useCallback(() => {
-    cerrarSesion()
+  const manejarCerrarSesion = useCallback(async () => {
+    await cerrarSesion()
     volverAlPanel()
     setSeccion('perfil')
     history.replaceState(null, '', '')
@@ -212,6 +213,10 @@ function Aplicacion() {
   // interfaz de acceso (iniciar sesión / crear cuenta / recuperar contraseña).
   if (!autenticado) {
     return <Acceso onAccesoExitoso={manejarAccesoExitoso} />
+  }
+
+  if (usuario?.activo === false) {
+    return <UsuarioInactivo onCerrarSesion={manejarCerrarSesion} />
   }
 
   return (
@@ -265,6 +270,7 @@ function Aplicacion() {
             <InformacionEmpresa
               infoGuardada={infoEmpresa}
               onGuardar={setInfoEmpresa}
+              puedeEditar={usuario?.rol === 'Administrador'}
             />
           ) : null}
           {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}

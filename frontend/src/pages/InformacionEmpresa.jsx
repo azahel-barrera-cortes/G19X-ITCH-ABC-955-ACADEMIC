@@ -16,7 +16,12 @@ const INFO_VACIA = {
   usar_info_empresa: false,
 }
 
-export default function InformacionEmpresa({ infoGuardada = null, onGuardar = null, onUsarInfo = null }) {
+export default function InformacionEmpresa({
+  infoGuardada = null,
+  onGuardar = null,
+  onUsarInfo = null,
+  puedeEditar = false,
+}) {
   const [info, setInfo] = useState(INFO_VACIA)
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
@@ -45,18 +50,22 @@ export default function InformacionEmpresa({ infoGuardada = null, onGuardar = nu
   }
 
   const actualizarCampo = useCallback((campo, valor) => {
+    if (!puedeEditar) return
     setInfo((previo) => ({ ...previo, [campo]: valor }))
-  }, [])
+  }, [puedeEditar])
 
   const toggleFirmaElectronica = useCallback(() => {
+    if (!puedeEditar) return
     setInfo((previo) => ({ ...previo, firma_electronica: !previo.firma_electronica }))
-  }, [])
+  }, [puedeEditar])
 
   const toggleUsarInfo = useCallback(() => {
+    if (!puedeEditar) return
     setInfo((previo) => ({ ...previo, usar_info_empresa: !previo.usar_info_empresa }))
-  }, [])
+  }, [puedeEditar])
 
   const manejarLogo = useCallback((evento) => {
+    if (!puedeEditar) return
     const archivo = evento.target.files?.[0]
     if (!archivo) return
     if (!archivo.type.startsWith('image/')) {
@@ -69,14 +78,19 @@ export default function InformacionEmpresa({ infoGuardada = null, onGuardar = nu
       setAviso('Logo cargado. Se mostrará en el encabezado del acta.')
     }
     lector.readAsDataURL(archivo)
-  }, [])
+  }, [puedeEditar])
 
   const eliminarLogo = useCallback(() => {
+    if (!puedeEditar) return
     setInfo((previo) => ({ ...previo, logo_empresa: '' }))
     setAviso('Logo eliminado.')
-  }, [])
+  }, [puedeEditar])
 
   const handleGuardar = async () => {
+    if (!puedeEditar) {
+      setError('Solo el Administrador puede modificar la información de la empresa o sociedad.')
+      return
+    }
     setCargando(true)
     setError(null)
     try {
@@ -92,38 +106,144 @@ export default function InformacionEmpresa({ infoGuardada = null, onGuardar = nu
 
   const tipoSeleccionado = TIPOS_SOCIEDAD.find((t) => t.valor === info.tipo_sociedad)
 
+  if (!puedeEditar) {
+    return (
+      <div className="space-y-5">
+        <header className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-tarjeta">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-corporativo-50 text-corporativo-600">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V5.8a1 1 0 0 1 .7-.95l6-2a1 1 0 0 1 .6 0l6 2a1 1 0 0 1 .7.95V21M8 8h1m-1 4h1m6-4h1m-1 4h1M9 21v-4h6v4" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-base font-semibold leading-6 text-slate-800">Información de la empresa o sociedad</h1>
+              <p className="mt-1 text-sm leading-5 text-slate-500">
+                Consulta la información empresarial configurada por el Administrador.
+              </p>
+            </div>
+          </div>
+        </header>
+
+        {error && <Alerta tono="error" titulo="Error" mensaje={error} />}
+        {aviso && <Alerta tono="exito" mensaje={aviso} />}
+
+        <Tarjeta className="space-y-5 p-5">
+          <section className="rounded-xl border border-slate-200 bg-slate-50/40 p-5">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+              Datos de la sociedad
+            </h2>
+            <dl className="mt-5 space-y-4">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Razón social / Nombre de la sociedad
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-slate-800">
+                  {info.nombre_sociedad || 'No especificada'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Tipo de sociedad
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-slate-800">
+                  {tipoSeleccionado?.etiqueta || 'No especificado'}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+              Logo de la empresa
+            </h2>
+            <div className="mt-4 flex min-h-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+              {info.logo_empresa ? (
+                <img
+                  src={info.logo_empresa}
+                  alt="Logo de la empresa"
+                  className="max-h-20 w-auto rounded object-contain"
+                />
+              ) : (
+                <p className="text-sm text-slate-500">No hay un logo registrado.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+                Firma electrónica
+              </h2>
+              <p className={`mt-3 text-sm font-semibold ${
+                info.firma_electronica ? 'text-emerald-700' : 'text-slate-500'
+              }`}>
+                {info.firma_electronica ? 'Activa' : 'Inactiva'}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Estado configurado por el Administrador.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+                Uso en la generación de actas
+              </h2>
+              <p className={`mt-3 text-sm font-semibold ${
+                info.usar_info_empresa ? 'text-emerald-700' : 'text-slate-500'
+              }`}>
+                {info.usar_info_empresa ? 'Activo' : 'Inactivo'}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Estado configurado por el Administrador.
+              </p>
+            </div>
+          </section>
+        </Tarjeta>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-lg font-semibold text-corporativo-700">Información de la empresa o sociedad</h1>
-        <p className="text-sm text-slate-500">
+    <div className="space-y-5">
+      <header className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-tarjeta">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-corporativo-50 text-corporativo-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V5.8a1 1 0 0 1 .7-.95l6-2a1 1 0 0 1 .6 0l6 2a1 1 0 0 1 .7.95V21M8 8h1m-1 4h1m6-4h1m-1 4h1M9 21v-4h6v4" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-base font-semibold leading-6 text-slate-800">Información de la empresa o sociedad</h1>
+            <p className="mt-1 text-sm leading-5 text-slate-500">
           Captura aquí los datos de la sociedad que comparece en las actas. Esta información
           se usará para completar el encabezado y, si lo deseas, la IA podrá incorporarla
           al redactar las cláusulas.
-        </p>
+            </p>
+          </div>
+        </div>
       </header>
 
       {error && <Alerta tono="error" titulo="Error" mensaje={error} />}
       {aviso && <Alerta tono="exito" mensaje={aviso} />}
 
-      <Tarjeta>
-        <div className="space-y-5">
-          <fieldset className="rounded-xl border border-slate-200 p-4">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-corporativo-600">
+      <Tarjeta className="space-y-5 p-5">
+        <fieldset className="rounded-xl border border-slate-200 bg-slate-50/40 p-5">
+          <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-corporativo-600">
               Datos de la sociedad
-            </legend>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Campo etiqueta="Razón social / Nombre de la sociedad" requerido ayuda="Nombre legal con el que se constituye y aparece en los estatutos." htmlFor="nombre_sociedad">
+          </legend>
+          <div className="space-y-5">
+            <Campo etiqueta="Razón social / Nombre de la sociedad" requerido ayuda="Nombre legal con el que se constituye y aparece en los estatutos." htmlFor="nombre_sociedad">
                 <input
                   id="nombre_sociedad"
                   className="campo"
                   value={info.nombre_sociedad}
                   onChange={(e) => actualizarCampo('nombre_sociedad', e.target.value)}
                   placeholder="Comercializadora del Norte, S.A. de C.V."
+                  disabled={!puedeEditar}
                 />
-              </Campo>
+            </Campo>
 
-              <Campo etiqueta="R.F.C." ayuda="Clave del Registro Federal de Contribuyentes (opcional)." htmlFor="rfc_sociedad">
+            <Campo etiqueta="R.F.C." ayuda="Clave del Registro Federal de Contribuyentes (opcional)." htmlFor="rfc_sociedad">
                 <input
                   id="rfc_sociedad"
                   className="campo uppercase"
@@ -131,15 +251,17 @@ export default function InformacionEmpresa({ infoGuardada = null, onGuardar = nu
                   value={info.rfc_sociedad}
                   onChange={(e) => actualizarCampo('rfc_sociedad', e.target.value.toUpperCase())}
                   placeholder="CDN950101ABC"
+                  disabled={!puedeEditar}
                 />
-              </Campo>
+            </Campo>
 
-              <Campo etiqueta="Tipo de sociedad" requerido ayuda="Determina qué actas corporativas pueden generarse estrictamente." htmlFor="tipo_sociedad">
+            <Campo etiqueta="Tipo de sociedad" requerido ayuda="Determina qué actas corporativas pueden generarse estrictamente." htmlFor="tipo_sociedad">
                 <select
                   id="tipo_sociedad"
                   className="campo"
                   value={info.tipo_sociedad}
                   onChange={(e) => actualizarCampo('tipo_sociedad', e.target.value)}
+                  disabled={!puedeEditar}
                 >
                   <option value="">Selecciona un tipo de sociedad</option>
                   {TIPOS_SOCIEDAD.map((tipo) => (
@@ -151,78 +273,114 @@ export default function InformacionEmpresa({ infoGuardada = null, onGuardar = nu
                 {tipoSeleccionado && (
                   <p className="mt-1 text-xs text-slate-500">{tipoSeleccionado.etiqueta}</p>
                 )}
-              </Campo>
+            </Campo>
 
-              <Campo etiqueta="Logo de la empresa" ayuda="Imagen que se mostrará en el encabezado del acta (PNG, JPG, SVG, WebP)." htmlFor="logo_empresa">
+            <Campo etiqueta="Logo de la empresa" ayuda="Imagen que se mostrará en el encabezado del acta (PNG, JPG, SVG, WebP)." htmlFor="logo_empresa">
                 <input
                   id="logo_empresa"
                   type="file"
                   accept="image/*"
                   className="campo"
                   onChange={manejarLogo}
+                  disabled={!puedeEditar}
                 />
                 {info.logo_empresa && (
                   <div className="mt-2 flex items-center gap-3">
                     <img src={info.logo_empresa} alt="Logo" className="h-10 w-auto rounded border border-slate-200" />
-                    <Boton variante="secundario" tamano="sm" onClick={eliminarLogo}>Eliminar logo</Boton>
+                    {puedeEditar && (
+                      <Boton variante="secundario" tamano="sm" onClick={eliminarLogo}>Eliminar logo</Boton>
+                    )}
                   </div>
                 )}
-              </Campo>
-            </div>
-          </fieldset>
+            </Campo>
+          </div>
+        </fieldset>
 
-          <fieldset className="rounded-xl border border-slate-200 p-4">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-corporativo-600">
-              Firma electrónica (opcional)
-            </legend>
-            <div className="flex items-center gap-3">
-              <input
-                id="firma_electronica"
-                type="checkbox"
-                checked={info.firma_electronica}
-                onChange={toggleFirmaElectronica}
-                className="campo"
-              />
-              <label htmlFor="firma_electronica" className="text-sm font-medium">
-                Incluir leyenda de firma electrónica
+        <fieldset className="rounded-xl border border-slate-200 bg-white p-5 transition-colors">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.5 5.5 18.5 8.5M4 20l4.8-1 9.9-9.9a2.12 2.12 0 0 0-3-3L5.8 16 4 20Z" />
+                <path strokeLinecap="round" d="M13 18h7" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Firma electrónica</h3>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Opcional</p>
+                </div>
+                <input
+                  id="firma_electronica"
+                  type="checkbox"
+                  checked={info.firma_electronica}
+                  onChange={toggleFirmaElectronica}
+                  className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-corporativo-600 disabled:cursor-not-allowed"
+                  disabled={!puedeEditar}
+                />
+              </div>
+              <label htmlFor="firma_electronica" className="mt-4 block cursor-pointer text-sm font-medium leading-5 text-slate-700">
+                Incluir leyenda de firma electrónica en el PDF
               </label>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Si se activa, el PDF del acta incluirá una leyenda de firma electrónica.
+                Puedes habilitarla o deshabilitarla por acta.
+              </p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Si se activa, el PDF del acta incluirá una leyenda de firma electrónica.
-              Esta función es opcional y puede habilitarse o deshabilitarse por acta.
-            </p>
-          </fieldset>
+          </div>
+        </fieldset>
 
-          <fieldset className="rounded-xl border border-slate-200 bg-corporativo-50 p-4">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-corporativo-600">
-              Usar en la generación de actas
-            </legend>
-            <div className="flex items-center gap-3">
-              <input
-                id="usar_info_empresa"
-                type="checkbox"
-                checked={info.usar_info_empresa}
-                onChange={toggleUsarInfo}
-                className="campo"
-              />
-              <label htmlFor="usar_info_empresa" className="text-sm font-medium text-corporativo-700">
+        <fieldset className={`rounded-xl border p-5 transition-colors ${
+          info.usar_info_empresa
+            ? 'border-corporativo-300 bg-corporativo-50'
+            : 'border-slate-200 bg-white'
+        }`}>
+          <div className="flex items-start gap-4">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+              info.usar_info_empresa ? 'bg-white text-corporativo-600' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12.5 12 4l9 8.5M5.5 10.5V20h13v-9.5M9 20v-5h6v5" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-corporativo-700">Usar en la generación de actas</h3>
+                  <p className="mt-1 text-xs font-medium text-corporativo-600">Configuración automática</p>
+                </div>
+                <input
+                  id="usar_info_empresa"
+                  type="checkbox"
+                  checked={info.usar_info_empresa}
+                  onChange={toggleUsarInfo}
+                  className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-corporativo-600 disabled:cursor-not-allowed"
+                  disabled={!puedeEditar}
+                />
+              </div>
+              <label htmlFor="usar_info_empresa" className="mt-4 block cursor-pointer text-sm font-medium leading-5 text-corporativo-700">
                 ¿Usar esta información al generar el acta?
               </label>
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                La sociedad, el tipo, el logo y la firma electrónica se incluirán
+                automáticamente en cada acta que generes.
+              </p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Si se activa, la sociedad, el tipo de sociedad, el logo y la firma electrónica
-              se incluirán automáticamente en cada acta que generes. La IA podrá usar estos
-              datos para redactar las cláusulas y el encabezado del PDF.
-            </p>
-          </fieldset>
-        </div>
+          </div>
+        </fieldset>
       </Tarjeta>
 
-      <div className="flex justify-end">
-        <Boton variante="primero" onClick={handleGuardar} cargando={cargando}>
-          Guardar información de la sociedad
-        </Boton>
-      </div>
+      {puedeEditar ? (
+        <div className="flex justify-end px-1">
+          <Boton variante="primero" onClick={handleGuardar} cargando={cargando}>
+            Guardar información de la sociedad
+          </Boton>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-800">
+          Solo el Administrador puede editar o guardar la información de la empresa o sociedad.
+        </div>
+      )}
     </div>
   )
 }

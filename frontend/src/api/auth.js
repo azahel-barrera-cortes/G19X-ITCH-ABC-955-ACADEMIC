@@ -36,9 +36,17 @@ export async function iniciarSesion({ email, password }) {
   return peticion('/auth/login', { method: 'POST', body: { email, password } })
 }
 
+export async function registrarCierreSesion(token) {
+  return peticion('/auth/logout', { method: 'POST', token })
+}
+
 /* ── Perfil ─────────────────────────────────────────────────────────── */
 export async function obtenerPerfil(token) {
   return peticion('/auth/me', { token })
+}
+
+export async function obtenerCodigoEmpresa(token) {
+  return peticion('/auth/me/codigo-empresa', { method: 'POST', token })
 }
 
 export async function actualizarPerfil(token, cambios) {

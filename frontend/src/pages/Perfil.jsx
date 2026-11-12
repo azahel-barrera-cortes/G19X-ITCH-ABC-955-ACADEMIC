@@ -4,13 +4,13 @@ import Campo from '../components/ui/Campo.jsx'
 import Tarjeta from '../components/ui/Tarjeta.jsx'
 import Alerta from '../components/ui/Alerta.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { actualizarPerfil, cambiarPassword } from '../api/auth.js'
-import { ROLES, etiquetaRol, seccionesConAcceso } from '../constants/roles.js'
+import { actualizarPerfil, cambiarPassword, obtenerCodigoEmpresa, obtenerPerfil } from '../api/auth.js'
+import { ROLES } from '../constants/roles.js'
 import InformacionEmpresa from './InformacionEmpresa.jsx'
 
 const ROLES_PERFIL = ROLES
 
-export default function Perfil({ onCambiarVista = null }) {
+export default function Perfil() {
   const { usuario, token, cerrarSesion, actualizarUsuario } = useAuth()
   const [perfil, setPerfil] = useState({ nombre_completo: '', rol: 'capturista' })
   const [password, setPassword] = useState({ actual: '', nueva: '', confirmar: '' })
@@ -20,13 +20,58 @@ export default function Perfil({ onCambiarVista = null }) {
   const [avisoPassword, setAvisoPassword] = useState(null)
   const [cargandoPerfil, setCargandoPerfil] = useState(false)
   const [cargandoPassword, setCargandoPassword] = useState(false)
+  const [codigoCopiado, setCodigoCopiado] = useState(false)
+  const [errorCodigo, setErrorCodigo] = useState(null)
 
   useEffect(() => {
     if (usuario) setPerfil({ nombre_completo: usuario.nombre_completo || '', rol: usuario.rol || 'capturista' })
   }, [usuario])
 
+  useEffect(() => {
+    if (!usuario || usuario.rol !== 'Administrador' || usuario.codigo_empresa) return undefined
+    let montado = true
+    setErrorCodigo(null)
+    obtenerCodigoEmpresa(token)
+      .then((perfilActualizado) => {
+        if (montado) actualizarUsuario(perfilActualizado)
+      })
+      .catch((fallo) => {
+        if (!montado) return
+        // Compatibilidad con un backend que ya genera el código desde /auth/me,
+        // pero aún no expone el endpoint dedicado.
+        if (fallo.message === 'Not Found' || fallo.message.includes('404')) {
+          obtenerPerfil(token)
+            .then((perfilActualizado) => {
+              if (!montado) return
+              actualizarUsuario(perfilActualizado)
+              if (!perfilActualizado.codigo_empresa) {
+                setErrorCodigo('El backend todavía no ha generado el código de esta empresa.')
+              }
+            })
+            .catch((errorPerfil) => {
+              if (montado) setErrorCodigo(errorPerfil.message || 'No se pudo obtener el código de la empresa.')
+            })
+          return
+        }
+        setErrorCodigo(fallo.message || 'No se pudo obtener el código de la empresa.')
+      })
+    return () => {
+      montado = false
+    }
+  }, [usuario, token, actualizarUsuario])
+
   const manejarCambioPerfil = (campo, valor) => setPerfil((p) => ({ ...p, [campo]: valor }))
   const manejarCambioPassword = (campo, valor) => setPassword((p) => ({ ...p, [campo]: valor }))
+
+  const copiarCodigoEmpresa = async () => {
+    try {
+      await navigator.clipboard.writeText(usuario.codigo_empresa)
+      setCodigoCopiado(true)
+      window.setTimeout(() => setCodigoCopiado(false), 2000)
+    } catch {
+      setCodigoCopiado(false)
+    }
+  }
 
   const manejarGuardarPerfil = async (e) => {
     e.preventDefault()
@@ -60,122 +105,154 @@ export default function Perfil({ onCambiarVista = null }) {
     )
   }
 
+  const iniciales = (perfil.nombre_completo || usuario.email || 'U')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join('')
+    .toUpperCase()
+  const puedeEditarPerfil = usuario.rol === 'SuperAdministrador'
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 py-6">
-      <header>
-        <h1 className="text-xl font-semibold text-corporativo-700">Mi perfil</h1>
-        <p className="text-sm text-slate-500">
-          Gestiona tu información personal, tu contraseña y los datos de la sociedad.
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="overflow-hidden rounded-2xl bg-gradient-to-br from-corporativo-700 via-corporativo-700 to-corporativo-800 px-6 py-7 text-white shadow-lg sm:px-8">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl font-bold tracking-wide ring-1 ring-white/25">
+              {iniciales}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-corporativo-100">Configuración de cuenta</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Mi perfil</h1>
+              <p className="mt-1 text-sm text-corporativo-100">{usuario.email}</p>
+            </div>
+          </div>
+          <span className="w-fit rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white">
+            {ROLES_PERFIL.find((rol) => rol.valor === usuario.rol)?.etiqueta || usuario.rol}
+          </span>
+        </div>
+        <p className="mt-6 max-w-2xl text-sm leading-6 text-corporativo-100">
+          Administra tus datos de acceso y la información que se utilizará en las actas de tu sociedad.
         </p>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Izquierda: bloque de Perfil */}
-        <div className="space-y-6">
-
-      {/* Funciones permitidas al rol: es lo primero que ve el usuario al entrar. */}
-      <Tarjeta>
-        <header className="mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-corporativo-600">
-            Funciones disponibles para tu rol
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Tu rol actual es <strong>{etiquetaRol(usuario.rol)}</strong>. Estas son las
-            secciones del sistema habilitadas para ti; el resto permanece oculto y
-            protegido también en el servidor.
-          </p>
-        </header>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {seccionesConAcceso(usuario.rol).map((seccion) => (
-            <button
-              key={seccion.id}
-              type="button"
-              onClick={() => onCambiarVista && onCambiarVista(seccion.id)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-corporativo-300 hover:bg-corporativo-50"
-            >
-              <span className="block text-sm font-semibold text-corporativo-700">
-                {seccion.etiqueta}
-              </span>
-              <span className="mt-0.5 block text-xs text-slate-500">{seccion.descripcion}</span>
-            </button>
-          ))}
-        </div>
-      </Tarjeta>
-
-      <Tarjeta>
-        <header className="mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-corporativo-600">Información personal</h2>
-        </header>
-        {errorPerfil && <Alerta tono="error" className="mb-4">{errorPerfil}</Alerta>}
-        {avisoPerfil && <Alerta tono="exito" className="mb-4">{avisoPerfil}</Alerta>}
-        <form onSubmit={manejarGuardarPerfil} className="grid gap-4 md:grid-cols-2">
-          <Campo etiqueta="Correo electrónico" htmlFor="email">
-            <input id="email" type="email" className="campo" value={usuario.email} disabled />
-          </Campo>
-          <Campo etiqueta="Nombre completo" htmlFor="nombre_completo">
-            <input id="nombre_completo" type="text" className="campo" value={perfil.nombre_completo}
-              onChange={(e) => manejarCambioPerfil('nombre_completo', e.target.value)}
-              placeholder="Tu nombre completo" required />
-          </Campo>
-          <Campo etiqueta="Rol" htmlFor="rol">
-            <select id="rol" className="campo" value={perfil.rol}
-              onChange={(e) => manejarCambioPerfil('rol', e.target.value)}
-              disabled={usuario.rol !== 'Administrador'}>
-              {ROLES_PERFIL.map((rol) => (
-                <option key={rol.valor} value={rol.valor}>{rol.etiqueta}</option>
-              ))}
-            </select>
-          </Campo>
-          <div className="md:col-span-2 flex justify-end">
-            <Boton type="submit" variante="primario" cargando={cargandoPerfil}>Guardar cambios</Boton>
+      {usuario.rol === 'Administrador' && (
+        <Tarjeta className="border-corporativo-200 bg-corporativo-50/70 p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-corporativo-800">Código de tu empresa</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-5 text-corporativo-700">
+                Comparte este código con tus empleados para vincular sus cuentas a tu empresa
+                cuando se registren.
+              </p>
+              {errorCodigo && <p className="mt-2 text-sm font-medium text-red-700">{errorCodigo}</p>}
+            </div>
+            {usuario.codigo_empresa ? (
+              <div className="flex items-center gap-3">
+                <code className="rounded-lg border border-corporativo-200 bg-white px-4 py-2.5 text-base font-bold tracking-wider text-corporativo-800 shadow-sm">
+                  {usuario.codigo_empresa}
+                </code>
+                <Boton variante="secundario" tamano="sm" onClick={copiarCodigoEmpresa}>
+                  {codigoCopiado ? 'Copiado' : 'Copiar'}
+                </Boton>
+              </div>
+            ) : (
+              <span className="text-sm font-medium text-corporativo-700">Generando código…</span>
+            )}
           </div>
-        </form>
-      </Tarjeta>
+        </Tarjeta>
+      )}
 
-      <Tarjeta>
-        <header className="mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-corporativo-600">Cambiar contraseña</h2>
-        </header>
-        {errorPassword && <Alerta tono="error" className="mb-4">{errorPassword}</Alerta>}
-        {avisoPassword && <Alerta tono="exito" className="mb-4">{avisoPassword}</Alerta>}
-        <form onSubmit={manejarGuardarPassword} className="space-y-4">
-          <Campo etiqueta="Contraseña actual" htmlFor="password_actual">
-            <input id="password_actual" type="password" className="campo"
-              value={password.actual} onChange={(e) => manejarCambioPassword('actual', e.target.value)}
-              placeholder="Tu contraseña actual" autoComplete="current-password" />
-          </Campo>
-          <Campo etiqueta="Nueva contraseña" htmlFor="password_nueva">
-            <input id="password_nueva" type="password" className="campo"
-              value={password.nueva} onChange={(e) => manejarCambioPassword('nueva', e.target.value)}
-              placeholder="Mínimo 6 caracteres" autoComplete="new-password" minLength={6} required />
-          </Campo>
-          <Campo etiqueta="Confirmar nueva contraseña" htmlFor="password_confirmar">
-            <input id="password_confirmar" type="password" className="campo"
-              value={password.confirmar} onChange={(e) => manejarCambioPassword('confirmar', e.target.value)}
-              placeholder="Repite la nueva contraseña" autoComplete="new-password" required />
-          </Campo>
-          <div className="flex justify-end">
-            <Boton type="submit" variante="primario" cargando={cargandoPassword}>Cambiar contraseña</Boton>
-          </div>
-        </form>
-      </Tarjeta>
-
-      <Tarjeta className="border-red-200 bg-red-50">
-        <header className="mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-red-700">Sesión</h2>
-        </header>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-red-700">Cierra sesión de forma segura.</p>
-          <Boton variante="peligro" onClick={() => { cerrarSesion() }}>
-            Cerrar sesión
-          </Boton>
-        </div>
-      </Tarjeta>
-        </div>
-
-        {/* Derecha: bloque de Información de la empresa o sociedad */}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
         <div className="space-y-6">
-          <InformacionEmpresa />
+          <Tarjeta className="overflow-hidden">
+            <header className="border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+              <h2 className="text-base font-semibold text-slate-800">Información personal</h2>
+              <p className="mt-1 text-sm text-slate-500">Actualiza los datos visibles de tu cuenta.</p>
+            </header>
+            <div className="p-6">
+              {errorPerfil && <Alerta tono="error" className="mb-5">{errorPerfil}</Alerta>}
+              {avisoPerfil && <Alerta tono="exito" className="mb-5">{avisoPerfil}</Alerta>}
+              <form onSubmit={manejarGuardarPerfil} className="grid gap-5 md:grid-cols-2">
+                <Campo etiqueta="Nombre completo" htmlFor="nombre_completo">
+                  <input id="nombre_completo" type="text" className="campo" value={perfil.nombre_completo}
+                    onChange={(e) => manejarCambioPerfil('nombre_completo', e.target.value)}
+                    placeholder="Tu nombre completo" required disabled={!puedeEditarPerfil} />
+                </Campo>
+                <Campo etiqueta="Correo electrónico" htmlFor="email">
+                  <input id="email" type="email" className="campo" value={usuario.email} disabled />
+                </Campo>
+                <Campo etiqueta="Rol" htmlFor="rol">
+                  <input
+                    id="rol"
+                    type="text"
+                    className="campo"
+                    value={ROLES_PERFIL.find((rol) => rol.valor === perfil.rol)?.etiqueta || perfil.rol}
+                    disabled
+                    readOnly
+                  />
+                </Campo>
+                {puedeEditarPerfil ? (
+                  <div className="flex items-end justify-end md:col-span-2">
+                    <Boton type="submit" variante="primario" cargando={cargandoPerfil}>Guardar cambios</Boton>
+                  </div>
+                ) : (
+                  <p className="text-xs leading-5 text-slate-500 md:col-span-2">
+                    Esta información es administrada por el SuperAdministrador.
+                  </p>
+                )}
+              </form>
+            </div>
+          </Tarjeta>
+
+          <Tarjeta className="overflow-hidden">
+            <header className="border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+              <h2 className="text-base font-semibold text-slate-800">Cambiar contraseña</h2>
+              <p className="mt-1 text-sm text-slate-500">Mantén segura tu cuenta con una contraseña actualizada.</p>
+            </header>
+            <div className="p-6">
+              {errorPassword && <Alerta tono="error" className="mb-5">{errorPassword}</Alerta>}
+              {avisoPassword && <Alerta tono="exito" className="mb-5">{avisoPassword}</Alerta>}
+              <form onSubmit={manejarGuardarPassword} className="space-y-5">
+                <Campo etiqueta="Contraseña actual" htmlFor="password_actual">
+                  <input id="password_actual" type="password" className="campo"
+                    value={password.actual} onChange={(e) => manejarCambioPassword('actual', e.target.value)}
+                    placeholder="Tu contraseña actual" autoComplete="current-password" />
+                </Campo>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <Campo etiqueta="Nueva contraseña" htmlFor="password_nueva">
+                    <input id="password_nueva" type="password" className="campo"
+                      value={password.nueva} onChange={(e) => manejarCambioPassword('nueva', e.target.value)}
+                      placeholder="Mínimo 6 caracteres" autoComplete="new-password" minLength={6} required />
+                  </Campo>
+                  <Campo etiqueta="Confirmar nueva contraseña" htmlFor="password_confirmar">
+                    <input id="password_confirmar" type="password" className="campo"
+                      value={password.confirmar} onChange={(e) => manejarCambioPassword('confirmar', e.target.value)}
+                      placeholder="Repite la nueva contraseña" autoComplete="new-password" required />
+                  </Campo>
+                </div>
+                <div className="flex justify-end">
+                  <Boton type="submit" variante="primario" cargando={cargandoPassword}>Cambiar contraseña</Boton>
+                </div>
+              </form>
+            </div>
+          </Tarjeta>
+
+          <Tarjeta className="border-red-200 bg-red-50/70 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-red-800">Sesión</h2>
+                <p className="mt-1 text-sm text-red-700">Cierra sesión de forma segura en este dispositivo.</p>
+              </div>
+              <Boton variante="peligro" onClick={() => { cerrarSesion() }}>
+                Cerrar sesión
+              </Boton>
+            </div>
+          </Tarjeta>
+        </div>
+
+        <div className="rounded-2xl bg-white/60 p-1">
+          <InformacionEmpresa puedeEditar={usuario.rol === 'Administrador'} />
         </div>
       </div>
     </div>
