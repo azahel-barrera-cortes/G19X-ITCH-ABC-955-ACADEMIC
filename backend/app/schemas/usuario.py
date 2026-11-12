@@ -21,12 +21,33 @@ class UsuarioBase(BaseModel):
     )
     activo: bool = True
     codigo_empresa: Optional[str] = None
+    empresa_codigo: Optional[str] = None
 
 
 class UsuarioCrear(UsuarioBase):
     """Petición de creación de usuario."""
 
     password: str = Field(min_length=6, max_length=128)
+
+
+class InformacionEmpresa(BaseModel):
+    """Información empresarial compartida por el Administrador y su empresa."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    nombre_sociedad: Optional[str] = Field(default=None, max_length=200)
+    rfc_sociedad: Optional[str] = Field(default=None, max_length=13)
+    tipo_sociedad: Optional[str] = Field(default=None, max_length=60)
+    logo_empresa: Optional[str] = None
+    firma_electronica: bool = False
+    usar_info_empresa: bool = False
+
+
+class InformacionEmpresaActualizar(InformacionEmpresa):
+    """Información empresarial que el Administrador debe completar al guardar."""
+
+    nombre_sociedad: str = Field(min_length=1, max_length=200)
+    tipo_sociedad: str = Field(min_length=1, max_length=60)
 
 
 class PerfilActualizar(BaseModel):

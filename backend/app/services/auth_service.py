@@ -59,11 +59,25 @@ def crear_usuario(db: Session, datos: UsuarioCrear) -> Usuario:
         password_hash=security.hash_password(datos.password),
         activo=datos.activo,
         codigo_empresa=generar_codigo_empresa(db) if datos.rol == "Administrador" else None,
+        empresa_codigo=datos.codigo_empresa if datos.rol != "Administrador" else None,
     )
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
     return usuario
+
+
+def obtener_administrador_empresa(db: Session, codigo: str) -> Optional[Usuario]:
+    """Busca el Administrador propietario de un código empresarial."""
+    return (
+        db.query(Usuario)
+        .filter(
+            Usuario.rol == "Administrador",
+            Usuario.codigo_empresa == codigo,
+            Usuario.activo.is_(True),
+        )
+        .first()
+    )
 
 
 def usuario_desde_respuesta(usuario: Usuario) -> UsuarioRespuesta:

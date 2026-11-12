@@ -81,6 +81,13 @@ _COLUMNAS_NUEVAS = {
         ("reset_token", "VARCHAR(128)"),
         ("reset_token_expires", "DATETIME"),
         ("codigo_empresa", "VARCHAR(32)"),
+        ("empresa_codigo", "VARCHAR(32)"),
+        ("nombre_sociedad", "VARCHAR(200)"),
+        ("rfc_sociedad", "VARCHAR(13)"),
+        ("tipo_sociedad", "VARCHAR(60)"),
+        ("logo_empresa", "TEXT"),
+        ("firma_electronica", "BOOLEAN DEFAULT 0"),
+        ("usar_info_empresa", "BOOLEAN DEFAULT 0"),
     ),
 }
 

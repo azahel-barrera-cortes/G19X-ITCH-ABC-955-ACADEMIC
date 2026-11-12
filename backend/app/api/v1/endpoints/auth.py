@@ -29,6 +29,8 @@ from app.schemas.usuario import (
     UsuarioCrear,
     UsuarioRespuesta,
     UsuarioBase,
+    InformacionEmpresa,
+    InformacionEmpresaActualizar,
 )
 from app.services.auth_service import (
     autenticar_usuario,
@@ -37,6 +39,7 @@ from app.services.auth_service import (
     generar_codigo_empresa,
     crear_token_reinicio_password,
     actualizar_password_por_token,
+    obtener_administrador_empresa,
 )
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
@@ -57,18 +60,86 @@ def registrar_usuario(
 
     * **Primer usuario del sistema** (base vacía): se crea como ``SuperAdministrador``
       para poder arrancar la plataforma con acceso total.
-    * **Autoregistro anónimo**: el rol se fuerza a ``capturista`` (el mínimo
-      privilegio), sin importar el rol solicitado. Un SuperAdministrador o
-      Administrador puede elevarlo después desde ``PUT /auth/users/{id}``.
+    * **Autoregistro anónimo**: acepta ``capturista``, ``revisor`` o
+      ``abogado_responsable`` y exige un código perteneciente a un Administrador
+      activo.
     * **Administrador autenticado**: puede asignar cualquier rol válido.
     """
     total_usuarios = db.query(Usuario).count()
     if total_usuarios == 0:
         datos.rol = "SuperAdministrador"
     elif not (solicitante and solicitante.rol in ("SuperAdministrador", "Administrador")):
-        datos.rol = "capturista"
+        roles_publicos = ("capturista", "revisor", "abogado_responsable")
+        if datos.rol not in roles_publicos:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El rol de registro debe ser capturista, revisor o abogado_responsable.",
+            )
+        if not datos.codigo_empresa:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El código de empresa es obligatorio para el registro.",
+            )
+        datos.codigo_empresa = datos.codigo_empresa.strip().upper()
+        if not obtener_administrador_empresa(db, datos.codigo_empresa):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El código de empresa no existe o no está activo.",
+            )
     usuario = crear_usuario(db, datos)
     return usuario_desde_respuesta(usuario)
+
+
+def _administrador_de_empresa(db: Session, usuario: Usuario) -> Usuario:
+    if usuario.rol == "Administrador":
+        return usuario
+    if not usuario.empresa_codigo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El usuario no tiene una empresa vinculada.",
+        )
+    administrador = obtener_administrador_empresa(db, usuario.empresa_codigo)
+    if not administrador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró el Administrador de la empresa vinculada.",
+        )
+    return administrador
+
+
+@router.get(
+    "/me/empresa",
+    response_model=InformacionEmpresa,
+    summary="Obtener la información empresarial vinculada.",
+)
+def informacion_empresa(
+    usuario_actual: UsuarioActual,
+    db: Session = Depends(get_db),
+) -> InformacionEmpresa:
+    administrador = _administrador_de_empresa(db, usuario_actual)
+    return InformacionEmpresa.model_validate(administrador)
+
+
+@router.put(
+    "/me/empresa",
+    response_model=InformacionEmpresa,
+    summary="Actualizar la información empresarial (solo Administrador).",
+)
+def actualizar_informacion_empresa(
+    cambios: InformacionEmpresaActualizar,
+    usuario_actual: UsuarioActual,
+    db: Session = Depends(get_db),
+) -> InformacionEmpresa:
+    if usuario_actual.rol != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el Administrador puede modificar la información empresarial.",
+        )
+    for campo, valor in cambios.model_dump().items():
+        setattr(usuario_actual, campo, valor)
+    db.commit()
+    db.refresh(usuario_actual)
+    return InformacionEmpresa.model_validate(usuario_actual)
 
 
 @router.post(

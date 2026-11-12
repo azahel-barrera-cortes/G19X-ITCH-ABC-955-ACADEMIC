@@ -27,9 +27,18 @@ class Usuario(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
     # Código que el Administrador de la empresa comparte con sus empleados.
+    # Código propio del Administrador para invitar a los miembros de su empresa.
     codigo_empresa: Mapped[Optional[str]] = mapped_column(
         String(32), unique=True, nullable=True, index=True
     )
+    # Código de empresa al que pertenece un usuario no administrador.
+    empresa_codigo: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
+    nombre_sociedad: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    rfc_sociedad: Mapped[Optional[str]] = mapped_column(String(13), nullable=True)
+    tipo_sociedad: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    logo_empresa: Mapped[Optional[str]] = mapped_column(nullable=True)
+    firma_electronica: Mapped[bool] = mapped_column(default=False, nullable=False)
+    usar_info_empresa: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Token de recuperación de contraseña (válido 1 hora)
     reset_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
