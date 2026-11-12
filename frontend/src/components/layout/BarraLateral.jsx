@@ -62,11 +62,74 @@ const SECCIONES = [
   },
 ]
 
-export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null }) {
-  // Solo se muestran las secciones que el rol del usuario tiene permitidas.
-  const secciones = seccionesVisibles
-    ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
-    : SECCIONES
+/**
+ * Secciones exclusivas para el rol SuperAdministrador.
+ * Solo se muestran cuando el usuario tiene ese rol.
+ */
+const SECCIONES_SUPERADMIN = [
+  {
+    id: 'usuarios',
+    etiqueta: 'Administracion de Usuarios',
+    descripcion: 'Gestion de usuarios del sistema',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 8 4 4 0 010-8z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 21a3 3 0 100-6m-5 6a3 3 0 100-6m-3 6a3 3 0 100-6m9-6a3 3 0 100-6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'vitacora',
+    etiqueta: 'Vitacora',
+    descripcion: 'Vitacora de acciones del sistema',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'estadisticas',
+    etiqueta: 'Estadisticas',
+    descripcion: 'Estadisticas del sistema',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'seguridad',
+    etiqueta: 'Seguridad',
+    descripcion: 'Seguridad de usuarios y accesos',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4m8 0h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'guia-super-admin',
+    etiqueta: 'Gia de super Administrador',
+    descripcion: 'Flujo, API, Notas y seguridad del super administrador',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a4 4 0 000 8h12a4 4 0 000-8h-5a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+]
+
+export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null, esSuperAdmin = false }) {
+  // Para SuperAdministrador se muestran exclusivamente sus 5 secciones.
+  // Esas IDs no están en SECCIONES_SISTEMA, por lo que no se filtran por
+  // seccionesVisibles; se muestran tal cual.
+  const secciones = esSuperAdmin
+    ? SECCIONES_SUPERADMIN
+    : (seccionesVisibles
+        ? SECCIONES.filter((item) => seccionesVisibles.includes(item.id))
+        : SECCIONES)
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">

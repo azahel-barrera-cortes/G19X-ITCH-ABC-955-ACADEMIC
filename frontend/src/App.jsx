@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import BarraLateral from './components/layout/BarraLateral.jsx'
-import BarraLateralAdmin from './components/layout/BarraLateralAdmin.jsx'
 import Encabezado from './components/layout/Encabezado.jsx'
 import AdministracionActas from './pages/AdministracionActas.jsx'
 import Administrador from './pages/Administrador.jsx'
@@ -13,11 +12,11 @@ import GenerarActaConIA from './pages/GenerarActaConIA.jsx'
 import InformacionEmpresa from './pages/InformacionEmpresa.jsx'
 import Acceso from './pages/Acceso.jsx'
 import Perfil from './pages/Perfil.jsx'
-import UsuariosAdmin from './pages/UsuariosAdmin.jsx'
+import UsuariosSuperAdmin from './pages/UsuariosSuperAdmin.jsx'
 import VitacoraSuperAdmin from './pages/VitacoraSuperAdmin.jsx'
 import EstadisticasSuperAdmin from './pages/EstadisticasSuperAdmin.jsx'
 import SeguridadSuperAdmin from './pages/SeguridadSuperAdmin.jsx'
-import GuiaSuperUsuarioAdmin from './pages/GuiaSuperUsuarioAdmin.jsx'
+import GuiaSuperAdmin from './pages/GuiaSuperAdmin.jsx'
 import { obtenerCatalogos } from './api/client.js'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { seccionesPermitidas, SECCIONES_SISTEMA } from './constants/roles.js'
@@ -26,7 +25,17 @@ const CLAVE_INFO_EMPRESA = 'pgac_info_empresa'
 const CLAVE_SECCION = 'pgac_seccion'
 
 /** IDs de sección válidas (espejo de las secciones del sistema). */
-const SECCIONES_VALIDAS = SECCIONES_SISTEMA.map((seccion) => seccion.id)
+const SECCIONES_SUPERADMIN_IDS = [
+  'usuarios',
+  'vitacora',
+  'estadisticas',
+  'seguridad',
+  'guia-super-admin',
+]
+const SECCIONES_VALIDAS = [
+  ...SECCIONES_SISTEMA.map((seccion) => seccion.id),
+  ...SECCIONES_SUPERADMIN_IDS,
+]
 
 /**
  * Lee el hash de la URL (`#/asistente`) y devuelve el id de sección si es
@@ -106,12 +115,17 @@ function Aplicacion() {
 
   // Guarda de navegación: si la sección activa no está permitida para el rol,
   // se regresa al perfil (p. ej. un capturista no puede quedarse en Biblioteca).
+  const esSuperAdmin = usuario?.rol === 'SuperAdministrador'
+
   useEffect(() => {
-    if (autenticado && seccion !== 'perfil' && !seccionesVisibles.includes(seccion)) {
+    const seccionPermitida =
+      seccionesVisibles.includes(seccion) ||
+      (esSuperAdmin && SECCIONES_SUPERADMIN_IDS.includes(seccion))
+    if (autenticado && seccion !== 'perfil' && !seccionPermitida) {
       setSeccion('perfil')
       setVistaGenerar('panel')
     }
-  }, [autenticado, seccion, seccionesVisibles])
+  }, [autenticado, seccion, seccionesVisibles, esSuperAdmin])
 
   // Mantiene la URL (`#/seccion`) y el sessionStorage sincronizados con la
   // sección actual para que al refrescar la página el usuario se quede en
@@ -202,20 +216,13 @@ function Aplicacion() {
 
   return (
     <div className="flex min-h-full">
-      {usuario?.rol === 'Administrador' ? (
-        <BarraLateralAdmin
-          seccion={seccion}
-          onCambiarSeccion={cambiarSeccion}
-          onCerrarSesion={manejarCerrarSesion}
-        />
-      ) : (
-        <BarraLateral
-          seccion={seccion}
-          onCambiarSeccion={cambiarSeccion}
-          onCerrarSesion={manejarCerrarSesion}
-          seccionesVisibles={seccionesVisibles}
-        />
-      )}
+      <BarraLateral
+        seccion={seccion}
+        onCambiarSeccion={cambiarSeccion}
+        onCerrarSesion={manejarCerrarSesion}
+        seccionesVisibles={seccionesVisibles}
+        esSuperAdmin={usuario?.rol === 'SuperAdministrador'}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Encabezado
@@ -262,15 +269,11 @@ function Aplicacion() {
           ) : null}
           {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
           {seccion === 'administrador' ? <Administrador /> : null}
-          {seccion === 'superadministrador' && (
-            <>
-              {seccion === 'usuarios' && <UsuariosAdmin />}
-              {seccion === 'vitacora' && <VitacoraSuperAdmin />}
-              {seccion === 'estadisticas' && <EstadisticasSuperAdmin />}
-              {seccion === 'seguridad' && <SeguridadSuperAdmin />}
-              {seccion === 'guia-super-usuario' && <GuiaSuperUsuarioAdmin />}
-            </>
-          )}
+          {seccion === 'usuarios' && <UsuariosSuperAdmin />}
+          {seccion === 'vitacora' && <VitacoraSuperAdmin />}
+          {seccion === 'estadisticas' && <EstadisticasSuperAdmin />}
+          {seccion === 'seguridad' && <SeguridadSuperAdmin />}
+          {seccion === 'guia-super-admin' && <GuiaSuperAdmin />}
         </main>
 
         <footer className="border-t border-slate-200 bg-white">
