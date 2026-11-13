@@ -475,7 +475,158 @@ cabecera `Content-Disposition`, respetando acentos y espacios.
 
 ---
 
-## 8. Pruebas y verificación
+## 8. Creación de usuarios
+
+PGAC tiene dos formas de crear usuarios:
+
+### 8.1 Registro público (autoregistro)
+
+Desde la interfaz de acceso (`/acceso`), cualquier persona puede crear una cuenta con los roles operativos vinculados a una empresa:
+
+1. Hacer clic en **"Crear cuenta"**.
+2. Ingresar correo electrónico, nombre completo y contraseña.
+3. Seleccionar el rol: `capturista`, `revisor` o `abogado_responsable`.
+4. Proporcionar un **código de empresa válido** (ej. `PGAC-EMPRESA-001`). El sistema vincula la cuenta a esa empresa y asigna automáticamente un `codigo_empresa` al usuario.
+5. Confirmar el registro. El usuario recibe un correo de bienvenida y puede iniciar sesión inmediatamente.
+
+> Solo el `SuperAdministrador` puede crear usuarios con rol `Administrador` o `SuperAdministrador`. El registro público no permite esos roles.
+
+### 8.2 Creación por el SuperAdministrador
+
+Desde la página **UsuariosSuperAdmin** (accesible solo para `SuperAdministrador`):
+
+1. Ingresar como `SuperAdministrador`.
+2. Ir a **UsuariosSuperAdmin** en la barra lateral.
+3. Hacer clic en **"Nuevo usuario"**.
+4. Llenar: correo, nombre, rol, contraseña temporal y empresa (si aplica).
+5. Guardar. El usuario queda creado y activo, listo para iniciar sesión.
+
+### 8.3 Promover a SuperAdministrador
+
+Si ya existe un usuario en la base de datos y se necesita promoverlo a `SuperAdministrador`:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe scripts\crear_super_admin.py
+```
+
+El script solicita el correo del usuario a promover y le asigna el rol `SuperAdministrador` sin borrar sus datos existentes.
+
+---
+
+## 9. Roles y permisos (RBAC)
+
+PGAC usa control de acceso basado en roles con privilegios crecientes:
+
+| Rol | Nivel | Qué puede hacer | Qué NO puede hacer |
+|-----|-------|-----------------|-------------------|
+| `capturista` | 1 | Generar actas, usar asistente IA, consultar propia empresa, ver expediente ZIP, cambiar propia contraseña | Eliminar actas, ver bitácora, administración, gestionar usuarios |
+| `revisor` | 2 | Todo de capturista + listar/eliminar actas, ver bitácora, administración de actas (versiones, vigencia, caducidad), expediente ZIP, integración notarial | Gestionar usuarios, cambiar roles, activar/desactivar cuentas |
+| `abogado_responsable` | 3 | Todo de revisor + cambiar estatus de actas, restaurar versiones, validar actas | Gestionar usuarios, administración global |
+| `Administrador` | 4 | Todo de abogado_responsable + gestionar información de empresa, ver código empresarial | Crear SuperAdministradores, eliminar cuentas críticas |
+| `SuperAdministrador` | 5 | Todo del sistema: gestionar usuarios, cambiar roles, activar/desactivar/eliminar cuentas, reasignar actas en cuarentena, ver bitácora global, estadísticas | Ninguna restricción (acceso absoluto) |
+
+### Reglas de acceso
+
+- **Sin sesión:** solo se muestra la interfaz de acceso (login, registro, recuperar contraseña). Ninguna función de actas es visible.
+- **Con sesión:** la barra lateral muestra únicamente las secciones permitidas para el rol del usuario.
+- **Backend:** cada endpoint valida el rol del usuario autenticado. Responde `401` si no hay token y `403` si el rol es insuficiente.
+- **Cuentas inactivas:** no pueden iniciar sesión; reciben una pantalla informativa.
+- **Perfil:** todos pueden cambiar su contraseña desde `PUT /api/v1/auth/me`. Solo el `SuperAdministrador` puede editar el nombre de otros usuarios.
+
+---
+
+## 10. Manejo de actas y validación
+
+### 10.1 Creación de actas
+
+Hay dos vías para crear un acta:
+
+**Vía A — Formulario por pasos (wizard):**
+1. **Paso 1 — Datos generales:** sociedad, tipo de asamblea, fecha, hora, lugar, quórum.
+2. **Paso 2 — Asistentes:** lista de asistentes con su rol y tipo (socio, invitado, etc.).
+3. **Paso 3 — Orden del día y acuerdos:** temas a tratar y decisiones tomadas.
+4. **Paso 4 — Revisión y PDF:** previsualizar, validar y descargar el acta final.
+
+**Vía B — Asistente IA (chat):**
+- Conversar con el asistente para ir recopilando los datos paso a paso.
+- El asistente propone `confirmacion_creacion` y `resumen_creacion` antes de persistir.
+- El usuario confirma explícitamente antes de crear el acta.
+
+### 10.2 Validación de consistencia
+
+Cada acta se valida automáticamente al generar o guardar:
+
+| Aspecto | Qué se verifica | Nivel |
+|---------|-----------------|-------|
+| Quórum | Asistentes presentes vs. requeridos según tipo de asamblea | Crítico |
+| Convocatoria | Fecha y forma de convocatoria según estatutos | Advertencia |
+| Mayorías | Votos a favor vs. umbral requerido (simple, calificada, unánime) | Crítico |
+| Orden del día | Todos los temas tienen acuerdos asociados | Informativo |
+| Fundamentos legales | Referencias a artículos de la LGSM presentes | Informativo |
+
+Resultado: puntaje (0–100) + lista de hallazgos clasificados como crítico / advertencia / informativo.
+
+> El modelo **no sustituye la revisión de un abogado corporativo**. El sistema advierte esta limitación en la interfaz, en el pie del PDF y en las recomendaciones de validación.
+
+### 10.3 Gestión del ciclo de vida
+
+- **Folio:** cada acta recibe un folio automático (`PGAC-AAAA-NNNN`).
+- **Versiones:** cada actualización genera una nueva versión; el historial nunca se borra.
+- **Estatus:** borrador → revisión → aprobada → firmada → archivada (transiciones controladas por rol).
+- **Restaurar versión:** se puede restaurar una versión anterior emitiendo una versión nueva (el historial queda intacto).
+- **Caducidad:** se puede fijar, ampliar o eliminar la fecha de caducidad con motivo registrado.
+- **Exportar ZIP:** `GET /api/v1/expediente/{id}/zip` genera PDF + `metadatos.json`.
+
+---
+
+## 11. Uso del asistente IA
+
+### 11.1 Acceso
+
+Desde cualquier página del sistema, abrir el panel del **Asistente IA** (barra lateral o botón flotante). Requiere sesión iniciada.
+
+### 11.2 Intenciones soportadas
+
+| Intención | Descripción | Rol mínimo |
+|-----------|-------------|------------|
+| Redactar cláusula | Genera texto legal para un acuerdo específico | capturista |
+| Validar acta | Evalúa consistencia y devuelve puntaje + hallazgos | capturista |
+| Consultar estatus | Muestra el estatus actual de un acta | capturista |
+| Consultar versiones | Lista versiones disponibles de un acta | capturista |
+| Descargar PDF | Genera y ofrece descarga del PDF del acta | capturista |
+| Cambiar estatus | Transiciona el acta a un nuevo estatus | abogado_responsable |
+| Restaurar versión | Recupera una versión anterior como nueva versión | abogado_responsable |
+| Crear acta guiada | Recopila datos paso a paso y propone la creación | capturista |
+
+### 11.3 Flujo de creación guiada
+
+1. El usuario escribe: *"Quiero crear un acta de asamblea ordinaria para aumentar el capital"*.
+2. El asistente pregunta los datos faltantes uno a uno (sociedad, fecha, monto, etc.).
+3. Cuando tiene la información mínima, propone un **resumen de creación** con `confirmacion_creacion = true`.
+4. El usuario revisa el resumen y confirma explícitamente.
+5. El sistema persiste el acta y devuelve su folio.
+
+### 11.4 Redacción en vivo (SSE)
+
+El endpoint `POST /api/v1/actas/redactar-stream` transmite la cláusula del primer acuerdo fragmento a fragmento (`inicio` → `fragmento`… → `fin`). En la web, el botón **"Ver redacción en vivo"** muestra el texto mientras se genera.
+
+### 11.5 Proveedores de IA soportados
+
+Configurar en `backend/.env`:
+
+| Proveedor | Variable clave | Notas |
+|-----------|---------------|-------|
+| Azure OpenAI | `AZURE_OPENAI_*` | Endpoint, clave, deployment, api-version |
+| Google Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` | Credenciales de Google |
+| OpenAI-compatible | `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Ollama, Groq, DeepSeek, LM Studio, vLLM |
+| Plantillas (offline) | `AI_PROVIDER=plantillas` | Respaldo determinista sin LLM |
+
+Si el proveedor de IA falla y `AI_ALLOW_FALLBACK=true`, el sistema degrada automáticamente a plantillas legales deterministas parametrizadas.
+
+---
+
+## 12. Pruebas y verificación
 
 ```powershell
 cd backend
@@ -532,7 +683,7 @@ Para mantener la cobertura por encima del 90 % a medida que crece el proyecto:
 
 ---
 
-## 9. PostgreSQL
+## 13. PostgreSQL
 
 Por defecto se usa SQLite (`backend/pgac.db`) para que el proyecto funcione
 sin infraestructura. Para PostgreSQL:
@@ -555,7 +706,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 
 ---
 
-## 10. Notas legales y limitaciones
+## 14. Notas legales y limitaciones
 
 - La plataforma es una **herramienta de apoyo documental**: no sustituye la
   revisión de un abogado corporativo ni la protocolización ante fedatario público.
@@ -576,7 +727,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 
 ---
 
-## 11. Siguientes pasos sugeridos
+## 15. Siguientes pasos sugeridos
 
 1. Rate limiting y controles contra abuso en login y recuperación de contraseña.
 2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades.
