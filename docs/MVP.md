@@ -15,7 +15,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ### Backend (Python + FastAPI)
 | Módulo | Qué incluye |
 |--------|-------------|
-| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, nombre, rol, password_hash, activo, `codigo_empresa`, reset_token) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
+| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, nombre, rol, password_hash, activo, `codigo_empresa`, hash de `reset_token`, vencimiento y `token_version`) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
 | Catálogos jurídicos | 26 tipos de acta y 13 tipos societarios, con requisitos específicos por materia y fundamentos normativos |
 | Plantillas legales parametrizadas | `PlantillaLegal` + `ParametroPlantilla` con validación de parámetros requeridos, valores por defecto, `obtener_parametros_plantilla()`, `parametros_requeridos_por_materia()` y `DatosPlantillaIncompletosError` |
 | IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible (Ollama, Groq, DeepSeek, LM Studio, vLLM); si falla, degrada a plantillas deterministas |
@@ -28,7 +28,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
 | Endpoints | `GET /health`, catálogos, `redactar`, `redactar-stream`, `generar-pdf`, CRUD de actas, `estatus`, `pdf`, `validar`, `bitacora`, `expediente/zip`, `notaria/actas*`, `administracion/*`, `asistente/chat*`, `auth/*`; el PDF devuelve encabezados de trazabilidad `X-Acta-Folio`, `X-Acta-Id`, `X-Acta-Version`, `X-Acta-Paginas`, `X-Acta-Guardada`, `X-IA-Proveedor`, `X-IA-Advertencias`, `X-Validacion-Puntaje` |
-| Variables de entorno | `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AZURE_OPENAI_*`, `GEMINI_API_KEY`, `MARGEN_CM`, `PIE_CONFIDENCIALIDAD`, `CORS_ORIGINS`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NOMBRE` |
+| Variables de entorno | `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AZURE_OPENAI_*`, `GEMINI_API_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `SMTP_SSL`, `SMTP_TIMEOUT_SECONDS`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `MARGEN_CM`, `PIE_CONFIDENCIALIDAD`, `CORS_ORIGINS`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NOMBRE` |
 
 ### Frontend (React 18 + Vite + Tailwind)
 | Componente | Qué incluye |
@@ -40,7 +40,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Biblioteca de actas | Listar actas con filtros, descarga de PDF, edición, cambio de estatus, revalidación y eliminación (revisor+ para listar/delete) |
 | Administración de actas | Resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad (revisor+ consulta; capturista+ mutaciones) |
 | Asistente IA | Chat conversacional para creación guiada de actas, validación, consulta de estatus y descarga de PDF (usuario autenticado) |
-| Autenticación | Login, registro automático al crear cuenta, perfil, cambio de contraseña, recuperación (token muestra por `DEBUG`), control de cuentas inactivas y administración global de usuarios |
+| Autenticación | Login, registro, perfil, cambio y recuperación de contraseña por SMTP, control de cuentas inactivas y administración global de usuarios. La recuperación es igual para todos los roles, incluidos SuperAdministrador; token hash de un solo uso, expiración de 60 minutos, respuestas que no enumeran cuentas y revocación de sesiones previas |
 | Administración global | `UsuariosSuperAdmin.jsx`, `VitacoraSuperAdmin.jsx` y `UsuarioInactivo.jsx`: gestión de usuarios, bitácora para SuperAdministrador y pantalla de bloqueo para cuentas inactivas |
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
 | Navegación y administración | Menú filtrado por rol, rutas con hash persistidas, panel de generación con plantillas frecuentes, panel de Administrador (perfil, empresa, usuarios y seguridad) y panel global del SuperAdministrador (usuarios, bitácora, estadísticas, seguridad y guía) |
@@ -69,7 +69,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | **Aislamiento multiempresa completo** | Separación estricta de datos por sociedad/cliente | El MVP ya vincula usuarios y configuración empresarial mediante código, pero aún no aplica aislamiento completo de todas las actas |
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
 | **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |
-| **Servicio de correo** | Envío del token de recuperación por email | El token se muestra en la respuesta solo en modo DEBUG |
+| **Rate limiting** | Límites de intentos para login y recuperación | Requiere definir almacenamiento compartido y política por cuenta/IP |
 
 ---
 
@@ -77,6 +77,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 
 - [ ] Se instala y arranca la aplicación: backend con PostgreSQL o SQLite, frontend en Vite.
 - [ ] El SuperAdministrador inicial accede por login con las credenciales de `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`; **sin sesión iniciada solo se muestra la interfaz de acceso**: ninguna sección del sistema de actas visible.
+- [ ] La recuperación envía por SMTP un token de un solo uso y vigencia de 60 minutos; no revela si la cuenta existe y, al cambiar la contraseña, invalida sesiones previas. Esto aplica también al SuperAdministrador.
 - [ ] Tras un acceso correcto se abre **Mi perfil** para usuarios operativos con las funciones permitidas por el rol: capturista (generar actas, asistente y empresa en modo lectura), revisor+ (biblioteca, administración, bitácora y API notarial), abogado responsable+ (estatus y validación) y Administrador (gestión de información de empresa). El SuperAdministrador entra directamente al panel global de superadministración del sistema.
 - [ ] El acta se valida en consistencia (quórum, mayorías, fundamentos legales)
 - [ ] Las actas se pueden listar, editar, cambiar de estatus y eliminar
@@ -98,8 +99,9 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
   recomienda PostgreSQL con migraciones (Alembic).
 - El número de acciones e importes se almacenan como `float`; para precisión
   monetaria estricta migrar a `Numeric`/`Decimal`.
-- La recuperación de contraseña no envía mail: en `DEBUG` el token viaja en la
-  respuesta (se debe eliminar antes de la producción).
+- El envío de recuperación requiere configurar SMTP y el remitente en
+  `backend/.env`; sin esos valores la API responde `503`. La configuración de
+  producción debe usar STARTTLS o SSL. Sigue pendiente implementar rate limiting.
 - El asistente conversacional exige rol `abogado_responsable` (o superior)
    para cambiar el estatus de un acta y restaurar versiones anteriores.
 - El front-end guarda la sesión (JWT + usuario) en `localStorage`: si se

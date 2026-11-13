@@ -41,6 +41,7 @@ PGAC/
 │       │   ├── ai_service.py           LLM + reglas + degradación a plantillas
 │       │   ├── pdf_generator.py        build_acta_pdf(data: dict) -> bytes
 │       │   ├── auth_service.py         registro, login y recuperación de contraseña
+│       │   ├── email_service.py        envío de recuperación por SMTP configurable
 │       │   └── acta_service.py         orquestación, folios, CRUD
 │       └── api/v1/                 router, deps (RBAC) + endpoints (actas, administración, asistente, auth, bitácora, expediente ZIP, notaría, sistema)
 └── frontend/                   React 18 + Vite + Tailwind CSS
@@ -237,8 +238,8 @@ token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 | `POST` | `/api/v1/auth/registro` | Registro público vinculado a empresa (`capturista`, `revisor` o `abogado_responsable`); el `SuperAdministrador` asigna otros roles desde `UsuariosSuperAdmin` |
 | `POST` | `/api/v1/auth/login` | Iniciar sesión; devuelve el JWT de acceso |
 | `GET` `PUT` | `/api/v1/auth/me` | Perfil del usuario autenticado (consulta y actualización) |
-| `POST` | `/api/v1/auth/reset-password` | Solicita token de recuperación (público; en `DEBUG` lo devuelve en `detalle`) |
-| `POST` | `/api/v1/auth/reset-password/confirm` | Confirma la nueva contraseña con el token |
+| `POST` | `/api/v1/auth/reset-password` | Solicita recuperación; envía el token por SMTP y no revela si el correo está registrado |
+| `POST` | `/api/v1/auth/reset-password/confirm` | Confirma la nueva contraseña con el token de un solo uso |
 | `GET` | `/health` | Estado de la plataforma (BD + proveedor de IA) |
 | `GET` | `/api/v1/sistema/estado` | Igual que `/health`, dentro de la API versionada |
 | `GET` | `/api/v1/actas/catalogos` | Tipos de asamblea, mayorías, caracteres y estatus |
@@ -267,6 +268,16 @@ token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 | `GET` | `/api/v1/expediente/{id}/zip` | Expediente ZIP: PDF del acta + `metadatos.json` (capturista+) |
 | `GET` | `/api/v1/notaria/actas` | Listado de actas para integración notarial (revisor+) |
 | `GET` | `/api/v1/notaria/actas/{id}` | Metadatos públicos del acta para validación notarial (revisor+) |
+
+La recuperación de contraseña está disponible para todas las cuentas activas,
+incluido el `SuperAdministrador`, usando el correo registrado. El backend envía
+un token válido durante 60 minutos; guarda únicamente su hash SHA-256, lo consume
+de forma atómica y revoca las sesiones anteriores al cambiar la contraseña. El
+token nunca se devuelve en la respuesta, tampoco en `DEBUG`. Configura
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`,
+`SMTP_SSL`, `SMTP_TIMEOUT_SECONDS`, `EMAIL_FROM_ADDRESS` y `EMAIL_FROM_NAME` en
+`backend/.env` (ver `backend/.env.example`). Sin configuración válida, el
+endpoint responde `503`; en producción SMTP debe usar STARTTLS o SSL.
 
 ### Endpoint principal: `POST /api/v1/actas/generar-pdf`
 
@@ -325,7 +336,8 @@ para ser portables entre PostgreSQL y SQLite.
 | `codigo_empresa` | Código empresarial generado únicamente para usuarios con rol `Administrador` |
 | `password_hash` | Contraseña hasheada con bcrypt; **nunca se expone** por la API |
 | `activo` | Desactivar la cuenta sin borrarla |
-| `reset_token`, `reset_token_expires` | Token temporal de recuperación (1 hora, de solo lectura) |
+| `reset_token`, `reset_token_expires` | Hash SHA-256 del token temporal y su vencimiento (1 hora) |
+| `token_version` | Versión de sesión JWT; cambia al actualizar la contraseña e invalida sesiones previas |
 | `created_at`, `updated_at` | Auditoría de fechas |
 
 ### `bitacora_cambios`
@@ -552,9 +564,10 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
   el andamiaje; si se requiere precisión monetaria estricta, migra esas columnas a
   `Numeric`/`Decimal`.
 - La plataforma incluye **autenticación JWT con roles (RBAC)** y bitácora de
-  cambios. Quedan fuera de alcance la multiempresa, la firma electrónica
-  avanzada y el envío de correo: la recuperación de contraseña muestra el
-  token solo en modo `DEBUG` (ver `README.md#3-autenticacion-y-control-de-acceso`).
+  cambios. La recuperación por correo está implementada mediante SMTP
+  configurable; el despliegue debe proporcionar la configuración de correo.
+  La multiempresa y la firma electrónica avanzada requieren completar sus
+  respectivos controles antes de producción.
 - El proyecto cubre la **estructura base** solicitada en `PGAC.md`.
 - El PDF se genera con ReportLab de forma determinista; los márgenes, la
   tipografía y el pie de página se ajustan desde `backend/.env`.
@@ -563,11 +576,11 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 
 ## 11. Siguientes pasos sugeridos
 
-1. Servicio de correo para la recuperación de contraseña (hoy el token se expone solo en `DEBUG`).
+1. Rate limiting y controles contra abuso en login y recuperación de contraseña.
 2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
-5. Panel de gestión de usuarios en el frontend y aislamiento multiempresa.
+5. Completar la revisión de seguridad del registro inicial y los controles multiempresa.
 
 ---
 

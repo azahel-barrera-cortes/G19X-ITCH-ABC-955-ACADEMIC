@@ -85,7 +85,11 @@ El sistema debe exigir autenticación para toda operación del dominio:
   contraseña; el código empresarial se muestra al `Administrador`.
   La gestión de usuarios (listar, cambiar rol, activar/desactivar, eliminar y
   restablecer contraseña) está reservada al `SuperAdministrador`.
-- Recuperación de contraseña mediante token temporal de un solo uso (1 hora).
+- Recuperación de contraseña por correo para cuentas activas de todos los roles,
+  incluido `SuperAdministrador`. El token dura 60 minutos, se almacena como hash
+  SHA-256, solo puede utilizarse una vez y nunca se devuelve en la respuesta.
+  Solicitud y confirmación no inician sesión automáticamente; el usuario vuelve
+  al acceso con su nueva contraseña.
 
 ### RF-12: Interfaz de acceso separada y perfil por rol
 - Sin sesión iniciada, la aplicación muestra únicamente la interfaz de acceso
@@ -167,7 +171,8 @@ El backend persiste la información en tres tablas principales (portables entre 
 | `codigo_empresa` | Código empresarial generado únicamente para usuarios con rol `Administrador` |
 | `password_hash` | bcrypt, nunca expuesto por la API |
 | `activo` | Habilita/deshabilita la cuenta |
-| `reset_token`, `reset_token_expires` | Token de recuperación (1 hora) |
+| `reset_token`, `reset_token_expires` | Hash SHA-256 del token de recuperación y vencimiento (1 hora) |
+| `token_version` | Versión incluida en el JWT; incrementa al cambiar la contraseña y revoca sesiones anteriores |
 | `created_at`, `updated_at` | Auditoría |
 
 ### `bitacora_cambios`
@@ -212,7 +217,6 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 | Multiempresa | Aislamiento de datos por sociedad/cliente |
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
-| Servicio de correo | Envío del token de recuperación por email (hoy solo en `DEBUG`) |
 | Vinculación multiempresa completa | El MVP vincula usuarios y datos empresariales mediante código, pero aún no aísla completamente las actas por sociedad |
 
 ---
@@ -230,15 +234,23 @@ La plataforma implementa autenticación JWT con control de acceso por roles
   con `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NOMBRE` (acceso
   absoluto). Solo el `SuperAdministrador` puede asignar roles válidos,
   activar/desactivar o eliminar usuarios desde `UsuariosSuperAdmin`.
-- Las contraseñas se guardan con bcrypt y la recuperación se hace con un
-  token temporal de un solo uso de 1 hora (en `DEBUG` el token viaja en la
-  respuesta para poder probar el flujo de extremo a extremo).
+- Las contraseñas se guardan con bcrypt. La recuperación genera un token
+  aleatorio de un solo uso con vigencia de 60 minutos; se persiste solo su hash
+  SHA-256 y su consumo junto al cambio de contraseña es atómico. La respuesta
+  genérica evita revelar si un correo está registrado. El correo usa SMTP
+  configurable (`SMTP_*`, `EMAIL_FROM_*`); sin configuración el endpoint
+  responde `503`. STARTTLS o SSL es obligatorio en producción.
+- Un cambio de contraseña incrementa `token_version` y revoca los JWT emitidos
+  anteriormente. El `SuperAdministrador` no omite el flujo de recuperación y
+  recibe el token en el correo registrado.
 - Las acciones sensibles quedan registradas en la bitácora de cambios
   (usuario, rol, IP, antes/después).
 
 Riesgos conocidos (aceptados hasta la versión post-actual):
 - El JWT se almacena en `localStorage` del navegador (exposición ante XSS);
   recomiéndase HTTPS y, a futuro, cookies `HttpOnly`.
+- El despliegue debe configurar SMTP antes de habilitar operativamente la
+  recuperación; aún se requiere rate limiting para evitar abuso del endpoint.
 - No hay aislamiento multiempresa: un revisor+ puede consultar todas las
 - El asistente conversacional exige rol `abogado_responsable` (o superior)
    para cambiar el estatus de un acta y restaurar versiones anteriores;
@@ -259,7 +271,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 
 ## 8. Hoja de ruta sugerida (post-MVP)
 
-1. Servicio de correo para la recuperación de contraseña
+1. Rate limiting y controles de abuso para autenticación y recuperación
 2. Migraciones con Alembic y aislamiento completo por sociedad
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances)
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo)
