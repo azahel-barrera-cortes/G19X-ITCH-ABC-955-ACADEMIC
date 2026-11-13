@@ -7,9 +7,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import RequiereRevisor, UsuarioActual, get_db, registrar_bitacora
+from app.api.v1.deps import RequiereRevisor, get_db
 from app.models.usuario import BitacoraCambios
 from app.schemas.usuario import BitacoraCambiosRespuesta
+from app.services.tenant_access import alcance_empresa, filtrar_por_empresa
 
 router = APIRouter(prefix="/bitacora", tags=["Bitácora de cambios"])
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/bitacora", tags=["Bitácora de cambios"])
     summary="Listar entradas de la bitácora de cambios (revisor+).",
 )
 def listar_bitacora(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     db: Session = Depends(get_db),
     accion: Optional[str] = Query(None, description="Filtrar por acción (crear, actualizar, eliminar)"),
     entidad: Optional[str] = Query(None, description="Filtrar por entidad (actas, usuarios)"),
@@ -29,6 +30,9 @@ def listar_bitacora(
 ) -> List[BitacoraCambiosRespuesta]:
     """Lista las entradas de la bitácora con filtros opcionales."""
     consulta = db.query(BitacoraCambios)
+    consulta = filtrar_por_empresa(
+        consulta, alcance_empresa(usuario_actual), BitacoraCambios.empresa_codigo
+    )
     if accion:
         consulta = consulta.filter(BitacoraCambios.accion == accion)
     if entidad:
@@ -48,12 +52,16 @@ def listar_bitacora(
     summary="Obtener una entrada concreta de la bitácora.",
 )
 def obtener_entrada(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     entrada_id: int,
     db: Session = Depends(get_db),
 ) -> BitacoraCambiosRespuesta:
     """Devuelve una entrada de auditoría por su identificador."""
-    entrada = db.query(BitacoraCambios).filter(BitacoraCambios.id == entrada_id).first()
+    consulta = db.query(BitacoraCambios).filter(BitacoraCambios.id == entrada_id)
+    consulta = filtrar_por_empresa(
+        consulta, alcance_empresa(usuario_actual), BitacoraCambios.empresa_codigo
+    )
+    entrada = consulta.first()
     if not entrada:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import RequiereRevisor, UsuarioActual, get_db, registrar_bitacora
-from app.db.session import get_db
+from app.api.v1.deps import RequiereRevisor, get_db, registrar_bitacora
 from app.models.acta import Acta
 from app.schemas.acta import ActaResumen
+from app.services.tenant_access import alcance_empresa, filtrar_por_empresa, obtener_acta_autorizada
 
 router = APIRouter(prefix="/notaria", tags=["Integración Notaría"])
 
@@ -34,9 +34,10 @@ def listar_actas_notaria(
     desplazamiento: int = Query(0, ge=0),
 ) -> List[ActaResumen]:
     """Devuelve un resumen de actas para consulta por una notaría."""
-    from sqlalchemy import or_, select
-
     consulta = db.query(Acta)
+    consulta = filtrar_por_empresa(
+        consulta, alcance_empresa(usuario_actual), Acta.empresa_codigo
+    )
     if sociedad:
         consulta = consulta.filter(Acta.sociedad.ilike(f"%{sociedad}%"))
     if estatus:
@@ -67,12 +68,7 @@ def obtener_acta_notaria(
     db: Session = Depends(get_db),
 ) -> dict:
     """Devuelve los metadatos públicos de un acta sin el contenido completo."""
-    acta = db.query(Acta).filter(Acta.id == acta_id).first()
-    if not acta:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Acta {acta_id} no encontrada.",
-        )
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     registrar_bitacora(
         db,
         usuario=usuario_actual,

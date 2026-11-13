@@ -10,14 +10,13 @@ import io
 import zipfile
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import RequiereCapturista, UsuarioActual, get_db, registrar_bitacora
-from app.db.session import get_db
-from app.models.acta import Acta
+from app.api.v1.deps import RequiereCapturista, get_db, registrar_bitacora
 from app.services import acta_service
+from app.services.tenant_access import obtener_acta_autorizada
 
 router = APIRouter(prefix="/expediente", tags=["Expediente ZIP"])
 
@@ -32,12 +31,7 @@ def exportar_expediente_zip(
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Crea un ZIP con el PDF del acta y un fichero de metadatos JSON."""
-    acta = db.query(Acta).filter(Acta.id == acta_id).first()
-    if not acta:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Acta {acta_id} no encontrada.",
-        )
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
 
     # Registrar en la bitácora de cambios.
     registrar_bitacora(
