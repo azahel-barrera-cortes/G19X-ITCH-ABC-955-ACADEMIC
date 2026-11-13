@@ -174,6 +174,10 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
 
 ### Flujo de uso de la interfaz
 
+Para instrucciones detalladas de acceso, responsabilidades por rol, generación
+manual y asistida por IA, revisión y limitaciones, consulta la
+[Guía completa de usuario](./docs/GUIA_USUARIO.md).
+
 0. **Acceso (interfaz separada del sistema de actas)** — sin sesión iniciada la
    aplicación solo muestra la pantalla de acceso: **Iniciar sesión**,
    **Crear cuenta** o **Recuperar contraseña**. No se muestra la barra lateral
