@@ -25,6 +25,28 @@ const ENDPOINTS = [
   ['GET', '/api/v1/sistema/estado', 'Estado de la base de datos y del proveedor de IA.'],
 ]
 
+function GuiaCuenta({ rol }) {
+  const responsable = rol === 'Administrador'
+    ? 'al SuperAdministrador'
+    : 'al Administrador de tu empresa'
+
+  return (
+    <Tarjeta>
+      <TarjetaEncabezado
+        titulo="Acceso y seguridad de tu cuenta"
+        descripcion="Protege tus credenciales y conserva el acceso a tu rol"
+      />
+      <TarjetaCuerpo>
+        <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+          <li>Desde Mi perfil puedes cambiar tu contraseña; las nuevas contraseñas deben tener al menos 12 caracteres. Después del cambio, inicia sesión de nuevo.</li>
+          <li>Si olvidaste la contraseña, usa ¿Olvidaste tu contraseña? en la pantalla de acceso. La recuperación depende de que el correo del sistema esté configurado.</li>
+          <li>No compartas tu contraseña. Si no puedes acceder o tu cuenta está desactivada, contacta {responsable}.</li>
+        </ul>
+      </TarjetaCuerpo>
+    </Tarjeta>
+  )
+}
+
 /** Sección «Guía de uso»: flujo de trabajo, API y notas legales. */
 export default function Ayuda({ catalogos, rol }) {
   const titulo = etiquetaGuiaRol(rol)
@@ -42,6 +64,13 @@ export default function Ayuda({ catalogos, rol }) {
             el Revisor o el Abogado solicite cambios.
           </p>
         </header>
+
+        <p className="rounded-lg border border-corporativo-100 bg-corporativo-50 px-4 py-3 text-sm leading-relaxed text-corporativo-800">
+          El registro solicita el código de tu empresa y permite elegir Capturista, Revisor o
+          Abogado Responsable. Los roles Administrador y SuperAdministrador requieren que el
+          SuperAdministrador cree o actualice la cuenta. Si ya tienes acceso, inicia sesión con el
+          correo registrado.
+        </p>
 
         <section className="grid gap-3 md:grid-cols-3">
           {[
@@ -67,8 +96,9 @@ export default function Ayuda({ catalogos, rol }) {
                 <h3 className="font-semibold text-corporativo-800">Formulario manual</h3>
                 <p className="mt-1 text-sm leading-relaxed text-slate-600">
                   En Generar acta puedes iniciar desde cero o seleccionar una plantilla. Completa
-                  los pasos de datos generales, asistentes y quórum, y orden del día y acuerdos.
-                  Los requisitos específicos dependen del tipo de asamblea.
+                  los cuatro pasos: datos generales, asistentes y quórum, orden del día y acuerdos,
+                  y revisión del borrador antes de enviarlo. Los requisitos jurídicos dependen del
+                  tipo de asamblea.
                 </p>
               </div>
               <div className="rounded-xl border border-acento-400/50 bg-acento-50 p-4">
@@ -81,9 +111,10 @@ export default function Ayuda({ catalogos, rol }) {
             </div>
             <ol className="mt-5 space-y-3">
               {[
-                ['Verifica los datos', 'Confirma sociedad, fecha, lugar, convocatoria, asistentes, capital y quórum contra los documentos fuente.'],
-                ['Revisa el borrador', 'En el paso de revisión puedes generar cláusulas, consultar la validación y revisar la vista previa. La IA puede usar el proveedor configurado o plantillas locales.'],
-                ['Envía a revisión', 'Pulsa Enviar a revisión. El acta aparece en Mis actas y se envía al Revisor.'],
+                ['Completa los datos generales', 'Captura sociedad, fecha, lugar, convocatoria y los datos jurídicos específicos que solicita el tipo de acta.'],
+                ['Registra asistentes y quórum', 'Verifica capital, acciones, representación y cargos de la mesa contra los documentos fuente.'],
+                ['Agrega orden del día y acuerdos', 'Incluye cada punto, el resumen de la decisión y los datos de votación que correspondan.'],
+                ['Revisa y envía', 'En Revisión y PDF genera o completa las cláusulas, consulta la validación y revisa la vista previa. Después de pulsar Enviar a revisión, consulta el avance en Mis actas.'],
               ].map(([encabezado, descripcion], indice) => (
                 <li key={encabezado} className="flex gap-3">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-corporativo-100 text-sm font-bold text-corporativo-700">
@@ -128,7 +159,7 @@ export default function Ayuda({ catalogos, rol }) {
               <li>El asistente ayuda a recopilar datos y proponer redacción; verifica nombres, fechas, cifras, votaciones y fundamento legal.</li>
               <li>Si la IA externa no está configurada, PGAC puede usar plantillas y validaciones locales.</li>
               <li>No puedes aprobar un acta ni generar el PDF final oficial. El Revisor y luego el Abogado atienden esas etapas.</li>
-              <li>El PDF final se habilita después de la aprobación del Abogado Responsable.</li>
+              <li>El PDF final se habilita después de la aprobación del Abogado Responsable y queda listo para imprimir. PGAC no recaba firmas electrónicas; las firmas manuscritas y formalizaciones que correspondan se realizan fuera del sistema.</li>
             </ul>
             <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
               Proveedor configurado: <strong>{catalogos?.proveedor_ia || 'plantillas'}</strong>
@@ -137,6 +168,7 @@ export default function Ayuda({ catalogos, rol }) {
             </p>
           </TarjetaCuerpo>
         </Tarjeta>
+        <GuiaCuenta rol={rol} />
       </div>
     )
   }
@@ -177,7 +209,7 @@ export default function Ayuda({ catalogos, rol }) {
             <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
               <li>Consulta el código de empresa y el resumen de usuarios activos y desactivados.</li>
               <li>Usa la búsqueda por nombre o correo y filtra por rol o estado de acceso.</li>
-              <li>Con Agregar usuario registra nombre, correo, contraseña temporal y rol. Los roles asignables en la empresa son Capturista, Revisor y Abogado.</li>
+              <li>Con Agregar usuario registra nombre, correo, contraseña temporal de al menos 12 caracteres y rol. Los roles asignables en la empresa son Capturista, Revisor y Abogado.</li>
               <li>Con Modificar puedes actualizar nombre, rol o contraseña; el correo existente no se cambia desde esta pantalla.</li>
               <li>Usa Desactivar acceso o Reactivar acceso para revocar o restablecer el inicio de sesión sin eliminar el perfil.</li>
             </ol>
@@ -185,6 +217,20 @@ export default function Ayuda({ catalogos, rol }) {
               Asigna cada rol según las responsabilidades de la persona y desactiva accesos que ya
               no deban utilizarse.
             </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Configurar la información de la empresa"
+            descripcion="Los datos del perfil pueden reutilizarse en las actas de la empresa"
+          />
+          <TarjetaCuerpo>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>Abre Mi perfil y revisa la sección Información de la empresa o sociedad.</li>
+              <li>Captura la razón social y el tipo de sociedad; el RFC y el logo son opcionales.</li>
+              <li>Guarda la información y activa Usar esta información al generar el acta si quieres precargarla en nuevos documentos. El resto de los usuarios puede consultarla, pero solo el Administrador puede modificarla.</li>
+            </ol>
           </TarjetaCuerpo>
         </Tarjeta>
 
@@ -233,9 +279,11 @@ export default function Ayuda({ catalogos, rol }) {
               <li>La administración de usuarios se limita a las cuentas de la empresa; la superadministración global corresponde al SuperAdministrador.</li>
               <li>La validación asistida es orientativa; confirma la información contra los documentos societarios.</li>
               <li>Las decisiones de revisión y aprobación legal corresponden al Revisor y al Abogado Responsable.</li>
+              <li>Puedes consultar y descargar actas aprobadas desde la Biblioteca, pero no aprobarlas ni emitir decisiones de revisión.</li>
             </ul>
           </TarjetaCuerpo>
         </Tarjeta>
+        <GuiaCuenta rol={rol} />
       </div>
     )
   }
@@ -293,7 +341,7 @@ export default function Ayuda({ catalogos, rol }) {
                 },
                 {
                   titulo: 'Descarga el documento final',
-                  descripcion: 'Después de aprobar, usa Descargar PDF final en la bandeja o consulta el registro en Biblioteca. La aprobación queda registrada y el PDF se genera al solicitar la descarga.',
+                  descripcion: 'Después de aprobar, usa Descargar PDF final en la bandeja o consulta el registro en Biblioteca. El PDF queda listo para imprimir; PGAC no recaba firmas electrónicas y las firmas manuscritas se obtienen fuera del sistema.',
                 },
               ].map((paso, indice) => (
                 <li key={paso.titulo} className="flex gap-3">
@@ -384,6 +432,7 @@ export default function Ayuda({ catalogos, rol }) {
             </p>
           </TarjetaCuerpo>
         </Tarjeta>
+        <GuiaCuenta rol={rol} />
       </div>
     )
   }
@@ -531,6 +580,7 @@ export default function Ayuda({ catalogos, rol }) {
             </p>
           </TarjetaCuerpo>
         </Tarjeta>
+        <GuiaCuenta rol={rol} />
       </div>
     )
   }
@@ -540,7 +590,7 @@ export default function Ayuda({ catalogos, rol }) {
       <header>
         <h1 className="text-lg font-semibold text-corporativo-700">{titulo}</h1>
         <p className="text-sm text-slate-500">
-          Cómo generar un acta, qué hace la IA y qué revisa el motor de validación antes de la firma.
+          Funciones disponibles según tu rol, flujo de revisión y alcance del PDF listo para impresión.
         </p>
       </header>
 
@@ -589,7 +639,7 @@ export default function Ayuda({ catalogos, rol }) {
       <Tarjeta>
         <TarjetaEncabezado
           titulo="Flujo de trabajo"
-          descripcion="Cuatro pasos desde la captura hasta el PDF firmable"
+          descripcion="Cuatro pasos de captura y revisión; después sigue el flujo de autorización"
         />
         <TarjetaCuerpo>
           <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
@@ -607,16 +657,17 @@ export default function Ayuda({ catalogos, rol }) {
               usan plantillas deterministas sin conexión).
             </li>
             <li>
-              <strong>Revisión y aprobación:</strong> el Revisor devuelve con observaciones o marca
-              el acta como revisada y la envía al Abogado. El Abogado también puede devolverla o
-              aprobarla de forma final.
+              <strong>Revisión del borrador:</strong> genera las cláusulas, consulta la validación
+              y envía el documento al Revisor. La revisión y aprobación legal ocurren después, en
+              las bandejas de cada rol.
             </li>
           </ol>
           <p className="mt-3 text-xs text-slate-500">
             En el paso 4, <strong>"Generar borrador con IA"</strong> redacta las cláusulas antes
             de enviar. Las correcciones del Revisor regresan a su bandeja; las del Abogado vuelven
             directamente a su etapa. Cada corrección aumenta la versión. El PDF final solo se
-            descarga después de la aprobación legal.
+            descarga después de la aprobación legal y queda listo para imprimir; la firma manuscrita
+            se recaba fuera de PGAC.
           </p>
         </TarjetaCuerpo>
       </Tarjeta>
@@ -699,8 +750,9 @@ export default function Ayuda({ catalogos, rol }) {
               al redactar las cláusulas y el encabezado del PDF.
             </li>
             <li>
-              <strong>Persistencia:</strong> la información se guarda en el navegador
-              (localStorage) y está disponible sin necesidad de autenticación.
+              <strong>Persistencia:</strong> el Administrador guarda la información en el perfil
+              empresarial; los usuarios autorizados la consultan al iniciar sesión. La interfaz
+              también conserva una copia local para precargar el formulario.
             </li>
           </ul>
         </TarjetaCuerpo>
@@ -735,11 +787,10 @@ export default function Ayuda({ catalogos, rol }) {
         />
         <TarjetaCuerpo>
           <p className="text-sm text-slate-700">
-            La redacción de cláusulas se resuelve con Azure OpenAI o Google Gemini cuando existen
-            credenciales; en caso contrario —o si el servicio falla— la plataforma utiliza sus plantillas
-            legales deterministas, por lo que <strong>nunca deja de funcionar sin conexión</strong>. El
-            maquetado del PDF se ejecuta siempre con ReportLab, de forma reproducible y sin intervención
-            del modelo.
+            La redacción puede usar Azure OpenAI, Google Gemini o un proveedor compatible con OpenAI
+            cuando está configurado. Si no hay proveedor o falla, PGAC puede recurrir a plantillas
+            deterministas. Esto no elimina la necesidad de que el backend y la base de datos estén
+            disponibles. El PDF se maqueta de forma reproducible, sin intervención del modelo.
           </p>
           <p className="mt-3 text-sm text-slate-700">
             Proveedor activo: <strong>{catalogos?.proveedor_ia || 'plantillas'}</strong>{' '}
@@ -748,8 +799,9 @@ export default function Ayuda({ catalogos, rol }) {
           <p className="mt-3 text-xs text-slate-500">
             Para habilitar IA externa configura en <code>backend/.env</code>:{' '}
             <code>AZURE_OPENAI_ENDPOINT</code>, <code>AZURE_OPENAI_API_KEY</code> y{' '}
-            <code>AZURE_OPENAI_DEPLOYMENT</code>; o bien <code>GEMINI_API_KEY</code> y{' '}
-            <code>GEMINI_MODEL</code>.
+            <code>AZURE_OPENAI_DEPLOYMENT</code>; <code>GEMINI_API_KEY</code> y{' '}
+            <code>GEMINI_MODEL</code>; o configura <code>AI_BASE_URL</code> y <code>AI_MODEL</code>{' '}
+            para un proveedor compatible con OpenAI.
           </p>
         </TarjetaCuerpo>
       </Tarjeta>
@@ -781,6 +833,7 @@ export default function Ayuda({ catalogos, rol }) {
           </div>
         </TarjetaCuerpo>
       </Tarjeta>
+      <GuiaCuenta rol={rol} />
     </div>
   )
 }
