@@ -39,7 +39,6 @@ class InformacionEmpresa(BaseModel):
     rfc_sociedad: Optional[str] = Field(default=None, max_length=13)
     tipo_sociedad: Optional[str] = Field(default=None, max_length=60)
     logo_empresa: Optional[str] = None
-    firma_electronica: bool = False
     usar_info_empresa: bool = False
 
 

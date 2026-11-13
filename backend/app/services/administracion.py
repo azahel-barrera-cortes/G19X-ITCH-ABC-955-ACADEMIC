@@ -70,7 +70,6 @@ _CAMPOS_INSTANTANEA = (
     "proveedor_ia",
     "tipo_sociedad",
     "datos_especificos",
-    "firma_electronica",
     "usar_info_empresa",
     "estatus",
     "estado_flujo",

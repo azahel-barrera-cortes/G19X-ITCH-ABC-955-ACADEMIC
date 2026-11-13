@@ -130,8 +130,7 @@ class ActaBase(BaseSchema):
         description="Datos jurídicos específicos del tipo de acta; requieren revisión profesional.",
     )
     logo_empresa: Optional[str] = Field(default=None, description="Logo de la empresa como data URL (base64), para el encabezado del PDF")
-    firma_electronica: bool = Field(default=False, description="Incluir leyenda de firma electrónica en el acta")
-    usar_info_empresa: bool = Field(default=False, description="Usar automáticamente tipo_sociedad, logo_empresa y firma_electronica al generar el acta")
+    usar_info_empresa: bool = Field(default=False, description="Usar automáticamente tipo_sociedad y logo_empresa al generar el acta")
 
     # --- Convocatoria (art. 186 LGSM) ---
     convocatoria_fecha: Optional[date] = None

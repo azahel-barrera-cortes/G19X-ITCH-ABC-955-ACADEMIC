@@ -91,7 +91,6 @@ def chatear(
             "rfc_sociedad": administrador.rfc_sociedad,
             "tipo_sociedad": administrador.tipo_sociedad,
             "logo_empresa": administrador.logo_empresa,
-            "firma_electronica": administrador.firma_electronica,
             "usar_info_empresa": administrador.usar_info_empresa,
         }
     resultado = motor.procesar_mensaje(

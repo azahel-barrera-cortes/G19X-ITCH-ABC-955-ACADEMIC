@@ -62,8 +62,8 @@ El sistema debe incluir un asistente de IA basado en chat que guíe al usuario e
 
 ### RF-10: Información de la empresa o sociedad
 El sistema debe permitir capturar y persistir los datos de la sociedad que comparece en las actas:
-- Razón social, R.F.C., tipo de sociedad (13 opciones del catálogo), logo de la empresa y firma electrónica opcional.
-- Toggle «Usar esta información al generar el acta»: al activarse, la sociedad, tipo de sociedad, logo y firma se incluyen automáticamente en cada acta generada, y la IA puede incorporar estos datos al redactar cláusulas y el encabezado del PDF.
+- Razón social, R.F.C., tipo de sociedad (13 opciones del catálogo) y logo de la empresa.
+- Toggle «Usar esta información al generar el acta»: al activarse, la sociedad, tipo de sociedad y logo se incluyen automáticamente en cada acta generada, y la IA puede incorporar estos datos al redactar cláusulas y el encabezado del PDF.
 - Persistencia en el backend: los datos de la sociedad se guardan con cada acta (campos `tipo_sociedad` y `logo_empresa` del modelo `Acta`) y están disponibles para el usuario autenticado; el frontend también conserva una copia en `localStorage` para uso inmediato.
 
 ### RF-11: Autenticación y control de acceso por roles (RBAC)
@@ -108,7 +108,7 @@ El sistema debe exigir autenticación para toda operación del dominio:
 - Las cuentas desactivadas no pueden iniciar sesión y reciben una pantalla
   informativa para cerrar sesión. La información de empresa es editable por el
   `Administrador`; capturista, revisor y abogado responsable solo consultan
-  razón social, tipo de sociedad, logo y estados de firma electrónica y uso en
+  razón social, tipo de sociedad, logo y estado de uso en
   generación de actas.
 
 ### RF-13: Bitácora de cambios (auditoría)
@@ -168,7 +168,7 @@ El backend persiste la información en tres tablas principales (portables entre 
 | Mesa directiva | `presidente`, `secretario` |
 | Cuerpo (JSON) | `asistentes`, `orden_del_dia`, `acuerdos`, `clausulas`, `validacion_ia` |
 | Documento | `texto_legal`, `observaciones` |
-| Empresa | `tipo_sociedad`, `logo_empresa`, `firma_electronica`, `usar_info_empresa` |
+| Empresa | `tipo_sociedad`, `logo_empresa`, `usar_info_empresa` |
 | Trazabilidad | `proveedor_ia`, `estatus`, `created_at`, `updated_at` |
 
 ### `usuarios`
@@ -223,7 +223,6 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 ### ❌ Queda fuera (post-escimiento actual)
 | Área | Qué queda fuera |
 |------|-----------------|
-| Firma electrónica | Firma electrónica avanzada, hash + sellado de tiempo |
 | Multiempresa (pendiente de migraciones) | Aislamiento de datos por sociedad/cliente mediante `empresa_codigo` y filtrado fail-closed en todos los endpoints de actas |
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
@@ -284,8 +283,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 1. Rate limiting y controles de abuso para autenticación y recuperación
 2. Migraciones con Alembic para esquema productivo (el aislamiento por sociedad ya está implementado mediante `empresa_codigo`)
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances)
-4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo)
-5. Multiusuario/logotipos por sociedad con aislamiento de datos y permisos por empresa
+4. Multiusuario/logotipos por sociedad con aislamiento de datos y permisos por empresa
 
 ---
 

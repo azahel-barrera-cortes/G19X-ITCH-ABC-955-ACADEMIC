@@ -40,7 +40,6 @@ class Usuario(Base):
     rfc_sociedad: Mapped[Optional[str]] = mapped_column(String(13), nullable=True)
     tipo_sociedad: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     logo_empresa: Mapped[Optional[str]] = mapped_column(nullable=True)
-    firma_electronica: Mapped[bool] = mapped_column(default=False, nullable=False)
     usar_info_empresa: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Hash del token de recuperación de contraseña (válido 1 hora).

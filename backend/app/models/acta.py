@@ -99,7 +99,6 @@ class Acta(Base):
     datos_especificos: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     datos_asistente: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     logo_empresa: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    firma_electronica: Mapped[bool] = mapped_column(default=False, nullable=False)
     usar_info_empresa: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # --- Gobernanza: vigencia ----------------------------------------------

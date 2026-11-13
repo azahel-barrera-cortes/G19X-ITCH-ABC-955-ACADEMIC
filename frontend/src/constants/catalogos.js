@@ -283,7 +283,6 @@ export const ACTA_VACIA = {
   /** Información de la empresa / sociedad (sección lateral independiente). */
   tipo_sociedad: '',
   logo_empresa: '',
-  firma_electronica: false,
   usar_info_empresa: false,
   datos_especificos: {},
   asistentes: [],

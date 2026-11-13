@@ -14,7 +14,7 @@ const APARTADOS = [
   {
     id: 'empresa',
     etiqueta: 'Información de la empresa',
-    descripcion: 'Datos de la sociedad, logo y firma electrónica',
+    descripcion: 'Datos de la sociedad y logo',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -110,7 +110,7 @@ export default function Administrador() {
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-900">Información de la empresa</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Captura los datos de la sociedad, tipo de sociedad, logo y firma electrónica.
+                Captura los datos de la sociedad, tipo de sociedad y logo.
               </p>
               <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
                 Apartado «Información de la empresa» en construcción.

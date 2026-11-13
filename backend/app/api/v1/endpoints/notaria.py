@@ -91,6 +91,5 @@ def obtener_acta_notaria(
         "creado_por": acta.creado_por,
         "created_at": str(acta.created_at) if acta.created_at else None,
         "updated_at": str(acta.updated_at) if acta.updated_at else None,
-        "firma_electronica": acta.firma_electronica,
         "usar_info_empresa": acta.usar_info_empresa,
     }

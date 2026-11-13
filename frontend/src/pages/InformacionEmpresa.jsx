@@ -15,7 +15,6 @@ const INFO_VACIA = {
   rfc_sociedad: '',
   tipo_sociedad: '',
   logo_empresa: '',
-  firma_electronica: false,
   usar_info_empresa: false,
 }
 
@@ -242,20 +241,7 @@ export default function InformacionEmpresa({
             </div>
           </section>
 
-          <section className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
-                Firma electrónica
-              </h2>
-              <p className={`mt-3 text-sm font-semibold ${
-                info.firma_electronica ? 'text-emerald-700' : 'text-slate-500'
-              }`}>
-                {info.firma_electronica ? 'Activa' : 'Inactiva'}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Estado configurado por el Administrador.
-              </p>
-            </div>
+          <section>
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-corporativo-600">
                 Uso en la generación de actas

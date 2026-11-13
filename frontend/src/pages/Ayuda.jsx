@@ -686,12 +686,12 @@ export default function Ayuda({ catalogos, rol }) {
           <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
             <li>
               <strong>Datos capturables:</strong> razón social, R.F.C., tipo de sociedad (7
-              opciones: S.A., S. de R.L., S. en C., S.A.S., S. en C. por A., S.C., S. en N.C.),
-              logo de la empresa y firma electrónica opcional.
+              opciones: S.A., S. de R.L., S. en C., S.A.S., S. en C. por A., S.C., S. en N.C.)
+              y logo de la empresa.
             </li>
             <li>
               <strong>Uso automático:</strong> activa el toggle "Usar esta información al generar
-              el acta" para que la sociedad, tipo de sociedad, logo y firma se incluyan en cada
+              el acta" para que la sociedad, tipo de sociedad y logo se incluyan en cada
               acta generada.
             </li>
             <li>

@@ -719,8 +719,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 - La plataforma incluye **autenticación JWT con roles (RBAC)** y bitácora de
   cambios. La recuperación por correo está implementada mediante SMTP
   configurable; el despliegue debe proporcionar la configuración de correo.
-  El aislamiento multiempresa está implementado mediante `empresa_codigo` con filtrado fail-closed;
-  la firma electrónica avanzada requiere infraestructura adicional antes de producción.
+  El aislamiento multiempresa está implementado mediante `empresa_codigo` con filtrado fail-closed.
 - El proyecto cubre la **estructura base** solicitada en `PGAC.md`.
 - El PDF se genera con ReportLab de forma determinista; los márgenes, la
   tipografía y el pie de página se ajustan desde `backend/.env`.
@@ -732,8 +731,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 1. Rate limiting y controles contra abuso en login y recuperación de contraseña.
 2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
-4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
-5. Completar la revisión de seguridad del registro inicial (rate limiting, cookies HttpOnly).
+4. Completar la revisión de seguridad del registro inicial (rate limiting, cookies HttpOnly).
 
 ---
 

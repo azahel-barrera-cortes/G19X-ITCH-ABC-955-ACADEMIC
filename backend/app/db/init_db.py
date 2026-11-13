@@ -77,7 +77,6 @@ _COLUMNAS_NUEVAS = {
         ("comentario_revision", "TEXT"),
         ("historial_revision", "JSON"),
         ("logo_empresa", "TEXT"),
-        ("firma_electronica", "BOOLEAN DEFAULT 0"),
         ("usar_info_empresa", "BOOLEAN DEFAULT 0"),
     ),
     "actas_versiones": (
@@ -93,7 +92,6 @@ _COLUMNAS_NUEVAS = {
         ("rfc_sociedad", "VARCHAR(13)"),
         ("tipo_sociedad", "VARCHAR(60)"),
         ("logo_empresa", "TEXT"),
-        ("firma_electronica", "BOOLEAN DEFAULT 0"),
         ("usar_info_empresa", "BOOLEAN DEFAULT 0"),
     ),
     "bitacora_cambios": (

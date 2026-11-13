@@ -276,7 +276,6 @@ def construir_documento(
         "tipo_sociedad": payload.tipo_sociedad,
         "datos_especificos": payload.datos_especificos,
         "logo_empresa": payload.logo_empresa,
-        "firma_electronica": payload.firma_electronica,
         "tipo_asamblea_texto": etiqueta_tipo_asamblea(payload.tipo_asamblea),
         "titulo_documento": titulo_documento(payload),
         "subtitulo_documento": (
@@ -358,7 +357,6 @@ def _volcar_payload(
     if datos_asistente is not None:
         modelo.datos_asistente = dict(datos_asistente)
     modelo.logo_empresa = payload.logo_empresa
-    modelo.firma_electronica = payload.firma_electronica
     modelo.usar_info_empresa = payload.usar_info_empresa
 
     modelo.asistentes = [asistente.model_dump(mode="json") for asistente in payload.asistentes]
@@ -553,7 +551,6 @@ def payload_desde_acta(
         secretario=acta.secretario,
         tipo_sociedad=acta.tipo_sociedad,
         logo_empresa=acta.logo_empresa,
-        firma_electronica=acta.firma_electronica,
         usar_info_empresa=acta.usar_info_empresa,
         asistentes=list(acta.asistentes or []),
         orden_del_dia=list(acta.orden_del_dia or []),

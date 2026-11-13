@@ -67,7 +67,6 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Área | Qué queda fuera | Motivo |
 |------|----------------|--------|
 | **Autenticación y roles** | ✅ Entregado (JWT + RBAC + interfaz de acceso separada + perfil por rol + SuperAdministrador inicial por variables de entorno) | Requisito RF-11 de la versión entregada |
-| **Firma electrónica** | Firma electrónica avanzada, hash + sellado de tiempo | Requiere infraestructura adicional y validez legal específica |
 | **Aislamiento multiempresa completo** | Separación estricta de datos por sociedad/cliente | ✅ Entregado en esta versión: `empresa_codigo` en modelos, filtrado fail-closed en endpoints y `tenant_access.py`. El `SuperAdministrador` puede reasignar actas en cuarentena mediante `PATCH /administracion/actas/{acta_id}/empresa`. |
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
 | **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |

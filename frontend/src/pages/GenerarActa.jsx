@@ -95,7 +95,6 @@ export default function GenerarActa({
       rfc_sociedad: infoEmpresa.rfc_sociedad || '',
       tipo_sociedad: infoEmpresa.tipo_sociedad,
       logo_empresa: infoEmpresa.logo_empresa || '',
-      firma_electronica: Boolean(infoEmpresa.firma_electronica),
       usar_info_empresa: true,
     })
   }, [actaInicial, actualizarCampos, empresaAsignada, infoEmpresa, usaInfoEmpresa])

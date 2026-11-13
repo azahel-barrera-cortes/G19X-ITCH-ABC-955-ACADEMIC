@@ -48,7 +48,7 @@ Genera el código modular y bien documentado para los siguientes módulos:
 - **Estado y Peticiones API**:
   - Uso de `fetch` / `axios` para enviar los datos al backend de FastAPI y recibir la respuesta del PDF en formato Blob para visualización/descarga directa en el navegador.
 - **Información de la empresa o sociedad** (nueva sección del menú lateral):
-  - Formulario para capturar razón social, R.F.C., tipo de sociedad (7 opciones: S.A., S. de R.L., S. en C., S.A.S., S. en C. por A., S.C., S. en N.C.), logo de la empresa y firma electrónica opcional.
+  - Formulario para capturar razón social, R.F.C., tipo de sociedad (7 opciones: S.A., S. de R.L., S. en C., S.A.S., S. en C. por A., S.C., S. en N.C.) y logo de la empresa.
   - Toggle «Usar esta información al generar el acta»: al activarse, los datos de la sociedad se incluyen automáticamente en cada acta y la IA puede usarlos para redactar cláusulas y el encabezado del PDF.
 
 ---

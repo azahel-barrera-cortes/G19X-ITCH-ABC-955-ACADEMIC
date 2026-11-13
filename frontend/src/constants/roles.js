@@ -116,7 +116,7 @@ export const SECCIONES_SISTEMA = [
     id: 'empresa',
     minimo: 'capturista',
     etiqueta: 'Información de la empresa o sociedad',
-    descripcion: 'Datos de la sociedad, tipo, logo y firma electrónica',
+    descripcion: 'Datos de la sociedad, tipo y logo',
   },
   {
     id: 'ayuda',
