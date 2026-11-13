@@ -180,22 +180,21 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    `SuperAdministrador` desde `UsuariosSuperAdmin`.
    Tras un acceso correcto se abre **Mi perfil** para los usuarios operativos;
    el `SuperAdministrador` entra directamente a **UsuariosSuperAdmin** y no
-   muestra Perfil. La barra lateral y la navegación móvil solo
-   presentan esas secciones (un capturista, por ejemplo, no ve Biblioteca y
-   solo accede a las operaciones de Administración permitidas; el backend
-   responde 403 si intenta invocar una operación reservada).
-1. **Generar acta** → panel de inicio con plantillas frecuentes, formulario manual
-   o redacción asistida por IA → Paso 1 *Datos generales* → Paso 2 *Asistentes y quórum* →
-   Paso 3 *Orden del día y acuerdos* → Paso 4 *Revisión y PDF*.
-2. En el paso 4: **«Generar borrador con IA»** devuelve cláusulas + validación;
-   **«Descargar PDF final»** compila el PDF (`Blob`) y lo descarga, mostrando
-   folio, versión, páginas y proveedor de IA leídos de los encabezados `X-Acta-*`.
-3. La **información de la empresa o sociedad** se consulta desde el backend y,
-   para el Administrador, permite editar razón social, RFC, tipo societario,
-   logo, firma electrónica y el toggle de uso automático. Al activarse, estos
-   datos se incorporan al wizard, al asistente, a la redacción y al PDF.
-4. **Biblioteca de actas** → filtros por folio/sociedad, tipo y estatus;
-   descarga, edición, revalidación, cambio de estatus y eliminación.
+   muestra Perfil. La barra lateral y la navegación móvil muestran únicamente
+   los accesos definidos para cada rol; el backend también valida cada petición
+   y responde 403 si se intenta invocar una operación reservada.
+1. **Generar acta** → el Capturista crea el acta desde el formulario por pasos
+   o mediante el asistente IA. Ambas vías envían el borrador a revisión; no
+   generan el PDF final.
+2. **Mis actas** → el Capturista consulta el avance y corrige las actas devueltas.
+   Cada corrección crea una nueva versión y vuelve al Revisor si él la devolvió;
+   si la devolución fue del Abogado, pasa directamente a su bandeja.
+3. **Revisión de actas** → el Revisor aprueba el borrador para el Abogado o lo
+   devuelve con observaciones. **Aprobación de actas** → el Abogado revisa el acta
+   y sus versiones, la aprueba finalmente o la devuelve al Capturista; después de
+   aprobarla puede descargar el PDF final desde su bandeja o la Biblioteca.
+4. **Biblioteca de actas** y **Administración de Actas** presentan el historial
+   y las herramientas de consulta/versionado permitidas al rol.
 
 ### ¿Qué ve cada usuario al iniciar sesión?
 
@@ -204,11 +203,11 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 
 | Rol | Pantalla de entrada | Secciones visibles en la barra lateral | Acciones principales |
 |-----|---------------------|----------------------------------------|----------------------|
-| **Capturista** | Mi perfil | Generar acta, Asistente IA, Información de la empresa o sociedad, Administración (operaciones permitidas), Guía de uso | Crear y editar actas, redactar con IA, generar PDF y exportar expediente ZIP |
-| **Revisor** | Mi perfil | Todo lo del capturista, además: Biblioteca de actas y Administración | Listar y consultar actas, descargar PDF guardado, consultar administración, bitácora de cambios y API de notaría |
-| **Abogado responsable** | Mi perfil | Todo lo del revisor | Cambiar estatus, aprobar y revalidar actas |
-| **Administrador** | Mi perfil | Todas las secciones operativas | Gestionar la información de empresa o sociedad y usar las funciones de actas |
-| **SuperAdministrador** | UsuariosSuperAdmin | Usuarios, bitácora, estadísticas, seguridad y guía global, además de las funciones operativas | Crear, editar, activar, desactivar y eliminar usuarios; asignar roles, revisar estadísticas, seguridad y bitácora global |
+| **Capturista** | Mi perfil | Perfil, Generar Acta, Asistente IA, Mis Actas, Guía de Capturista | Crear actas, consultar el seguimiento y corregir las observaciones recibidas |
+| **Revisor** | Mi perfil | Perfil, Revisión de Actas, Biblioteca de Actas, Guía de Revisor | Revisar borradores, consultar el historial y aprobarlos para el Abogado o devolverlos al Capturista |
+| **Abogado responsable** | Mi perfil | Perfil, Aprobación de Actas, Biblioteca de Actas, Guía de Abogado | Aprobar o devolver actas; descargar el PDF final tras la aprobación |
+| **Administrador** | Mi perfil | Perfil, Administración de Usuarios, Administración de Actas, Biblioteca de Actas, Guía de Administrador | Administrar usuarios de la empresa y consultar el repositorio y sus versiones |
+| **SuperAdministrador** | UsuariosSuperAdmin | Administración de Usuarios, Bitácora, Estadísticas, Seguridad, Guía de SuperAdministrador | Administrar usuarios globales, revisar estadísticas, seguridad y bitácora |
 
 > El código empresarial se genera automáticamente para cada usuario con rol
 > `Administrador`. El registro público permite seleccionar `capturista`,

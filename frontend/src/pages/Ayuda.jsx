@@ -1,14 +1,19 @@
 import { Tarjeta, TarjetaCuerpo, TarjetaEncabezado } from '../components/ui/Tarjeta.jsx'
+import { etiquetaGuiaRol } from '../constants/roles.js'
 
 const ENDPOINTS = [
   ['GET', '/api/v1/actas/catalogos', 'Catálogos de tipos de asamblea, mayorías, caracteres y estatus.'],
   ['POST', '/api/v1/actas/redactar', 'Genera el borrador con IA y la validación (no persiste ni exporta).'],
-  ['POST', '/api/v1/actas/generar-pdf', 'Endpoint principal: redacta, guarda y devuelve el PDF binario.'],
+  ['POST', '/api/v1/actas', 'Guarda el borrador y lo envía a la bandeja del Revisor.'],
+  ['GET', '/api/v1/actas/bandeja', 'Consulta las actas propias o pendientes según el rol.'],
+  ['POST', '/api/v1/actas/{id}/decision', 'Aprueba o devuelve el acta en su etapa actual.'],
+  ['POST', '/api/v1/actas/{id}/reenviar', 'Reenvía la nueva versión a la etapa que solicitó la corrección.'],
+  ['POST', '/api/v1/actas/generar-pdf', 'Genera una vista previa no persistida.'],
   ['GET', '/api/v1/actas', 'Historial de actas con filtros y paginación.'],
   ['GET', '/api/v1/actas/{id}', 'Acta completa, con sus cláusulas y su validación.'],
-  ['PUT', '/api/v1/actas/{id}', 'Reemplaza el contenido del acta e incrementa su versión.'],
-  ['PATCH', '/api/v1/actas/{id}/estatus', 'Cambia el estatus del expediente del acta.'],
-  ['GET', '/api/v1/actas/{id}/pdf', 'Regenera el PDF desde la base de datos (sin IA).'],
+  ['PUT', '/api/v1/actas/{id}', 'Guarda las correcciones del Capturista y crea una versión.'],
+  ['PATCH', '/api/v1/actas/{id}/estatus', 'Registra estados posteriores a la aprobación final.'],
+  ['GET', '/api/v1/actas/{id}/pdf', 'Genera el PDF final solo después de la aprobación legal.'],
   ['POST', '/api/v1/actas/{id}/validar', 'Vuelve a validar la consistencia del acta.'],
   ['DELETE', '/api/v1/actas/{id}', 'Elimina el acta del historial.'],
   ['GET', '/api/v1/administracion/resumen', 'Totales del repositorio, por estatus y por vigencia.'],
@@ -21,11 +26,519 @@ const ENDPOINTS = [
 ]
 
 /** Sección «Guía de uso»: flujo de trabajo, API y notas legales. */
-export default function Ayuda({ catalogos }) {
+export default function Ayuda({ catalogos, rol }) {
+  const titulo = etiquetaGuiaRol(rol)
+
+  if (rol === 'capturista') {
+    return (
+      <div className="space-y-5">
+        <header className="rounded-2xl bg-gradient-to-r from-corporativo-700 to-corporativo-500 px-6 py-7 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+            Centro de ayuda · Capturista
+          </p>
+          <h1 className="mt-2 text-2xl font-bold">{titulo}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-white/90">
+            Guía para crear actas, dar seguimiento a su revisión y preparar nuevas versiones cuando
+            el Revisor o el Abogado solicite cambios.
+          </p>
+        </header>
+
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            ['Generar acta', 'Empieza desde una plantilla, con el formulario manual o con redacción asistida por IA.'],
+            ['Mis actas', 'Consulta el estado, las observaciones y el historial de tus actas.'],
+            ['Asistente IA', 'Recopila datos conversando y ayuda a crear o editar un borrador.'],
+          ].map(([encabezado, descripcion]) => (
+            <article key={encabezado} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="font-semibold text-corporativo-700">{encabezado}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{descripcion}</p>
+            </article>
+          ))}
+        </section>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Crear y enviar un acta"
+            descripcion="Elige el modo de captura que se adapte al documento"
+          />
+          <TarjetaCuerpo>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-corporativo-200 bg-corporativo-50/60 p-4">
+                <h3 className="font-semibold text-corporativo-800">Formulario manual</h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  En Generar acta puedes iniciar desde cero o seleccionar una plantilla. Completa
+                  los pasos de datos generales, asistentes y quórum, y orden del día y acuerdos.
+                  Los requisitos específicos dependen del tipo de asamblea.
+                </p>
+              </div>
+              <div className="rounded-xl border border-acento-400/50 bg-acento-50 p-4">
+                <h3 className="font-semibold text-corporativo-800">Asistente IA</h3>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  Describe la asamblea y responde las preguntas del chat. Revisa los datos propuestos
+                  y las cláusulas antes de enviar el acta a revisión.
+                </p>
+              </div>
+            </div>
+            <ol className="mt-5 space-y-3">
+              {[
+                ['Verifica los datos', 'Confirma sociedad, fecha, lugar, convocatoria, asistentes, capital y quórum contra los documentos fuente.'],
+                ['Revisa el borrador', 'En el paso de revisión puedes generar cláusulas, consultar la validación y revisar la vista previa. La IA puede usar el proveedor configurado o plantillas locales.'],
+                ['Envía a revisión', 'Pulsa Enviar a revisión. El acta aparece en Mis actas y se envía al Revisor.'],
+              ].map(([encabezado, descripcion], indice) => (
+                <li key={encabezado} className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-corporativo-100 text-sm font-bold text-corporativo-700">
+                    {indice + 1}
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">{encabezado}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{descripcion}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Corregir un acta devuelta"
+            descripcion="Las correcciones se realizan desde Mis actas y siempre generan una versión nueva"
+          />
+          <TarjetaCuerpo>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>En Mis actas, localiza el registro con estado Con errores y lee las observaciones del Revisor o del Abogado.</li>
+              <li>Pulsa Editar y corregir. La edición está disponible cuando el acta fue devuelta con errores; la sociedad y el tipo de acta permanecen bloqueados.</li>
+              <li>Corrige los campos necesarios en el formulario. Puedes aplicar propuestas del asistente IA, pero revísalas antes de guardar.</li>
+              <li>Guarda los cambios para crear una versión nueva. Si te devolvió el Revisor, vuelve a su bandeja; si te devolvió el Abogado, se envía directamente a Aprobación.</li>
+            </ol>
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Cada versión conserva el historial. No envíes una corrección sin revisar que responda
+              a las observaciones recibidas.
+            </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Asistente IA y límites del rol"
+            descripcion="Apoyo de captura sin reemplazar la verificación humana"
+          />
+          <TarjetaCuerpo>
+            <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>El asistente ayuda a recopilar datos y proponer redacción; verifica nombres, fechas, cifras, votaciones y fundamento legal.</li>
+              <li>Si la IA externa no está configurada, PGAC puede usar plantillas y validaciones locales.</li>
+              <li>No puedes aprobar un acta ni generar el PDF final oficial. El Revisor y luego el Abogado atienden esas etapas.</li>
+              <li>El PDF final se habilita después de la aprobación del Abogado Responsable.</li>
+            </ul>
+            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Proveedor configurado: <strong>{catalogos?.proveedor_ia || 'plantillas'}</strong>
+              {' · '}
+              {catalogos?.ia_habilitada ? 'IA externa habilitada' : 'modo de plantillas locales'}.
+            </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+      </div>
+    )
+  }
+
+  if (rol === 'Administrador') {
+    return (
+      <div className="space-y-5">
+        <header className="rounded-2xl bg-gradient-to-r from-corporativo-700 to-corporativo-500 px-6 py-7 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+            Centro de ayuda · Administración de empresa
+          </p>
+          <h1 className="mt-2 text-2xl font-bold">{titulo}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-white/90">
+            Guía para administrar los accesos de tu empresa y mantener ordenados los expedientes,
+            versiones e información de vigencia de las actas.
+          </p>
+        </header>
+
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            ['Administración de usuarios', 'Crea cuentas vinculadas a la empresa y gestiona roles y accesos.'],
+            ['Administración de actas', 'Consulta métricas, vigencia, caducidad y versiones del repositorio.'],
+            ['Biblioteca de actas', 'Busca registros, consulta actas, valida su consistencia y descarga PDFs aprobados.'],
+          ].map(([encabezado, descripcion]) => (
+            <article key={encabezado} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="font-semibold text-corporativo-700">{encabezado}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{descripcion}</p>
+            </article>
+          ))}
+        </section>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Administrar los usuarios de la empresa"
+            descripcion="Acciones disponibles en Administración de usuarios"
+          />
+          <TarjetaCuerpo>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>Consulta el código de empresa y el resumen de usuarios activos y desactivados.</li>
+              <li>Usa la búsqueda por nombre o correo y filtra por rol o estado de acceso.</li>
+              <li>Con Agregar usuario registra nombre, correo, contraseña temporal y rol. Los roles asignables en la empresa son Capturista, Revisor y Abogado.</li>
+              <li>Con Modificar puedes actualizar nombre, rol o contraseña; el correo existente no se cambia desde esta pantalla.</li>
+              <li>Usa Desactivar acceso o Reactivar acceso para revocar o restablecer el inicio de sesión sin eliminar el perfil.</li>
+            </ol>
+            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Asigna cada rol según las responsabilidades de la persona y desactiva accesos que ya
+              no deban utilizarse.
+            </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Administración de actas y vigencia"
+            descripcion="Control de expedientes sin cambiar las decisiones de revisión"
+          />
+          <TarjetaCuerpo>
+            <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li><strong>Resumen:</strong> consulta total de actas, versiones registradas, vencidas y próximas a vencer.</li>
+              <li><strong>Caducidad:</strong> filtra por estado de vigencia; fija, amplía o quita un plazo y registra el motivo.</li>
+              <li><strong>Versiones:</strong> abre el historial para ver el contenido de cada versión o restaurar una anterior. Restaurar emite una versión nueva; no borra el historial ni retrocede el contador.</li>
+              <li><strong>Bitácora de actas:</strong> consulta actividad reciente de creación, revisión y cambios sobre expedientes.</li>
+            </ul>
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Cambiar la vigencia o restaurar contenido genera una nueva versión. Verifica el
+              expediente y el motivo antes de guardar el cambio.
+            </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Biblioteca de actas"
+            descripcion="Consulta del repositorio y acciones disponibles por registro"
+          />
+          <TarjetaCuerpo>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>Busca por folio, sociedad o título; acota los resultados por tipo de asamblea y estatus.</li>
+              <li>Usa Ver acta para abrir el documento y Analizar con IA para ejecutar o consultar la validación de consistencia.</li>
+              <li>La tarjeta de análisis muestra proveedor, puntaje, hallazgos y recomendaciones; puedes contraerla y volverla a abrir.</li>
+              <li>Las actas aprobadas permiten descargar el PDF final. La aprobación se realiza desde la bandeja del Abogado, no desde Biblioteca.</li>
+              <li>Eliminar quita el acta del historial y no se puede deshacer. Confirma la selección antes de proceder.</li>
+            </ol>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Límites y responsabilidades"
+            descripcion="Administración del repositorio y accesos de la empresa"
+          />
+          <TarjetaCuerpo>
+            <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>La administración de usuarios se limita a las cuentas de la empresa; la superadministración global corresponde al SuperAdministrador.</li>
+              <li>La validación asistida es orientativa; confirma la información contra los documentos societarios.</li>
+              <li>Las decisiones de revisión y aprobación legal corresponden al Revisor y al Abogado Responsable.</li>
+            </ul>
+          </TarjetaCuerpo>
+        </Tarjeta>
+      </div>
+    )
+  }
+
+  if (rol === 'abogado_responsable') {
+    return (
+      <div className="space-y-5">
+        <header className="rounded-2xl bg-gradient-to-r from-corporativo-700 to-corporativo-500 px-6 py-7 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+            Centro de ayuda · Abogado Responsable
+          </p>
+          <h1 className="mt-2 text-2xl font-bold">{titulo}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-white/90">
+            Guía para revisar las actas, solicitar correcciones, consultar versiones y aprobar el
+            documento final desde las secciones de Aprobación y Biblioteca.
+          </p>
+        </header>
+
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            ['Aprobación de actas', 'Revisa las actas aprobadas por el Revisor y las correcciones enviadas directamente a tu etapa.'],
+            ['Biblioteca de actas', 'Consulta el historial, abre documentos y revisa la consistencia desde el repositorio.'],
+            ['PDF final', 'Al aprobar el acta se habilita su descarga en Aprobación y en Biblioteca.'],
+          ].map(([encabezado, descripcion]) => (
+            <article key={encabezado} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="font-semibold text-corporativo-700">{encabezado}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{descripcion}</p>
+            </article>
+          ))}
+        </section>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Proceso de aprobación"
+            descripcion="Secuencia recomendada para revisar y resolver cada acta"
+          />
+          <TarjetaCuerpo>
+            <ol className="space-y-4">
+              {[
+                {
+                  titulo: 'Abre Aprobación de actas',
+                  descripcion: 'La bandeja muestra las actas que el Revisor marcó como revisadas y las versiones corregidas que el Capturista envió directamente al Abogado.',
+                },
+                {
+                  titulo: 'Examina el contenido y sus antecedentes',
+                  descripcion: 'Usa Ver acta para consultar el documento. Ver versiones abre el historial de solo lectura y permite inspeccionar el contenido de cada versión.',
+                },
+                {
+                  titulo: 'Apóyate en el análisis asistido',
+                  descripcion: 'Pulsa Analizar con IA para revisar la consistencia y comparar la versión actual con la anterior. La tarjeta presenta secciones modificadas, hallazgos y recomendaciones; puedes agregar el análisis a las observaciones y editarlo antes de devolver.',
+                },
+                {
+                  titulo: 'Aprueba o devuelve con observaciones',
+                  descripcion: 'Si el acta está lista, pulsa Aprobar acta. Si necesita cambios, escribe observaciones concretas y pulsa Devolver con errores; las observaciones son obligatorias.',
+                },
+                {
+                  titulo: 'Descarga el documento final',
+                  descripcion: 'Después de aprobar, usa Descargar PDF final en la bandeja o consulta el registro en Biblioteca. La aprobación queda registrada y el PDF se genera al solicitar la descarga.',
+                },
+              ].map((paso, indice) => (
+                <li key={paso.titulo} className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-corporativo-100 text-sm font-bold text-corporativo-700">
+                    {indice + 1}
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">{paso.titulo}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{paso.descripcion}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Herramientas por pantalla"
+            descripcion="Qué puedes hacer en cada sección de tu menú"
+          />
+          <TarjetaCuerpo className="grid gap-5 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-corporativo-700">Aprobación de actas</h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
+                <li>Ver acta: abre el contenido de la versión que estás revisando.</li>
+                <li>Ver versiones: consulta las versiones anteriores sin modificarlas.</li>
+                <li>Analizar con IA: despliega u oculta el análisis; al reabrirlo se conserva el resultado cargado.</li>
+                <li>Agregar análisis a observaciones: copia hallazgos y recomendaciones al campo de retroalimentación para que los revises.</li>
+                <li>Aprobar acta o Devolver con errores: registra tu decisión en el flujo.</li>
+                <li>Descargar PDF final: aparece cuando el acta está aprobada.</li>
+              </ul>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-corporativo-700">Biblioteca de actas</h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
+                <li>Filtra el historial por folio, sociedad, tipo de asamblea o estatus.</li>
+                <li>Ver acta abre el documento y Analizar con IA ejecuta la validación de consistencia.</li>
+                <li>La tarjeta de validación muestra el puntaje, el proveedor, los hallazgos y las recomendaciones; el botón permite contraerla o volver a mostrarla.</li>
+                <li>Descargar PDF final solo está disponible para actas aprobadas.</li>
+              </ul>
+            </div>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Cómo funciona el ciclo de correcciones"
+            descripcion="El destino depende del rol que solicitó el último cambio"
+          />
+          <TarjetaCuerpo>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <h3 className="text-sm font-semibold text-amber-900">Si tú devuelves el acta</h3>
+                <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                  El Capturista recibe tus observaciones y crea una nueva versión. Esa versión vuelve
+                  directamente a Aprobación de actas; el Revisor no repite su etapa.
+                </p>
+              </div>
+              <div className="rounded-lg border border-corporativo-100 bg-corporativo-50 p-4">
+                <h3 className="text-sm font-semibold text-corporativo-800">Si el Revisor la devuelve</h3>
+                <p className="mt-1 text-sm leading-relaxed text-corporativo-700">
+                  El Capturista corrige y envía una nueva versión al Revisor. Cuando este la marque
+                  como revisada, llegará a tu bandeja para la aprobación legal.
+                </p>
+              </div>
+            </div>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Alcance del análisis y responsabilidad profesional"
+            descripcion="La IA apoya la revisión; no sustituye el criterio jurídico"
+          />
+          <TarjetaCuerpo>
+            <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>El análisis puede señalar inconsistencias en quórum, convocatoria, asistentes, orden del día, acuerdos, votaciones y cláusulas.</li>
+              <li>Si hay un proveedor de IA configurado, este complementa las reglas locales. Sin proveedor, la aplicación informa resultados basados en reglas deterministas.</li>
+              <li>Los hallazgos son sugerencias: confirma fechas, cifras, poderes, estatutos y anexos contra las fuentes societarias antes de decidir.</li>
+              <li>La aprobación y la devolución son decisiones humanas. Verifica y ajusta la retroalimentación antes de enviarla al Capturista.</li>
+              <li>PGAC no reemplaza la asesoría legal, la firma de las partes ni la protocolización ante fedatario cuando corresponda.</li>
+            </ul>
+            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Proveedor configurado: <strong>{catalogos?.proveedor_ia || 'plantillas'}</strong>
+              {' · '}
+              {catalogos?.ia_habilitada ? 'IA externa habilitada' : 'validaciones con reglas locales'}.
+            </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+      </div>
+    )
+  }
+
+  if (rol === 'revisor') {
+    return (
+      <div className="space-y-5">
+        <header className="rounded-2xl bg-gradient-to-r from-corporativo-700 to-corporativo-500 px-6 py-7 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+            Centro de ayuda · Revisor
+          </p>
+          <h1 className="mt-2 text-2xl font-bold">{titulo}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-white/90">
+            Guía para analizar cada borrador, dar retroalimentación clara al Capturista y enviar al
+            Abogado las actas que estén listas para su aprobación legal.
+          </p>
+        </header>
+
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            ['Revisión de actas', 'Atiende borradores nuevos y versiones corregidas que regresan a tu etapa.'],
+            ['Análisis asistido', 'Compara la versión actual con la anterior y ayuda a localizar inconsistencias.'],
+            ['Biblioteca de actas', 'Consulta el historial general y abre actas para su lectura.'],
+          ].map(([encabezado, descripcion]) => (
+            <article key={encabezado} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="font-semibold text-corporativo-700">{encabezado}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{descripcion}</p>
+            </article>
+          ))}
+        </section>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Proceso de revisión"
+            descripcion="Pasos para atender un borrador en tu bandeja"
+          />
+          <TarjetaCuerpo>
+            <ol className="space-y-4">
+              {[
+                {
+                  titulo: 'Abre Revisión de actas',
+                  descripcion: 'La bandeja muestra las actas pendientes de tu etapa. Revisa el folio, la versión, el estado y, si hay movimientos previos, consulta el historial de revisión.',
+                },
+                {
+                  titulo: 'Lee y analiza el documento',
+                  descripcion: 'Pulsa Ver acta para revisar el contenido. Analizar con IA despliega una validación de consistencia y, si existe una versión anterior, muestra qué secciones cambiaron. Si ya hay un resultado cargado, puedes contraerlo y volverlo a mostrar sin repetir el análisis.',
+                },
+                {
+                  titulo: 'Prepara observaciones cuando haya errores',
+                  descripcion: 'Describe correcciones concretas en el campo Observaciones. Puedes agregar los hallazgos del análisis como punto de partida y editar el texto. Las observaciones son obligatorias para devolver el acta.',
+                },
+                {
+                  titulo: 'Devuelve o envía al Abogado',
+                  descripcion: 'Pulsa Devolver con errores para que el Capturista corrija el documento, o Marcar revisada y enviar al Abogado si el borrador está listo para aprobación legal.',
+                },
+              ].map((paso, indice) => (
+                <li key={paso.titulo} className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-corporativo-100 text-sm font-bold text-corporativo-700">
+                    {indice + 1}
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">{paso.titulo}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{paso.descripcion}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Acciones de la bandeja"
+            descripcion="Funciones disponibles en cada registro"
+          />
+          <TarjetaCuerpo>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['Ver acta', 'Abre el contenido del acta que está pendiente de revisión.'],
+                ['Analizar con IA', 'Muestra u oculta puntaje, secciones modificadas, hallazgos y recomendaciones.'],
+                ['Agregar análisis a observaciones', 'Copia el resumen y los hallazgos al campo de observaciones para revisarlos y ajustarlos antes de devolver.'],
+                ['Devolver con errores', 'Envía el acta al Capturista; escribe observaciones específicas antes de confirmar.'],
+                ['Marcar revisada y enviar al Abogado', 'Termina tu etapa y coloca el acta en la bandeja de aprobación legal.'],
+                ['Historial de revisión', 'Consulta quién revisó, devolvió o reenvió cada versión y las observaciones registradas.'],
+              ].map(([accion, descripcion]) => (
+                <div key={accion} className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="text-sm font-semibold text-corporativo-700">{accion}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{descripcion}</p>
+                </div>
+              ))}
+            </div>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Ciclo de correcciones y Biblioteca"
+            descripcion="A dónde se dirige cada versión y qué puedes consultar"
+          />
+          <TarjetaCuerpo className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <h3 className="text-sm font-semibold text-amber-900">Si tú devuelves el acta</h3>
+                <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                  El Capturista corrige y crea una versión nueva que regresa a tu bandeja. Revisa
+                  nuevamente el documento y sus cambios antes de decidir.
+                </p>
+              </div>
+              <div className="rounded-lg border border-corporativo-100 bg-corporativo-50 p-4">
+                <h3 className="text-sm font-semibold text-corporativo-800">Si el Abogado devuelve el acta</h3>
+                <p className="mt-1 text-sm leading-relaxed text-corporativo-700">
+                  La corrección del Capturista vuelve directamente al Abogado, porque tu etapa ya
+                  fue completada.
+                </p>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Biblioteca de actas</h3>
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-600">
+                <li>Busca en el historial por folio, sociedad, tipo de asamblea o estatus.</li>
+                <li>Usa Ver acta para consultar un documento desde el registro.</li>
+                <li>La Biblioteca es de consulta: las decisiones se toman desde Revisión de actas.</li>
+                <li>La descarga del PDF final y la aprobación legal corresponden al Abogado Responsable.</li>
+              </ul>
+            </div>
+          </TarjetaCuerpo>
+        </Tarjeta>
+
+        <Tarjeta>
+          <TarjetaEncabezado
+            titulo="Alcance de la asistencia con IA"
+            descripcion="Los resultados apoyan tu revisión, pero no deciden por ti"
+          />
+          <TarjetaCuerpo>
+            <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+              <li>El análisis puede señalar inconsistencias de quórum, convocatoria, asistentes, orden del día, acuerdos, votaciones y cláusulas.</li>
+              <li>Con proveedor de IA configurado, el modelo complementa las reglas locales; sin proveedor se muestran validaciones deterministas.</li>
+              <li>Comprueba los hallazgos contra el contenido del acta. La IA puede omitir problemas o sugerir cambios que no correspondan.</li>
+              <li>Tu decisión de devolver o enviar al Abogado es humana; el análisis no cambia el estado del acta automáticamente.</li>
+            </ul>
+            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Proveedor configurado: <strong>{catalogos?.proveedor_ia || 'plantillas'}</strong>
+              {' · '}
+              {catalogos?.ia_habilitada ? 'IA externa habilitada' : 'validaciones con reglas locales'}.
+            </p>
+          </TarjetaCuerpo>
+        </Tarjeta>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-lg font-semibold text-corporativo-700">Guía de uso</h1>
+        <h1 className="text-lg font-semibold text-corporativo-700">{titulo}</h1>
         <p className="text-sm text-slate-500">
           Cómo generar un acta, qué hace la IA y qué revisa el motor de validación antes de la firma.
         </p>
@@ -46,15 +559,22 @@ export default function Ayuda({ catalogos }) {
       <Tarjeta>
         <TarjetaEncabezado
           titulo="Navegación"
-          descripcion="Las cuatro secciones están en la barra lateral izquierda (en móvil aparecen arriba)."
+          descripcion="Las secciones visibles dependen del rol y aparecen en la barra lateral (en móvil, arriba)."
         />
         <TarjetaCuerpo>
           <ul className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
             <li>
-              <strong>Generar acta:</strong> formulario por pasos, redacción con IA y PDF.
+              <strong>Generar acta:</strong> formulario manual o asistente IA; ambos envían a revisión.
             </li>
             <li>
-              <strong>Biblioteca de actas:</strong> historial, estatus, descarga de PDF y edición.
+              <strong>Mis actas:</strong> el Capturista consulta el avance y corrige las actas devueltas.
+            </li>
+            <li>
+              <strong>Revisión y aprobación:</strong> el Revisor y el Abogado atienden sus respectivas bandejas.
+            </li>
+            <li>
+              <strong>Biblioteca de actas:</strong> historial, versiones y descarga del PDF final
+              aprobado para el Abogado.
             </li>
             <li>
               <strong>Administración:</strong> versiones, vigencia y caducidad de los expedientes.
@@ -87,15 +607,16 @@ export default function Ayuda({ catalogos }) {
               usan plantillas deterministas sin conexión).
             </li>
             <li>
-              <strong>Revisión y PDF:</strong> se muestra la validación de consistencia (puntaje
-              y hallazgos), se genera el borrador con IA y se descarga el PDF final con encabezado,
-              quórum, firmas y numeración de páginas.
+              <strong>Revisión y aprobación:</strong> el Revisor devuelve con observaciones o marca
+              el acta como revisada y la envía al Abogado. El Abogado también puede devolverla o
+              aprobarla de forma final.
             </li>
           </ol>
           <p className="mt-3 text-xs text-slate-500">
-            En el paso 4, el botón <strong>"Generar borrador con IA"</strong> devuelve las cláusulas
-            y la validación sin guardar; <strong>"Descargar PDF final"</strong> compila el PDF,
-            guarda el acta y devuelve el folio, versión, páginas y proveedor de IA.
+            En el paso 4, <strong>"Generar borrador con IA"</strong> redacta las cláusulas antes
+            de enviar. Las correcciones del Revisor regresan a su bandeja; las del Abogado vuelven
+            directamente a su etapa. Cada corrección aumenta la versión. El PDF final solo se
+            descarga después de la aprobación legal.
           </p>
         </TarjetaCuerpo>
       </Tarjeta>
@@ -144,12 +665,8 @@ export default function Ayuda({ catalogos }) {
               extraordinaria, aumento de capital, fusión, disolución, etc.) para elegir.
             </li>
             <li>
-              <strong>Acciones rápidas:</strong> validar una acta, cambiar su estatus, consultar
-              versiones, descargar el PDF y restaurar versiones desde el chat.
-            </li>
-            <li>
-              <strong>Borrador organizable:</strong> genera un texto estructurado del acta que
-              puedes copiar al formulario manual.
+              <strong>Envío al flujo:</strong> al completar la información, el asistente guarda el
+              acta y la envía al Revisor; las correcciones posteriores vuelven al rol que las solicitó.
             </li>
           </ul>
           <p className="mt-3 text-xs text-slate-500">
