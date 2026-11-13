@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 
-def _flujo_completo(cliente) -> dict:
+def _flujo_completo(cliente, confirmar: bool = True) -> dict:
     r = cliente.post("/api/v1/asistente/chat", json={"mensaje": "Quiero crear un acta"})
     assert r.status_code == 200, r.text
     d = r.json()
@@ -54,6 +54,17 @@ def _flujo_completo(cliente) -> dict:
         assert r.status_code == 200, r.text
         ultimo = r.json()
         sesion = ultimo.get("sesion_id") or sesion
+    if ultimo and ultimo.get("confirmacion_creacion") and confirmar:
+        r = cliente.post(
+            "/api/v1/asistente/chat",
+            json={
+                "mensaje": "Confirmar y enviar a revisión",
+                "sesion_id": ultimo["sesion_id"],
+                "autor": "capturista_demo",
+            },
+        )
+        assert r.status_code == 200, r.text
+        ultimo = r.json()
     return ultimo
 
 
@@ -111,7 +122,64 @@ def test_catalogo_si_no_sabe_que_acta(cliente_autenticado):
     assert "ordinaria" in r.text.lower() or d.get("tipos_acta")
 
 
+def test_catalogo_inicial_breve_y_completo_solo_a_peticion(cliente_autenticado):
+    from app.services.flujo_creacion import TIPOS_GUIA
+
+    r = cliente_autenticado.post(
+        "/api/v1/asistente/chat", json={"mensaje": "Quiero un acta"}
+    )
+    assert r.status_code == 200, r.text
+    inicial = r.json()
+    assert inicial["intencion"] == "catalogo_tipos"
+    assert len(inicial["tipos_acta"]) == 4
+    assert inicial["catalogo_completo_disponible"] is True
+    assert len(inicial["respuesta"]) < 140
+
+    r = cliente_autenticado.post(
+        "/api/v1/asistente/chat",
+        json={
+            "mensaje": "Ver todos los tipos",
+            "sesion_id": inicial["sesion_id"],
+        },
+    )
+    assert r.status_code == 200, r.text
+    completo = r.json()
+    assert completo["catalogo_completo_disponible"] is False
+    assert len(completo["tipos_acta"]) == len(TIPOS_GUIA)
+    assert len(completo["respuesta"]) < 100
+
+
+def test_cancelar_con_puntuacion_no_repite_catalogo(cliente_autenticado):
+    inicio = cliente_autenticado.post(
+        "/api/v1/asistente/chat", json={"mensaje": "Quiero un acta"}
+    )
+    assert inicio.status_code == 200, inicio.text
+
+    cancelacion = cliente_autenticado.post(
+        "/api/v1/asistente/chat",
+        json={"mensaje": "Cancelar.", "sesion_id": inicio.json()["sesion_id"]},
+    )
+    assert cancelacion.status_code == 200, cancelacion.text
+    datos = cancelacion.json()
+    assert datos["intencion"] == "cancelar_creacion"
+    assert "cancelada" in datos["respuesta"].lower()
+    assert not datos.get("tipos_acta")
+    assert not datos.get("catalogo_completo_disponible", False)
+
+
+def test_cancelar_sin_sesion_no_muestra_catalogo(cliente_autenticado):
+    respuesta = cliente_autenticado.post(
+        "/api/v1/asistente/chat", json={"mensaje": "Cancelar"}
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    datos = respuesta.json()
+    assert datos["intencion"] == "cancelar_creacion"
+    assert not datos.get("tipos_acta")
+
+
 def test_creacion_guiada_envia_a_revision_sin_generar_pdf_final(cliente_capturista, sesion):
+    from app.models.acta import Acta
+
     cliente = cliente_capturista
     email = "capturista_demo@pgac.com"
     _asignar_empresa_demo(sesion)
@@ -122,6 +190,9 @@ def test_creacion_guiada_envia_a_revision_sin_generar_pdf_final(cliente_capturis
     assert control["folio"] and control["acta_id"]
     assert control["creado_por"] == email
     assert control["estado_flujo"] == "revision"
+    acta_guardada = sesion.get(Acta, control["acta_id"])
+    assert acta_guardada is not None
+    assert acta_guardada.empresa_codigo == "PGAC-EMPRESA-PRUEBA"
     assert not control.get("pdf_descarga"), "El PDF final requiere aprobación del Abogado"
     assert ultimo.get("texto_organizado"), "Debe devolver el texto organizado"
 
@@ -151,6 +222,50 @@ def test_creacion_guiada_envia_a_revision_sin_generar_pdf_final(cliente_capturis
         json=cambios,
     )
     assert actualizada.status_code == 409, actualizada.text
+
+
+def test_creacion_guiada_revisa_y_permite_corregir_antes_de_enviar(cliente_capturista, sesion):
+    from app.models.acta import Acta
+
+    cliente = cliente_capturista
+    _asignar_empresa_demo(sesion)
+    resumen = _flujo_completo(cliente, confirmar=False)
+
+    assert resumen["confirmacion_creacion"] is True
+    assert resumen["resumen_creacion"]["sociedad (razon social)"] == "Empresa de prueba, S.A. de C.V."
+    assert sesion.query(Acta).count() == 0
+
+    corregir = cliente.post(
+        "/api/v1/asistente/chat",
+        json={
+            "mensaje": "Cambiar la fecha",
+            "sesion_id": resumen["sesion_id"],
+        },
+    )
+    assert corregir.status_code == 200, corregir.text
+    assert corregir.json()["campo_solicitado"] == "fecha"
+
+    nueva_fecha = cliente.post(
+        "/api/v1/asistente/chat",
+        json={
+            "mensaje": "22 de marzo de 2026",
+            "sesion_id": resumen["sesion_id"],
+        },
+    )
+    assert nueva_fecha.status_code == 200, nueva_fecha.text
+    assert nueva_fecha.json()["confirmacion_creacion"] is True
+
+    enviada = cliente.post(
+        "/api/v1/asistente/chat",
+        json={
+            "mensaje": "Confirmar y enviar a revisión",
+            "sesion_id": resumen["sesion_id"],
+        },
+    )
+    assert enviada.status_code == 200, enviada.text
+    control = enviada.json()["control_acta"]
+    assert control["fecha_acta"] == "2026-03-22"
+    assert sesion.get(Acta, control["acta_id"]).fecha.isoformat() == "2026-03-22"
 
 
 def test_creacion_directa_con_tipo(cliente_autenticado, sesion):

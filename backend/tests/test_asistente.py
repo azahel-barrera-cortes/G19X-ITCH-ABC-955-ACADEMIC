@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
+
 
 def _sin_guardar(payload: dict) -> dict:
     return {k: v for k, v in payload.items() if k != "guardar"}
@@ -76,6 +78,44 @@ def test_resumen_general(cliente_autenticado, payload_acta):
     assert r.json()["resumen"]["total_actas"] >= 1
 
 
+def test_tiempos_reporta_atrasos_en_dias_habiles(cliente_autenticado, payload_acta, sesion):
+    from app.models.acta import Acta
+
+    actas = [
+        (_crear_acta(cliente_autenticado, payload_acta), 6),
+        (_crear_acta(cliente_autenticado, payload_acta), 5),
+    ]
+    hoy = datetime.now(timezone.utc).date()
+    for acta, edad_habil in actas:
+        inicio = hoy
+        dias_habiles_atras = edad_habil
+        while dias_habiles_atras:
+            inicio -= timedelta(days=1)
+            if inicio.weekday() < 5:
+                dias_habiles_atras -= 1
+        registro = sesion.get(Acta, acta["id"])
+        registro.estado_flujo = "revision"
+        registro.historial_revision = [{
+            "accion": "reenviar",
+            "estado_resultante": "revision",
+            "creado_en": datetime.combine(
+                inicio, datetime.min.time(), tzinfo=timezone.utc
+            ).isoformat(),
+        }]
+    sesion.commit()
+
+    respuesta = cliente_autenticado.post(
+        "/api/v1/asistente/chat",
+        json={"mensaje": "¿Qué actas llevan más de 5 días hábiles en revisión?"},
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    datos = respuesta.json()
+    assert datos["intencion"] == "tiempos"
+    assert actas[0][0]["folio"] in datos["respuesta"]
+    assert actas[1][0]["folio"] not in datos["respuesta"]
+    assert "6 días hábiles" in datos["respuesta"]
+
+
 def test_edicion_asistida_propone_cambios_sin_guardarlos(cliente_autenticado, payload_acta):
     cliente = cliente_autenticado
     acta = _crear_acta(cliente, payload_acta)
@@ -122,8 +162,9 @@ def test_chat_general_ofrece_abrir_edicion_asistida(cliente_autenticado, payload
 def test_capturista_no_cambia_estatus_por_chat(cliente_anonimo, cliente_autenticado, sesion, payload_acta):
     from app.core import security
     from app.models.usuario import Usuario
+    empresa_codigo = sesion.query(Usuario).filter_by(email="admin@pgac.com").one().codigo_empresa
     sesion.query(Usuario).filter(Usuario.email == "capturista@pgac.com").delete()
-    sesion.add(Usuario(email="capturista@pgac.com", nombre_completo="Usuario de Prueba", rol="capturista", password_hash=security.hash_password("secreto-1"), activo=True))
+    sesion.add(Usuario(email="capturista@pgac.com", nombre_completo="Usuario de Prueba", rol="capturista", password_hash=security.hash_password("secreto-1"), activo=True, empresa_codigo=empresa_codigo))
     sesion.commit()
     try:
         acta = _crear_acta(cliente_autenticado, payload_acta)
