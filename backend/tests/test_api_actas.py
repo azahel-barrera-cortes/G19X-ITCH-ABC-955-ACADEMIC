@@ -165,6 +165,7 @@ def test_flujo_revisor_abogado_y_correcciones_por_capturista(
         "revision": ("revision-flujo@pgac.com", "revisor"),
         "abogado": ("abogado-flujo@pgac.com", "abogado_responsable"),
     }
+    empresa_codigo = sesion.query(Usuario).filter_by(email="admin@pgac.com").one().codigo_empresa
     cabeceras = {}
     try:
         for clave, (email, rol) in usuarios.items():
@@ -176,6 +177,7 @@ def test_flujo_revisor_abogado_y_correcciones_por_capturista(
                     rol=rol,
                     password_hash=security.hash_password("clave-flujo-123"),
                     activo=True,
+                    empresa_codigo=empresa_codigo,
                 )
             )
         sesion.commit()

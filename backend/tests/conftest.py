@@ -69,6 +69,7 @@ def admin_token(cliente: TestClient) -> str:
                 rol="Administrador",
                 password_hash=security.hash_password("clave-segura-123"),
                 activo=True,
+                codigo_empresa="PGAC-TEST",
             )
         )
         base.commit()
