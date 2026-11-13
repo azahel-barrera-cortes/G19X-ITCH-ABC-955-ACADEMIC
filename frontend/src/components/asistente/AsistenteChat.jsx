@@ -13,6 +13,12 @@ const SUGERENCIAS = [
   'Estatus de PGAC-2026-0001',
   'Cuantas actas hay por estatus?',
 ]
+const SUGERENCIAS_EDICION = [
+  'Quiero cambiar la fecha',
+  'Quiero cambiar el lugar',
+  'Quiero cambiar al presidente',
+  'Quiero cambiar las observaciones',
+]
 
 function burbujaClase(origen) {
   return origen === 'usuario'
@@ -20,24 +26,40 @@ function burbujaClase(origen) {
     : 'mr-auto bg-white text-slate-700 ring-1 ring-inset ring-slate-200'
 }
 
-export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBorrador = null }) {
-  const [mensajes, setMensajes] = useState([
-    { origen: 'ia', texto: 'Hola, te acompaño a crear tu acta paso a paso. Dime «Quiero crear un acta» o «Qué tipos de acta hay?» y empezamos. Al final genero el texto organizado + PDF descargable con su control (folio, fecha, autor, caducidad, versión).' },
+export default function AsistenteChat({
+  modo = 'pagina',
+  titulo = null,
+  onUsarBorrador = null,
+  actaId = null,
+  modoEdicion = false,
+  onAplicarCambios = null,
+  onEditarActa = null,
+  onIrAMisActas = null,
+  datosAsistente = null,
+}) {
+  const [mensajes, setMensajes] = useState(() => [
+    {
+      origen: 'ia',
+      texto: modoEdicion
+        ? `Edición asistida del acta ${actaId}. Indícame qué campo quieres cambiar; el tipo de acta y la sociedad permanecen bloqueados.`
+        : 'Hola, te acompaño a crear tu acta paso a paso. Dime «Quiero crear un acta» o «Qué tipos de acta hay?» y empezamos. El borrador se envía al flujo de revisión; el PDF final se habilita después de la aprobación del Abogado.',
+    },
   ])
   const [entrada, setEntrada] = useState('')
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState(null)
-  const [ejemplos, setEjemplos] = useState(SUGERENCIAS)
+  const [ejemplos, setEjemplos] = useState(modoEdicion ? SUGERENCIAS_EDICION : SUGERENCIAS)
   const [sesionId, setSesionId] = useState(null)
   const [descargando, setDescargando] = useState(false)
   const finRef = useRef(null)
   const compacto = modo === 'compacto'
 
   useEffect(() => {
+    if (modoEdicion) return
     obtenerAyudaAsistente()
       .then((d) => { if (d?.sugerencias?.length) setEjemplos(d.sugerencias.slice(0, 6)) })
       .catch(() => {})
-  }, [])
+  }, [modoEdicion])
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -51,7 +73,11 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
     setMensajes((p) => [...p, { origen: 'usuario', texto }])
     setCargando(true)
     try {
-      const r = await chatearAsistente(texto, { sesionId })
+      const r = await chatearAsistente(texto, {
+        sesionId,
+        actaId: modoEdicion ? actaId : null,
+        modo: modoEdicion ? 'edicion' : 'general',
+      })
       if (r.sesion_id) setSesionId(r.sesion_id)
       // Sesión cerrada (acta generada o cancelada): libera para empezar otra.
       if (r.control_acta || r.intencion === 'cancelar_creacion') setSesionId(null)
@@ -63,6 +89,8 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
         tipoSociedad: r.tipo_sociedad || null,
         marcoNormativo: r.marco_normativo || null,
         actaId: r.acta_id || r.acta?.id || null,
+        camposEdicion: r.campos_edicion || null,
+        cambiosPropuestos: r.cambios_propuestos || null,
       }])
     } catch (fallo) {
       setError(await mensajeDeError(fallo))
@@ -91,6 +119,8 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
     if (a.accion === 'validar' && a.acta_id) { enviar(`Valida el acta ${a.acta_id}`); return }
     if (a.accion === 'versiones' && a.acta_id) { enviar(`Versiones del acta ${a.acta_id}`); return }
     if (a.accion === 'descargar_pdf' && a.acta_id) { descargar(a.acta_id); return }
+    if (a.accion === 'editar_acta' && a.acta_id) { onEditarActa?.(a.acta_id); return }
+    if (a.accion === 'ir_mis_actas') { onIrAMisActas?.(); return }
     if (a.accion === 'aprobar' && a.acta_id) { enviar(`Pasa el acta ${a.acta_id} a ${a.estatus || 'revision'}`) }
   }
 
@@ -102,11 +132,26 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-corporativo-100 text-corporativo-700 text-sm font-bold">IA</span>
             {titulo || 'Asistente IA de actas'}
           </h1>
-          <p className="text-sm text-slate-500">Te acompaña a crear el acta paso a paso, genera texto + PDF y lleva el control (folio, fecha, autor, caducidad, versión).</p>
+          <p className="text-sm text-slate-500">Te acompaña a crear el acta y la envía a revisión; el PDF final se habilita tras la aprobación legal.</p>
         </header>
       ) : null}
       {sesionId ? <Alerta tono="info" titulo={`Creación en curso · sesión ${sesionId}`}>Responde el dato pedido o escribe «cancelar» para empezar de nuevo.</Alerta> : null}
       {error ? <Alerta tono="error" titulo="Sin conexión al asistente">{error}</Alerta> : null}
+      {modoEdicion && datosAsistente?.respuestas?.length ? (
+        <details className="rounded-xl border border-corporativo-100 bg-white px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-semibold text-corporativo-700">
+            Respuestas originales guardadas por el asistente
+          </summary>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-slate-600">
+            {datosAsistente.respuestas.map((item, indice) => (
+              <li key={`${item.campo}-${indice}`}>
+                <span className="font-medium">{item.pregunta}</span>
+                <span className="block whitespace-pre-line">{item.respuesta}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
 
       {/* Contenedor principal con borde arcoíris animado */}
       <div className="relative rounded-3xl bg-white overflow-hidden">
@@ -160,6 +205,39 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
                         ))}
                       </ul>
                     ) : null}
+                    {m.camposEdicion?.length ? (
+                      <div className="mt-3">
+                        <p className="mb-2 text-xs font-semibold text-slate-600">Campos editables</p>
+                        <div className="flex flex-wrap gap-2">
+                          {m.camposEdicion.map((campo) => (
+                            <button
+                              key={campo.clave}
+                              type="button"
+                              disabled={cargando}
+                              onClick={() => enviar(campo.clave)}
+                              className="rounded-full border border-corporativo-200 bg-corporativo-50 px-3 py-1.5 text-xs font-medium text-corporativo-700 hover:bg-corporativo-100 disabled:opacity-50"
+                            >
+                              {campo.etiqueta}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {m.cambiosPropuestos && Object.keys(m.cambiosPropuestos).length && onAplicarCambios ? (
+                      <div className="mt-3">
+                        <Boton
+                          tamano="sm"
+                          variante="primario"
+                          disabled={cargando}
+                          onClick={() => onAplicarCambios({
+                            actaId: m.actaId || actaId,
+                            cambios: m.cambiosPropuestos,
+                          })}
+                        >
+                          Aplicar cambios al formulario
+                        </Boton>
+                      </div>
+                    ) : null}
                     {m.acta ? (
                       <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 border border-slate-100">
                         {m.acta.folio} · {m.acta.estatus} · v{m.acta.version}{m.acta.creado_por ? ` · por ${m.acta.creado_por}` : ''}
@@ -169,10 +247,14 @@ export default function AsistenteChat({ modo = 'pagina', titulo = null, onUsarBo
                       <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900 border border-emerald-100">
                         <p className="font-semibold mb-1">Control: {m.control.folio} · v{m.control.version}</p>
                         <p className="mb-1">Fecha: {m.control.fecha_acta} · Creada: {m.control.fecha_creacion || '—'} · Por: {m.control.creado_por || '—'}</p>
-                        <p className="mb-2">Caducidad: {m.control.fecha_caducidad || 'sin fecha'} ({m.control.estado_caducidad})</p>
-                        <Boton tamano="sm" variante="primario" cargando={descargando} onClick={() => descargar(m.actaId || m.control.acta_id, m.control.pdf_nombre)}>
-                          Descargar PDF ({m.control.pdf_paginas || '?'} págs.)
-                        </Boton>
+                        <p className="mb-2">Estado: {m.control.estado_flujo || 'En revisión'} · Caducidad: {m.control.fecha_caducidad || 'sin fecha'}</p>
+                        {m.control.estado_flujo === 'aprobada' ? (
+                          <Boton tamano="sm" variante="primario" cargando={descargando} onClick={() => descargar(m.actaId || m.control.acta_id)}>
+                            Descargar PDF final
+                          </Boton>
+                        ) : (
+                          <p>El PDF final estará disponible después de la aprobación del Abogado.</p>
+                        )}
                       </div>
                     ) : null}
                     {m.borrador && onUsarBorrador ? (

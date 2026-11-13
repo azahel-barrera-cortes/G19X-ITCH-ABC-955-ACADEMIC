@@ -7,7 +7,7 @@ actas y cambiar su estatus, por lo que no puede quedar abierto al público.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -29,6 +29,7 @@ class AsistenteChatRequest(BaseModel):
     acta_id: Optional[int] = Field(default=None, ge=1)
     sesion_id: Optional[str] = Field(default=None, max_length=32)
     autor: Optional[str] = Field(default=None, max_length=150)
+    modo: Literal["general", "edicion"] = "general"
 
 
 class AccionChat(BaseModel):
@@ -62,6 +63,8 @@ class AsistenteChatResponse(BaseModel):
     folio: Optional[str] = None
     pdf_descarga: Optional[str] = None
     texto_organizado: Optional[str] = None
+    campos_edicion: Optional[List[Dict[str, str]]] = None
+    cambios_propuestos: Optional[Dict[str, Any]] = None
 
 
 @router.post("/chat", response_model=AsistenteChatResponse, summary="Conversar con el asistente")
@@ -72,8 +75,10 @@ def chatear(
 ) -> AsistenteChatResponse:
     """Procesa un mensaje: creación guiada, validación, estatus y versiones."""
     administrador = (
-        obtener_administrador_empresa(db, _usuario.empresa_codigo)
-        if _usuario.empresa_codigo
+        obtener_administrador_empresa(
+            db, _usuario.empresa_codigo or _usuario.codigo_empresa
+        )
+        if (_usuario.empresa_codigo or _usuario.codigo_empresa)
         else None
     )
     empresa = None
@@ -88,7 +93,7 @@ def chatear(
         }
     resultado = motor.procesar_mensaje(
         db, payload.mensaje, payload.folio, payload.acta_id,
-        payload.sesion_id, usuario=_usuario, empresa=empresa,
+        payload.sesion_id, usuario=_usuario, empresa=empresa, modo=payload.modo,
     )
     return AsistenteChatResponse(**resultado)
 

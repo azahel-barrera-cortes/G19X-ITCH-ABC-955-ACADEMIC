@@ -8,7 +8,13 @@ import {
 import { fechaLarga, moneda } from '../../utils/formato.js'
 
 /** Paso 1 del formulario: empresa, fecha, hora y tipo de acta corporativa. */
-export default function PasoDatosGenerales({ estado, actualizarCampo, errores = {}, infoEmpresa = null }) {
+export default function PasoDatosGenerales({
+  estado,
+  actualizarCampo,
+  errores = {},
+  infoEmpresa = null,
+  bloquearIdentidad = false,
+}) {
   const tipoSeleccionado = TIPOS_ASAMBLEA.find((tipo) => tipo.valor === estado.tipo_asamblea)
   const tipoSociedadSeleccionado = TIPOS_SOCIEDAD.find((t) => t.valor === (estado.tipo_sociedad || (infoEmpresa?.tipo_sociedad || '')))
   const tipoSociedad = estado.tipo_sociedad || infoEmpresa?.tipo_sociedad || ''
@@ -17,7 +23,7 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
   const hayInfoGuardada = Boolean(
     infoEmpresa?.nombre_sociedad && infoEmpresa?.tipo_sociedad,
   )
-  const empresaAsignada = Boolean(infoEmpresa && hayInfoGuardada)
+  const empresaAsignada = Boolean(bloquearIdentidad || (infoEmpresa && hayInfoGuardada))
   const usaInfo = Boolean(infoEmpresa?.usar_info_empresa)
 
   return (
@@ -35,10 +41,10 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
             className="campo"
             value={estado.sociedad}
             onChange={(evento) => {
-              if (!usaInfo) actualizarCampo('sociedad', evento.target.value)
+              if (!usaInfo && !bloquearIdentidad) actualizarCampo('sociedad', evento.target.value)
             }}
             placeholder="Comercializadora del Norte, S.A. de C.V."
-            readOnly={usaInfo}
+            readOnly={usaInfo || bloquearIdentidad}
           />
         </Campo>
 
@@ -109,6 +115,7 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
             id="tipo_asamblea"
             className="campo"
             value={estado.tipo_asamblea}
+            disabled={bloquearIdentidad}
             onChange={(evento) => actualizarCampo('tipo_asamblea', evento.target.value)}
           >
             {actasDisponibles.map((tipo) => (
@@ -117,6 +124,11 @@ export default function PasoDatosGenerales({ estado, actualizarCampo, errores = 
               </option>
             ))}
           </select>
+          {bloquearIdentidad ? (
+            <p className="mt-1 text-xs text-slate-500">
+              El tipo de acta no se puede cambiar al editar un expediente existente.
+            </p>
+          ) : null}
         </Campo>
 
         <div className="md:col-span-2 rounded-xl border border-corporativo-100 bg-corporativo-50/50 p-4">

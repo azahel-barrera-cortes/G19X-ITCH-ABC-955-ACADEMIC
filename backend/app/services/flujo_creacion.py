@@ -90,6 +90,7 @@ def detectar_tipo_sociedad_en_texto(texto: str) -> Optional[str]:
 def crear_sesion(tipo=None) -> Dict[str, Any]:
  sid = uuid.uuid4().hex[:12]
  s = {"sesion_id": sid, "tipo_asamblea": tipo, "datos": {},
+      "respuestas": [],
       "etapa": "tipo" if not tipo else "datos",
       "creada_en": datetime.utcnow().isoformat()}
  _SESIONES[sid] = s
@@ -233,6 +234,11 @@ def construir_payload_desde_sesion(sesion: Dict[str, Any]) -> Dict[str, Any]:
       if clave not in {campo["clave"] for campo in CAMPOS_REQUERIDOS}
       and valor not in (None, "", [], {})
    },
+   "datos_asistente": {
+       "tipo_asamblea": tipo,
+       "datos": dict(datos),
+       "respuestas": list(sesion.get("respuestas") or []),
+    },
    "observaciones": (
        "Borrador creado con acompañamiento del asistente. "
        "Requiere revisión de abogado o notario antes de firma, protocolización o inscripción."

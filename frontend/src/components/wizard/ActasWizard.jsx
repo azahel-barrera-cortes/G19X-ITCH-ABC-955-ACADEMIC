@@ -9,8 +9,8 @@ import PasoRevision from './PasoRevision.jsx'
  * Contenedor del formulario por pasos (wizard).
  *
  * Orquesta la navegación —incluida la validación de cada paso— y delega la
- * captura en los componentes especializados. El paso final recibe las acciones
- * de redacción con IA y de exportación a PDF.
+ * captura en los componentes especializados. El paso final redacta y envía a
+ * revisión; la descarga final corresponde al Abogado después de aprobar.
  */
 export default function ActasWizard({
   pasos,
@@ -23,6 +23,7 @@ export default function ActasWizard({
   actualizarCampo,
   errores = {},
   infoEmpresa = null,
+  bloquearIdentidad = false,
   ...accionesRevision
 }) {
   const paso = pasos.find((item) => item.id === pasoActual) || pasos[0]
@@ -30,7 +31,13 @@ export default function ActasWizard({
 
   const contenido =
     paso.id === 1 ? (
-      <PasoDatosGenerales estado={estado} actualizarCampo={actualizarCampo} errores={errores} infoEmpresa={infoEmpresa} />
+      <PasoDatosGenerales
+        estado={estado}
+        actualizarCampo={actualizarCampo}
+        errores={errores}
+        infoEmpresa={infoEmpresa}
+        bloquearIdentidad={bloquearIdentidad}
+      />
     ) : paso.id === 2 ? (
       <PasoAsistentes
         estado={estado}
@@ -89,7 +96,7 @@ export default function ActasWizard({
             <Boton onClick={() => onCambiarPaso(paso.id + 1)}>Siguiente →</Boton>
           ) : (
             <span className="text-xs text-slate-500">
-              Genera el borrador, revisa la validación y descarga el PDF final.
+              Genera el borrador y envía el acta a revisión.
             </span>
           )}
         </footer>

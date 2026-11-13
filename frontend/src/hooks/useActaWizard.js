@@ -154,6 +154,33 @@ const textoONulo = (valor) => {
   return texto === '' ? null : texto
 }
 
+const normalizarFecha = (valor) => {
+  const texto = String(valor ?? '').trim()
+  if (!texto) return ''
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(texto)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+
+  const local = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(texto)
+  if (!local) return texto
+
+  const primero = Number(local[1])
+  const segundo = Number(local[2])
+  const anio = Number(local[3])
+  const dia = primero > 12 ? primero : segundo > 12 ? segundo : primero
+  const mes = primero > 12 ? segundo : segundo > 12 ? primero : segundo
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia))
+  if (
+    fecha.getUTCFullYear() !== anio ||
+    fecha.getUTCMonth() !== mes - 1 ||
+    fecha.getUTCDate() !== dia
+  ) {
+    return texto
+  }
+
+  return `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
 const numeroONulo = (valor) => {
   const texto = String(valor ?? '').trim()
   if (texto === '') return null
@@ -166,17 +193,17 @@ const numeroOCero = (valor) => {
   return Number.isFinite(convertido) ? convertido : 0
 }
 
-/** Construye el cuerpo JSON que espera ``POST /actas/generar-pdf``. */
+/** Construye el cuerpo común para redactar y guardar un acta. */
 export function construirPayload(estado) {
   return {
     sociedad: String(estado.sociedad || '').trim(),
     rfc_sociedad: textoONulo(estado.rfc_sociedad),
     tipo_asamblea: estado.tipo_asamblea,
     titulo: textoONulo(estado.titulo),
-    fecha: estado.fecha,
+    fecha: normalizarFecha(estado.fecha),
     hora: estado.hora ? String(estado.hora).slice(0, 5) : null,
     lugar: String(estado.lugar || '').trim(),
-    convocatoria_fecha: textoONulo(estado.convocatoria_fecha),
+    convocatoria_fecha: textoONulo(normalizarFecha(estado.convocatoria_fecha)),
     convocatoria_medio: textoONulo(estado.convocatoria_medio),
     convocatoria_quien: textoONulo(estado.convocatoria_quien),
     /** Información de la empresa / sociedad (sección lateral independiente). */
@@ -261,10 +288,10 @@ export function estadoDesdeActa(acta) {
     rfc_sociedad: acta.rfc_sociedad || '',
     tipo_asamblea: acta.tipo_asamblea || base.tipo_asamblea,
     titulo: acta.titulo || '',
-    fecha: acta.fecha || base.fecha,
+    fecha: normalizarFecha(acta.fecha) || base.fecha,
     hora: acta.hora ? String(acta.hora).slice(0, 5) : base.hora,
     lugar: acta.lugar || '',
-    convocatoria_fecha: acta.convocatoria_fecha || '',
+    convocatoria_fecha: normalizarFecha(acta.convocatoria_fecha),
     convocatoria_medio: acta.convocatoria_medio || '',
     convocatoria_quien: acta.convocatoria_quien || '',
     tipo_sociedad: acta.tipo_sociedad || '',

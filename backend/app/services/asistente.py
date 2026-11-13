@@ -6,8 +6,8 @@ determinista. Lee el estatus real desde la BD, nunca lo inventa.
 
 Además acompaña la CREACIÓN guiada del acta: si el usuario pide un acta en
 específico le pide los datos necesarios; si no sabe qué acta crear le ofrece
-el catálogo con descripciones; al completar genera texto organizado + PDF
-descargable y devuelve el control (folio, fecha, autor, caducidad, versión).
+el catálogo con descripciones; al completar envía el borrador a revisión y
+devuelve el control (folio, fecha, autor, caducidad y versión).
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import logging
 import re
 import unicodedata
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -33,8 +34,9 @@ from app.schemas.acta import ActaGenerarPdfRequest
 from app.services import administracion, plantillas_legales
 from app.services.acta_service import (
     actualizar_estatus,
-    generar_pdf,
+    crear_acta,
     obtener_acta,
+    redactar,
     validar_acta_almacenada,
 )
 from app.services.flujo_creacion import (
@@ -72,7 +74,8 @@ PALABRAS_TEMA = (
     "restaurar", "historial", "hallazgo", "puntaje", "estado", "ayuda",
     "crear", "crea", "generar", "genera", "nueva", "nuevo", "necesito",
     "quiero", "elaborar", "hazme", "cual", "cuales", "tipos", "opciones",
-    "elegir", "escoger", "pdf", "descargar", "descarga", "cancelar",
+    "elegir", "escoger", "editar", "modificar", "pdf", "descargar",
+    "descarga", "cancelar",
 )
 
 PALABRAS_FUERA = (
@@ -123,6 +126,10 @@ def detectar_intencion(mensaje: str) -> str:
     n = _norm(mensaje or "")
     if any(k in n for k in ("restaurar", "recuperar version", "volver a la version")):
         return "restaurar"
+    if any(k in n for k in ("editar", "modificar", "modifica", "cambiar", "cambia")) and (
+        extraer_folio(mensaje) or extraer_id(mensaje)
+    ):
+        return "editar"
     if any(k in n for k in ("cancelar", "olvida", "empezar de nuevo", "reiniciar")):
         return "cancelar_creacion"
     if any(k in n for k in ("que tipos hay", "que actas hay", "cuales actas",
@@ -267,38 +274,49 @@ def _respuesta_sesion(sesion, texto, faltante_extra=None):
 def _cerrar_y_generar(db, sesion, autor):
     try:
         payload_dict = construir_payload_desde_sesion(sesion)
+        payload_dict["datos_asistente"] = {
+            "tipo_asamblea": sesion.get("tipo_asamblea"),
+            "datos": dict(sesion.get("datos") or {}),
+            "respuestas": list(sesion.get("respuestas") or []),
+        }
         payload_dict["creado_por"] = (autor or "asistente").strip()[:150] or "asistente"
+        payload_dict["estatus"] = EstatusActa.EN_REVISION.value
         solicitud = ActaGenerarPdfRequest(**payload_dict)
-        pdf_bytes, metadatos = generar_pdf(solicitud, db)
-        acta = _buscar(db, metadatos.get("folio"), metadatos.get("acta_id"))
+        borrador = redactar(solicitud)
+        acta = crear_acta(db, solicitud, borrador)
+        acta.estado_flujo = "revision"
+        db.commit()
+        db.refresh(acta)
         reiniciar_sesion(sesion.get("sesion_id"))
-        pdf_url = ("/api/v1/actas/%s/pdf" % metadatos.get("acta_id")) if metadatos.get("acta_id") else None
-        control = {"folio": metadatos.get("folio"), "acta_id": metadatos.get("acta_id"),
-            "version": metadatos.get("version", 1),
+        control = {"folio": acta.folio, "acta_id": acta.id,
+            "version": acta.version,
             "fecha_acta": payload_dict.get("fecha"),
-            "fecha_creacion": acta.created_at.isoformat() if acta is not None and getattr(acta, "created_at", None) else None,
+            "fecha_creacion": acta.created_at.isoformat() if getattr(acta, "created_at", None) else None,
             "creado_por": payload_dict.get("creado_por"),
-            "fecha_caducidad": acta.fecha_caducidad.isoformat() if acta is not None and getattr(acta, "fecha_caducidad", None) else None,
-            "estado_caducidad": acta.estado_caducidad if acta is not None else "sin_fecha",
-            "pdf_descarga": pdf_url, "pdf_nombre": metadatos.get("nombre_archivo"),
-            "pdf_paginas": metadatos.get("paginas")}
-        texto_org = str(getattr(acta, "texto_legal", "") or "")[:4000] if acta is not None else ""
+            "fecha_caducidad": acta.fecha_caducidad.isoformat() if acta.fecha_caducidad else None,
+            "estado_caducidad": acta.estado_caducidad,
+            "estado_flujo": acta.estado_flujo}
+        texto_org = str(acta.texto_legal or "")[:4000]
         tipo_txt = etiqueta_tipo_asamblea(payload_dict.get("tipo_asamblea") or "")
-        respuesta = ("Acta %s generada!\nCONTROL: folio %s | fecha %s | creada %s | por %s | "
-                     "caducidad %s (%s) | v%s | PDF %s (%s pags) -> GET %s\n\nTEXTO:\n%s\n\n"
-                     "AVISO: este documento es un borrador de apoyo y debe ser revisado por "
-                     "un abogado o notario antes de firmarse, protocolizarse o inscribirse."
-                     % (tipo_txt, control["folio"], control["fecha_acta"], control["fecha_creacion"],
-                        control["creado_por"], control["fecha_caducidad"] or "sin fecha",
-                        control["estado_caducidad"], control["version"],
-                        control["pdf_nombre"], control["pdf_paginas"], pdf_url, texto_org))
+        respuesta = (
+            "Acta %s creada y enviada a revisión.\nCONTROL: folio %s | fecha %s | "
+            "creada %s | por %s | v%s | estado: En revisión\n\nTEXTO:\n%s\n\n"
+            "El PDF final estará disponible después de la aprobación del Abogado."
+            % (
+                tipo_txt,
+                control["folio"],
+                control["fecha_acta"],
+                control["fecha_creacion"],
+                control["creado_por"],
+                control["version"],
+                texto_org,
+            )
+        )
         return {"respuesta": respuesta, "intencion": "crear", "tema_valido": True,
-                "acta": _dato_acta(acta) if acta is not None else None,
+                "acta": _dato_acta(acta),
                 "control_acta": control, "acta_id": control["acta_id"],
-                "folio": control["folio"], "pdf_descarga": pdf_url,
-                "texto_organizado": texto_org,
-                "acciones": ([{"etiqueta": "Descargar PDF", "accion": "descargar_pdf",
-                               "acta_id": control["acta_id"]}] if control["acta_id"] else [])}
+                "folio": control["folio"], "texto_organizado": texto_org,
+                "acciones": [{"etiqueta": "Ver actas", "accion": "ir_mis_actas"}]}
     except Exception as exc:
         logger.exception("Fallo generar acta desde asistente")
         falt = siguiente_faltante(sesion)
@@ -337,6 +355,176 @@ def _extraer_monto_texto(mensaje: str) -> Optional[str]:
         return formato.moneda(float(crudo))
     except (ValueError, TypeError):
         return None
+
+
+_CAMPOS_EDICION = [
+    {"clave": "titulo", "etiqueta": "Título", "tipo": "texto",
+     "alias": ("titulo", "nombre del acta")},
+    {"clave": "fecha", "etiqueta": "Fecha de celebración", "tipo": "fecha",
+     "alias": ("fecha", "dia de la asamblea")},
+    {"clave": "hora", "etiqueta": "Hora", "tipo": "hora",
+     "alias": ("hora",)},
+    {"clave": "lugar", "etiqueta": "Lugar", "tipo": "texto",
+     "alias": ("lugar", "domicilio")},
+    {"clave": "rfc_sociedad", "etiqueta": "RFC de la sociedad", "tipo": "texto",
+     "alias": ("rfc",)},
+    {"clave": "convocatoria_fecha", "etiqueta": "Fecha de convocatoria", "tipo": "fecha",
+     "alias": ("convocatoria", "fecha de convocatoria")},
+    {"clave": "convocatoria_medio", "etiqueta": "Medio de convocatoria", "tipo": "texto",
+     "alias": ("medio de convocatoria",)},
+    {"clave": "convocatoria_quien", "etiqueta": "Responsable de la convocatoria", "tipo": "texto",
+     "alias": ("responsable de la convocatoria", "quien convoco")},
+    {"clave": "capital_social", "etiqueta": "Capital social", "tipo": "numero",
+     "alias": ("capital social",)},
+    {"clave": "acciones_totales", "etiqueta": "Acciones totales", "tipo": "numero",
+     "alias": ("acciones totales", "total de acciones")},
+    {"clave": "capital_presente", "etiqueta": "Capital presente", "tipo": "numero",
+     "alias": ("capital presente",)},
+    {"clave": "quorum_porcentaje", "etiqueta": "Porcentaje de quórum", "tipo": "numero",
+     "alias": ("quorum", "porcentaje de quorum")},
+    {"clave": "presidente", "etiqueta": "Presidente", "tipo": "texto",
+     "alias": ("presidente",)},
+    {"clave": "secretario", "etiqueta": "Secretario", "tipo": "texto",
+     "alias": ("secretario",)},
+    {"clave": "observaciones", "etiqueta": "Observaciones", "tipo": "texto",
+     "alias": ("observaciones",)},
+]
+_SESIONES_EDICION: Dict[str, Dict[str, Any]] = {}
+
+
+def _opciones_edicion(acta: Acta) -> List[Dict[str, str]]:
+    opciones = [
+        {"clave": campo["clave"], "etiqueta": campo["etiqueta"]}
+        for campo in _CAMPOS_EDICION
+    ]
+    for clave, valor in (acta.datos_especificos or {}).items():
+        if isinstance(valor, (str, int, float, bool)):
+            opciones.append({
+                "clave": "datos_especificos." + str(clave),
+                "etiqueta": str(clave).replace("_", " ").capitalize(),
+            })
+    return opciones
+
+
+def _resolver_campo_edicion(texto: str, acta: Acta) -> Optional[str]:
+    valor = _norm(texto).strip()
+    opciones = _opciones_edicion(acta)
+    for opcion in opciones:
+        if valor == _norm(opcion["clave"]) or valor == _norm(opcion["etiqueta"]):
+            return opcion["clave"]
+    for campo in sorted(_CAMPOS_EDICION, key=lambda item: len(item["clave"]), reverse=True):
+        if any(_norm(alias) in valor for alias in campo["alias"]):
+            return campo["clave"]
+    for opcion in opciones:
+        if opcion["clave"].startswith("datos_especificos.") and _norm(opcion["etiqueta"]) in valor:
+            return opcion["clave"]
+    return None
+
+
+def _cambio_edicion(campo: str, texto: str) -> tuple[Optional[Any], Optional[str]]:
+    valor = texto.strip()
+    if not valor:
+        return None, "Escribe el nuevo valor para continuar."
+    definicion = next((item for item in _CAMPOS_EDICION if item["clave"] == campo), None)
+    tipo = definicion["tipo"] if definicion else "texto"
+    if tipo == "fecha":
+        fecha = extraer_datos(valor, "fecha").get("fecha")
+        if fecha is None:
+            return None, "No reconocí la fecha. Indícala, por ejemplo, como 15 de marzo de 2026."
+        return fecha, None
+    if tipo == "hora":
+        coincidencia = re.search(r"\b([01]?\d|2[0-3]):([0-5]\d)\b", valor)
+        if coincidencia is None:
+            return None, "Indica la hora con formato HH:MM, por ejemplo 10:30."
+        return f"{int(coincidencia.group(1)):02d}:{coincidencia.group(2)}", None
+    if tipo == "numero":
+        coincidencia = re.search(r"-?\d[\d,]*(?:\.\d+)?", valor)
+        if coincidencia is None:
+            return None, "Indica un valor numérico."
+        try:
+            return float(coincidencia.group(0).replace(",", "")), None
+        except ValueError:
+            return None, "No pude interpretar ese valor numérico."
+    return valor, None
+
+
+def _respuesta_edicion(sesion: Dict[str, Any], texto: str) -> Dict[str, Any]:
+    acta = sesion["acta"]
+    campo_actual = sesion.get("campo_actual")
+    cambios = sesion["cambios"]
+    if campo_actual:
+        valor, error = _cambio_edicion(campo_actual, texto)
+        if error:
+            respuesta = error
+        else:
+            if campo_actual.startswith("datos_especificos."):
+                clave = campo_actual.split(".", 1)[1]
+                cambios.setdefault("datos_especificos", dict(acta.datos_especificos or {}))
+                cambios["datos_especificos"][clave] = valor
+            else:
+                cambios[campo_actual] = valor
+            sesion["campo_actual"] = None
+            etiqueta = next(
+                (item["etiqueta"] for item in _opciones_edicion(acta)
+                 if item["clave"] == campo_actual),
+                campo_actual,
+            )
+            respuesta = (
+                f"Preparé el cambio de «{etiqueta}». Puedes elegir otro campo o aplicar "
+                "los cambios al formulario para revisarlos y guardar una nueva versión."
+            )
+    else:
+        if texto.strip() and texto.strip().lower() not in ("iniciar", "comenzar", "editar"):
+            campo = _resolver_campo_edicion(texto, acta)
+            if campo:
+                sesion["campo_actual"] = campo
+                etiqueta = next(
+                    (item["etiqueta"] for item in _opciones_edicion(acta)
+                     if item["clave"] == campo),
+                    campo,
+                )
+                respuesta = f"¿Cuál es el nuevo valor de «{etiqueta}»?"
+            elif any(palabra in _norm(texto) for palabra in ("sociedad", "tipo de acta", "tipo asamblea")):
+                respuesta = "El tipo de acta y la sociedad no se pueden cambiar. Elige otro campo de la lista."
+            else:
+                respuesta = "Elige un campo de la lista para indicarme qué deseas modificar."
+        else:
+            respuesta = "¿Qué campo deseas modificar? El tipo de acta y la sociedad permanecen bloqueados."
+
+    return {
+        "respuesta": respuesta,
+        "intencion": "editar",
+        "tema_valido": True,
+        "sesion_id": sesion["sesion_id"],
+        "acta_id": acta.id,
+        "campo_solicitado": sesion.get("campo_actual"),
+        "campos_edicion": _opciones_edicion(acta) if not sesion.get("campo_actual") else [],
+        "cambios_propuestos": cambios,
+    }
+
+
+def _procesar_edicion(db: Session, mensaje: str, acta_id: Optional[int],
+                      sesion_id: Optional[str]) -> Dict[str, Any]:
+    sesion = _SESIONES_EDICION.get(sesion_id) if sesion_id else None
+    if sesion and acta_id and sesion["acta"].id != acta_id:
+        sesion = None
+    if sesion is None:
+        acta = _buscar(db, None, acta_id)
+        if acta is None:
+            return {
+                "respuesta": "No encontré el acta para editar. Verifica su identificador.",
+                "intencion": "editar",
+                "tema_valido": True,
+            }
+        sesion_id = uuid4().hex[:12]
+        sesion = {
+            "sesion_id": sesion_id,
+            "acta": acta,
+            "campo_actual": None,
+            "cambios": {},
+        }
+        _SESIONES_EDICION[sesion_id] = sesion
+    return _respuesta_edicion(sesion, mensaje)
 
 
 def _redactar_libre(mensaje: str) -> Dict[str, Any]:
@@ -384,6 +572,11 @@ def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
             if elegido:
                 ses["tipo_asamblea"] = elegido
                 ses["etapa"] = "datos"
+                ses.setdefault("respuestas", []).append({
+                    "campo": "tipo_asamblea",
+                    "pregunta": "¿Qué tipo de acta quieres crear?",
+                    "respuesta": texto,
+                })
                 etiqueta = etiqueta_tipo_asamblea(elegido)
                 falt = siguiente_faltante(ses)
                 return _respuesta_sesion(ses, "Perfecto, creamos %s paso a paso.\n\n%s"
@@ -409,6 +602,11 @@ def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
                         falt,
                     )
                 ses["datos"].update(nuevos)
+                ses.setdefault("respuestas", []).append({
+                    "campo": falt["clave"],
+                    "pregunta": falt["pregunta"],
+                    "respuesta": texto,
+                })
                 falt2 = siguiente_faltante(ses)
                 if falt2 is None:
                     return _cerrar_y_generar(db, ses, autor)
@@ -430,6 +628,11 @@ def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
                 "intencion": "catalogo_tipos", "tema_valido": True,
                 "sesion_id": ses2["sesion_id"], "tipos_acta": TIPOS_GUIA}
     ses3 = crear_sesion(tipo or "ordinaria")
+    ses3.setdefault("respuestas", []).append({
+        "campo": "tipo_asamblea",
+        "pregunta": "¿Qué tipo de acta quieres crear?",
+        "respuesta": texto,
+    })
     if empresa and empresa.get("usar_info_empresa"):
         ses3["datos"].update({
             clave: valor for clave, valor in empresa.items() if valor not in (None, "")
@@ -442,8 +645,11 @@ def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
 
 def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                       acta_id: Optional[int] = None, sesion_id: Optional[str] = None,
-                      autor: Optional[str] = None, usuario=None, empresa=None) -> Dict[str, Any]:
+                      autor: Optional[str] = None, usuario=None, empresa=None,
+                      modo: str = "general") -> Dict[str, Any]:
     texto = (mensaje or "").strip()
+    if modo == "edicion":
+        return _procesar_edicion(db, texto, acta_id, sesion_id)
     if empresa is None and detectar_intencion(texto) == "crear":
         return {
             "respuesta": "No se ha asignado empresa",
@@ -465,7 +671,8 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                 reiniciar_sesion(sesion_id)
             return {"respuesta": "Creación cancelada. Dime «Quiero crear un acta» cuando quieras empezar.",
                     "intencion": "cancelar_creacion", "tema_valido": True}
-        return _flujo_creacion(db, texto, sesion_id, autor, empresa)
+        autor_efectivo = (usuario.email if usuario is not None else None) or autor
+        return _flujo_creacion(db, texto, sesion_id, autor_efectivo, empresa)
     fol = folio or extraer_folio(texto)
     aid = acta_id if acta_id is not None else extraer_id(texto)
     if inten == "ayuda":
@@ -507,6 +714,21 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                 "intencion": inten, "tema_valido": True, "requiere_acta": True,
                 "acciones": [{"etiqueta": "Ver resumen", "accion": "resumen"}]}
     dato = _dato_acta(acta)
+    if inten == "editar":
+        return {
+            "respuesta": (
+                f"Encontré {acta.folio}. Al abrir el editor podrás revisar los datos originales "
+                "recopilados por el asistente y pedirle cambios antes de guardar una nueva versión."
+            ),
+            "intencion": "editar",
+            "tema_valido": True,
+            "acta": dato,
+            "acciones": [{
+                "etiqueta": "Abrir edición asistida",
+                "accion": "editar_acta",
+                "acta_id": acta.id,
+            }],
+        }
     if inten == "estatus":
         resp = ("El acta " + _linea(acta) + ". Titulo: "
                 + str(acta.titulo or "(sin titulo)") + ". Acuerdos: "
@@ -529,6 +751,16 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                 "acta": _dato_acta(acta), "validacion": val.model_dump(mode="json"),
                 "acciones": [{"etiqueta": "Versiones", "accion": "versiones", "acta_id": acta.id}]}
     if inten == "aprobar":
+        if not (
+            usuario is not None
+            and security.tiene_nivel_minimo(usuario.rol, "abogado_responsable")
+        ):
+            return {
+                "respuesta": "Tu rol no permite cambiar el estatus de actas.",
+                "intencion": "aprobar",
+                "tema_valido": True,
+                "acta": _dato_acta(acta),
+            }
         destino = extraer_estatus_destino(texto)
         origen = str(getattr(acta.estatus, "value", acta.estatus))
         if destino is None:
@@ -538,6 +770,47 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                     "intencion": "aprobar", "tema_valido": True, "acta": dato,
                     "acciones": [{"etiqueta": "Pasar a revision", "accion": "aprobar",
                                   "acta_id": acta.id, "estatus": "en_revision"}]}
+        if destino == "en_revision" and acta.estado_flujo == "revision":
+            return {
+                "respuesta": f"El acta {acta.folio} ya está en la bandeja del Revisor.",
+                "intencion": "aprobar",
+                "tema_valido": True,
+                "acta": dato,
+            }
+        if destino in ("en_revision", "aprobada", "borrador"):
+            if destino == "aprobada":
+                val = validar_acta_almacenada(db, acta.id)
+                criticos = [h for h in val.hallazgos if str(h.severidad) == "critico"]
+                if criticos:
+                    return {
+                        "respuesta": (
+                            "No puedo aprobar esta acta: tiene hallazgos críticos. "
+                            + "; ".join(h.mensaje for h in criticos)[:400]
+                        ),
+                        "intencion": "aprobar",
+                        "tema_valido": True,
+                        "acta": _dato_acta(acta),
+                        "validacion": val.model_dump(mode="json"),
+                    }
+            return {
+                "respuesta": (
+                    "Las decisiones de revisión y aprobación deben hacerse desde las bandejas "
+                    "«Revisión de actas» o «Aprobación de actas» para conservar el flujo y la bitácora."
+                ),
+                "intencion": "aprobar",
+                "tema_valido": True,
+                "acta": dato,
+            }
+        if acta.estado_flujo != "aprobada":
+            return {
+                "respuesta": (
+                    "El PDF y los cambios de cierre solo están disponibles después de la "
+                    "aprobación final del Abogado."
+                ),
+                "intencion": "aprobar",
+                "tema_valido": True,
+                "acta": dato,
+            }
         if not _puede_avanzar(origen, destino):
             return {"respuesta": ("No puedo retroceder %s de %s a %s. El flujo solo avanza: %s."
                                   % (acta.folio, origen, destino, " > ".join(ORDEN_ESTATUS))),
@@ -551,9 +824,6 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                                       "Corrige: %s" % (acta.folio, destino, len(crit), det)),
                         "intencion": "aprobar", "tema_valido": True,
                         "acta": _dato_acta(acta), "validacion": val.model_dump(mode="json")}
-        if not (usuario is not None and security.tiene_nivel_minimo(usuario.rol, "abogado_responsable")):
-            return {"respuesta": "Tu rol no permite cambiar el estatus de actas.",
-                    "intencion": "aprobar", "tema_valido": True, "acta": _dato_acta(acta)}
         acta2 = actualizar_estatus(db, acta.id, destino)
         administracion.registrar_version(db, acta2, "Estatus a %s desde asistente" % destino)
         db.commit()

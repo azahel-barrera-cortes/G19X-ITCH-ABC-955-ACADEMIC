@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Alerta from '../components/ui/Alerta.jsx'
+import AsistenteChat from '../components/asistente/AsistenteChat.jsx'
 import Boton from '../components/ui/Boton.jsx'
 import ActasWizard from '../components/wizard/ActasWizard.jsx'
 import {
@@ -15,56 +16,66 @@ import {
   TIPOS_SOCIEDAD,
 } from '../constants/catalogos.js'
 import {
-  generarPdf,
+  actualizarActa,
+  crearActa,
+  reenviarActa,
   mensajeDeError,
   redactarActa,
   redactarEnVivo,
 } from '../api/client.js'
-import { descargarBlob } from '../utils/archivos.js'
 
-const PASOS_A_EXPORTAR = [1, 2, 3]
+const PASOS_A_VALIDAR = [1, 2, 3]
 
-/**
- * Arma el cuerpo de ``POST /actas/generar-pdf``.
- *
- * Si ya existe un borrador revisado por el usuario se envía con
- * ``generar_clausulas: false`` para que el PDF reproduzca exactamente el texto
- * revisado (sin volver a redactarlo) y, si se edita un acta guardada, se pide al
- * backend que incremente la versión.
- */
-function payloadParaPdf(estado, borrador, actaInicial) {
-  const base = construirPayload(estado)
-  const extra = actaInicial?.id ? { actualizar_acta_id: actaInicial.id } : {}
-
-  if (!borrador) return { ...base, ...extra }
-
-  return {
-    ...base,
-    ...extra,
-    generar_clausulas: false,
-    acuerdos: (borrador.acuerdos || []).map((acuerdo, indice) => ({
-      ...acuerdo,
-      numero: indice + 1,
-    })),
-  }
-}
-
-/** Página «Generar acta»: formulario por pasos + borrador con IA + PDF final. */
-export default function GenerarActa({ actaInicial = null, plantillaTipo = null, infoEmpresa = null, onVolver = null, onCerrarEdicion = null }) {
+/** Página «Generar acta»: captura, redacción asistida y envío a revisión. */
+export default function GenerarActa({
+  actaInicial = null,
+  cambiosIniciales = null,
+  plantillaTipo = null,
+  infoEmpresa = null,
+  onVolver = null,
+  onCerrarEdicion = null,
+  onSolicitudEnviada = null,
+}) {
+  const actaParaFormulario = useMemo(() => {
+    if (!actaInicial) return null
+    const cambios = Object.fromEntries(
+      Object.entries(cambiosIniciales || {}).filter(
+        ([campo]) => !['sociedad', 'tipo_asamblea', 'tipo_sociedad'].includes(campo),
+      ),
+    )
+    if (cambios.datos_especificos) {
+      cambios.datos_especificos = {
+        ...(actaInicial.datos_especificos || {}),
+        ...cambios.datos_especificos,
+      }
+    }
+    return { ...actaInicial, ...cambios }
+  }, [actaInicial, cambiosIniciales])
   const { estado, despachar, actualizarCampo, actualizarCampos, reiniciar, cargarActa, calculos, pasos } =
-    useActaWizard(actaInicial ? estadoDesdeActa(actaInicial) : undefined)
+    useActaWizard(actaParaFormulario ? estadoDesdeActa(actaParaFormulario) : undefined)
+
+  const actualizarCampoWizard = useCallback((campo, valor) => {
+    setBorrador(null)
+    actualizarCampo(campo, valor)
+  }, [actualizarCampo])
+  const despacharWizard = useCallback((accion) => {
+    setBorrador(null)
+    despachar(accion)
+  }, [despachar])
 
   const [pasoActual, setPasoActual] = useState(1)
   const [errores, setErrores] = useState({})
   const [borrador, setBorrador] = useState(null)
-  const [metadatosPdf, setMetadatosPdf] = useState(null)
   const [advertencias, setAdvertencias] = useState([])
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [cargandoRedaccion, setCargandoRedaccion] = useState(false)
-  const [cargandoPdf, setCargandoPdf] = useState(false)
+  const [cargandoEnvio, setCargandoEnvio] = useState(false)
+  const [cargandoGuardar, setCargandoGuardar] = useState(false)
   const [redaccionEnVivo, setRedaccionEnVivo] = useState(null)
-  const empresaAsignada = Boolean(infoEmpresa?.nombre_sociedad && infoEmpresa?.tipo_sociedad)
+  const empresaAsignada = Boolean(
+    actaInicial || (infoEmpresa?.nombre_sociedad && infoEmpresa?.tipo_sociedad),
+  )
   const usaInfoEmpresa = Boolean(infoEmpresa?.usar_info_empresa)
   const contextoActa = useMemo(() => {
     const tipo = TIPOS_ASAMBLEA.find((item) => item.valor === estado.tipo_asamblea)
@@ -78,7 +89,7 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
   }, [estado.tipo_asamblea, estado.tipo_sociedad])
 
   useEffect(() => {
-    if (!empresaAsignada || !usaInfoEmpresa) return
+    if (actaInicial || !empresaAsignada || !usaInfoEmpresa) return
     actualizarCampos({
       sociedad: infoEmpresa.nombre_sociedad,
       rfc_sociedad: infoEmpresa.rfc_sociedad || '',
@@ -87,19 +98,18 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
       firma_electronica: Boolean(infoEmpresa.firma_electronica),
       usar_info_empresa: true,
     })
-  }, [actualizarCampos, empresaAsignada, infoEmpresa, usaInfoEmpresa])
+  }, [actaInicial, actualizarCampos, empresaAsignada, infoEmpresa, usaInfoEmpresa])
 
   // Cuando se elige un acta en la biblioteca, se carga en el formulario.
   useEffect(() => {
-    if (!actaInicial) return
-    cargarActa(actaInicial)
+    if (!actaParaFormulario) return
+    cargarActa(actaParaFormulario)
     setBorrador(null)
-    setMetadatosPdf(null)
     setAdvertencias([])
     setError(null)
     setErrores({})
     setPasoActual(1)
-  }, [actaInicial, cargarActa])
+  }, [actaParaFormulario, cargarActa])
 
   // Cuando se elige una plantilla en el panel, se precarga el tipo de asamblea.
   useEffect(() => {
@@ -107,7 +117,6 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
     reiniciar()
     actualizarCampo('tipo_asamblea', plantillaTipo)
     setBorrador(null)
-    setMetadatosPdf(null)
     setAdvertencias([])
     setError(null)
     setErrores({})
@@ -164,7 +173,6 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
       const respuesta = await redactarActa({ ...construirPayload(estado), guardar: false })
       setBorrador(respuesta)
       setAdvertencias(respuesta.advertencias || [])
-      setMetadatosPdf(null)
     } catch (fallo) {
       setError(mensajeDeError(fallo))
     } finally {
@@ -215,48 +223,133 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
     }
   }
 
-  /** «Descargar PDF final»: POST /actas/generar-pdf -> Blob + metadatos. */
-  const handleDescargarPdf = async () => {
+  /** Guarda el acta con sus cláusulas y la envía a la bandeja del Revisor. */
+  const handleEnviarRevision = async () => {
     if (!empresaAsignada) {
       setError('No se ha asignado empresa')
       return
     }
-    for (const numero of PASOS_A_EXPORTAR) {
+    for (const numero of PASOS_A_VALIDAR) {
       const fallos = validarPaso(numero, estado)
       if (Object.keys(fallos).length) {
         setErrores(fallos)
         setPasoActual(numero)
-        setError('Revisa los campos señalados antes de generar el PDF.')
+        setError('Revisa los campos señalados antes de enviar el acta a revisión.')
         return
       }
     }
 
-    setCargandoPdf(true)
+    setCargandoEnvio(true)
     setError(null)
     try {
-      const resultado = await generarPdf(payloadParaPdf(estado, borrador, actaInicial))
-      setMetadatosPdf(resultado)
-      setAdvertencias(resultado.advertencias ? [resultado.advertencias] : [])
-      descargarBlob(resultado.blob, resultado.nombreArchivo)
-      setAviso(`PDF descargado: ${resultado.nombreArchivo}`)
+      const base = construirPayload(estado)
+      const payload = {
+        ...base,
+        estatus: 'en_revision',
+        generar_clausulas: !borrador,
+        ...(borrador
+          ? {
+              acuerdos: (borrador.acuerdos || []).map((acuerdo, indice) => ({
+                ...acuerdo,
+                numero: indice + 1,
+              })),
+            }
+          : {}),
+      }
+      const creada = await crearActa(payload)
+      setAviso(`${creada.folio} fue enviado a revisión como versión ${creada.version}.`)
+      onSolicitudEnviada?.(creada)
     } catch (fallo) {
       setError(await mensajeDeError(fallo))
     } finally {
-      setCargandoPdf(false)
+      setCargandoEnvio(false)
     }
+  }
+
+  const handleGuardarBorrador = async () => {
+    if (!actaInicial?.id) return
+    for (const numero of PASOS_A_VALIDAR) {
+      const fallos = validarPaso(numero, estado)
+      if (Object.keys(fallos).length) {
+        setErrores(fallos)
+        setPasoActual(numero)
+        setError('Revisa los campos señalados antes de guardar el borrador.')
+        return
+      }
+    }
+
+    setCargandoGuardar(true)
+    setError(null)
+    try {
+      const payload = construirPayload(estado)
+      const ultimaDevolucion = [...(actaInicial.historial_revision || [])]
+        .reverse()
+        .find((evento) => evento.accion === 'devolver')
+      const etapaDevolucion = ultimaDevolucion?.etapa === 'abogado' ? 'Abogado' : 'Revisor'
+      const actualizada = await actualizarActa(actaInicial.id, {
+        ...payload,
+        ...(borrador?.acuerdos?.length
+          ? {
+              acuerdos: borrador.acuerdos.map((acuerdo, indice) => ({
+                ...acuerdo,
+                numero: indice + 1,
+              })),
+            }
+          : {}),
+        estatus: 'borrador',
+        regenerar_con_ia: false,
+        motivo_cambio:
+          actaInicial.estado_flujo === 'con_errores'
+            ? `Corrección solicitada por el ${etapaDevolucion}`
+            : 'Edición del borrador',
+      })
+      if (actaInicial.estado_flujo === 'con_errores') {
+        const reenviada = await reenviarActa(actaInicial.id)
+        const etapa = reenviada.estado_flujo === 'abogado' ? 'directamente al Abogado' : 'al Revisor'
+        setAviso(`${reenviada.folio} fue corregida y enviada ${etapa} como versión ${reenviada.version}.`)
+      } else {
+        setAviso(`Borrador guardado como versión ${actualizada.version}.`)
+      }
+      onCerrarEdicion?.(actaInicial.id)
+    } catch (fallo) {
+      setError(await mensajeDeError(fallo))
+    } finally {
+      setCargandoGuardar(false)
+    }
+  }
+
+  const aplicarCambiosAsistidos = ({ cambios }) => {
+    const cambiosFormulario = Object.fromEntries(
+      Object.entries(cambios || {}).map(([campo, valor]) => [
+        campo,
+        campo === 'datos_especificos'
+          ? { ...estado.datos_especificos, ...valor }
+          : typeof valor === 'number' ? String(valor) : valor,
+      ]),
+    )
+    actualizarCampos(cambiosFormulario)
+    setBorrador(null)
+    setAviso('Cambios del asistente aplicados al formulario. Revísalos antes de guardar la nueva versión.')
+  }
+
+  const handleCancelarEdicion = () => {
+    if (actaInicial && onCerrarEdicion) {
+      onCerrarEdicion()
+      return
+    }
+    onVolver?.()
   }
 
   /** Reinicia el formulario por completo y sale del modo edición. */
   const handleNuevaActa = () => {
     reiniciar()
     setBorrador(null)
-    setMetadatosPdf(null)
     setAdvertencias([])
     setErrores({})
     setAviso(null)
     setError(null)
     setPasoActual(1)
-    if (onCerrarEdicion) onCerrarEdicion()
+    if (actaInicial && onCerrarEdicion) onCerrarEdicion()
   }
 
   return (
@@ -268,13 +361,14 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
               {actaInicial ? `Editando el acta ${actaInicial.folio}` : 'Generar acta corporativa'}
             </h1>
             <p className="text-sm text-slate-500">
-              Captura los datos en tres pasos; la plataforma redacta el cuerpo legal, valida su
-              consistencia y exporta el PDF formal listo para firma.
+              {actaInicial
+                ? 'Corrige las observaciones y guarda una nueva versión; se enviará al rol que solicitó los cambios.'
+                : 'Captura los datos en tres pasos y envía el acta a revisión. El PDF final se habilita después de la aprobación del Abogado.'}
             </p>
           </div>
           {onVolver ? (
-            <Boton variante="secundario" tamano="sm" onClick={onVolver}>
-              ← Volver al panel
+            <Boton variante="secundario" tamano="sm" onClick={handleCancelarEdicion}>
+              {actaInicial ? '← Volver a Mis actas' : '← Volver al panel'}
             </Boton>
           ) : null}
         </div>
@@ -312,8 +406,37 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
 
       {actaInicial ? (
         <Alerta tono="info" titulo="Modo edición">
-          Al exportar el PDF se guardará una nueva versión del acta {actaInicial.folio}.
+          Guardar los cambios emitirá una nueva versión del borrador {actaInicial.folio}. El tipo de
+          acta y la sociedad permanecen bloqueados.
         </Alerta>
+      ) : null}
+      {actaInicial?.estado_flujo === 'con_errores' && actaInicial.comentario_revision ? (
+        <Alerta tono="advertencia" titulo="Correcciones solicitadas por el Revisor o el Abogado">
+          {actaInicial.comentario_revision}
+        </Alerta>
+      ) : null}
+
+      {actaInicial ? (
+        <details className="tarjeta">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-corporativo-700">
+            Editar con el asistente IA
+          </summary>
+          <div className="border-t border-slate-200 px-5 py-4">
+            <p className="mb-3 text-sm text-slate-600">
+              Pide cambiar un campo y el asistente propondrá el nuevo valor. Después podrás
+              revisarlo en el formulario y guardar una nueva versión. Los asistentes, el orden del
+              día y los acuerdos se pueden modificar directamente en los pasos del formulario.
+            </p>
+            <AsistenteChat
+              modo="compacto"
+              titulo={`Editar ${actaInicial.folio}`}
+              actaId={actaInicial.id}
+              modoEdicion
+              datosAsistente={actaInicial.datos_asistente}
+              onAplicarCambios={aplicarCambiosAsistidos}
+            />
+          </div>
+        </details>
       ) : null}
 
       <ActasWizard
@@ -323,23 +446,27 @@ export default function GenerarActa({ actaInicial = null, plantillaTipo = null, 
         pasosCompletados={completados}
         estado={estado}
         calculos={calculos}
-        despachar={despachar}
-        actualizarCampo={actualizarCampo}
+        despachar={despacharWizard}
+        actualizarCampo={actualizarCampoWizard}
+        bloquearIdentidad={Boolean(actaInicial)}
         errores={errores}
         infoEmpresa={infoEmpresa}
         borrador={borrador}
         advertencias={advertencias}
-        metadatosPdf={metadatosPdf}
         aviso={aviso}
         redaccionEnVivo={redaccionEnVivo}
         cargandoRedaccion={cargandoRedaccion}
-        cargandoPdf={cargandoPdf}
+        cargandoEnvio={cargandoEnvio}
+        cargandoGuardar={cargandoGuardar}
         error={error}
         onRedactar={handleRedactar}
         onRedactarEnVivo={handleRedactarEnVivo}
-        onDescargarPdf={handleDescargarPdf}
+        onEnviarRevision={handleEnviarRevision}
+        onGuardarBorrador={handleGuardarBorrador}
+        onCancelarEdicion={handleCancelarEdicion}
         onNuevaActa={handleNuevaActa}
         actaId={actaInicial?.id || null}
+        esCorreccion={actaInicial?.estado_flujo === 'con_errores'}
       />
     </div>
   )

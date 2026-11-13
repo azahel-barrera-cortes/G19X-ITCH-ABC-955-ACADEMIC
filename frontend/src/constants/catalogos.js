@@ -78,6 +78,18 @@ export const ESTATUS_ACTA = [
   { valor: 'archivada', etiqueta: 'Archivada (cierre administrativo; no acredita protocolización)' },
 ]
 
+export const ESTADOS_FLUJO_ACTA = [
+  { valor: 'revision', etiqueta: 'En revisión' },
+  { valor: 'abogado', etiqueta: 'Revisada · Pendiente de Abogado' },
+  { valor: 'con_errores', etiqueta: 'Con errores' },
+  { valor: 'aprobada', etiqueta: 'Aprobada por Abogado' },
+  { valor: 'borrador', etiqueta: 'Borrador' },
+]
+
+export function etiquetaFlujoActa(estado) {
+  return ESTADOS_FLUJO_ACTA.find((item) => item.valor === estado)?.etiqueta || estado || 'Sin estado'
+}
+
 /** Tipos de sociedad mercantil (Ley General de Sociedades Mercantiles, México). */
 export const TIPOS_SOCIEDAD = [
   { valor: 'sociedad_anonima', etiqueta: 'Sociedad Anónima (S.A.)' },

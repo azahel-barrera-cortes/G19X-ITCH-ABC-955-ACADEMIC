@@ -75,6 +75,50 @@ def test_resumen_general(cliente_autenticado, payload_acta):
     assert r.json()["intencion"] == "resumen"
     assert r.json()["resumen"]["total_actas"] >= 1
 
+
+def test_edicion_asistida_propone_cambios_sin_guardarlos(cliente_autenticado, payload_acta):
+    cliente = cliente_autenticado
+    acta = _crear_acta(cliente, payload_acta)
+
+    r = cliente.post(
+        "/api/v1/asistente/chat",
+        json={
+            "mensaje": "Quiero cambiar el lugar",
+            "acta_id": acta["id"],
+            "modo": "edicion",
+        },
+    )
+    assert r.status_code == 200, r.text
+    inicio = r.json()
+    assert inicio["campo_solicitado"] == "lugar"
+
+    r = cliente.post(
+        "/api/v1/asistente/chat",
+        json={
+            "mensaje": "Av. Paseo de la Reforma 500, Ciudad de México",
+            "acta_id": acta["id"],
+            "sesion_id": inicio["sesion_id"],
+            "modo": "edicion",
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["cambios_propuestos"]["lugar"] == "Av. Paseo de la Reforma 500, Ciudad de México"
+    assert cliente.get(f"/api/v1/actas/{acta['id']}").json()["lugar"] == acta["lugar"]
+
+
+def test_chat_general_ofrece_abrir_edicion_asistida(cliente_autenticado, payload_acta):
+    cliente = cliente_autenticado
+    acta = _crear_acta(cliente, payload_acta)
+
+    respuesta = cliente.post(
+        "/api/v1/asistente/chat",
+        json={"mensaje": f"Quiero editar el acta {acta['id']}"},
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    accion = respuesta.json()["acciones"][0]
+    assert accion["accion"] == "editar_acta"
+    assert accion["acta_id"] == acta["id"]
+
 def test_capturista_no_cambia_estatus_por_chat(cliente_anonimo, cliente_autenticado, sesion, payload_acta):
     from app.core import security
     from app.models.usuario import Usuario

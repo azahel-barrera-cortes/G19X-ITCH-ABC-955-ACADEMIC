@@ -3,24 +3,15 @@ import Etiqueta from '../ui/Etiqueta.jsx'
 import Boton from '../ui/Boton.jsx'
 import PanelValidacion from '../actas/PanelValidacion.jsx'
 import VistaPreviaActa from '../actas/VistaPreviaActa.jsx'
-import { abrirBlob, descargarBlob } from '../../utils/archivos.js'
 import { fechaCorta, numero, porcentaje } from '../../utils/formato.js'
 
 const OPCIONES_DOCUMENTO = [
-  ['guardar', 'Guardar el acta en el historial'],
   ['generar_clausulas', 'Redactar cláusulas con IA / plantillas'],
   ['incluir_validacion', 'Ejecutar validación de consistencia'],
-  ['incluir_tabla_asistentes', 'Incluir tabla de asistentes'],
-  ['incluir_hoja_firmas', 'Incluir hoja de firmas'],
-  ['incluir_anexo_validacion', 'Incluir anexo de validación'],
 ]
 
 /**
- * Paso 4: revisión, validación de IA y exportación a PDF.
- *
- * Reúne las dos acciones clave del flujo del PGAC:
- *   · «Generar borrador con IA» -> POST /actas/redactar
- *   · «Descargar PDF final»     -> POST /actas/generar-pdf (respuesta Blob)
+ * Paso 4: revisión de la redacción y envío del acta al flujo de aprobación.
  */
 export default function PasoRevision({
   estado,
@@ -28,17 +19,20 @@ export default function PasoRevision({
   actualizarCampo,
   borrador,
   advertencias = [],
-  metadatosPdf = null,
   aviso = null,
   redaccionEnVivo = null,
   cargandoRedaccion = false,
-  cargandoPdf = false,
+  cargandoEnvio = false,
+  cargandoGuardar = false,
   error = null,
   onRedactar,
   onRedactarEnVivo,
-  onDescargarPdf,
+  onEnviarRevision,
+  onGuardarBorrador,
+  onCancelarEdicion,
   onNuevaActa,
   actaId = null,
+  esCorreccion = false,
 }) {
   const validacion = borrador?.validacion || null
 
@@ -110,7 +104,7 @@ export default function PasoRevision({
 
         <div className="tarjeta p-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-corporativo-600">
-            Opciones del documento
+            Opciones de redacción
           </h3>
           <div className="mt-3 space-y-2 text-sm text-slate-700">
             {OPCIONES_DOCUMENTO.map(([campo, etiqueta]) => (
@@ -146,7 +140,7 @@ export default function PasoRevision({
         <Boton
           variante="secundario"
           cargando={cargandoRedaccion}
-          disabled={cargandoPdf}
+          disabled={cargandoEnvio}
           onClick={onRedactar}
         >
           Generar borrador con IA
@@ -154,54 +148,41 @@ export default function PasoRevision({
         <Boton
           variante="fantasma"
           cargando={cargandoRedaccion}
-          disabled={cargandoPdf}
+          disabled={cargandoEnvio}
           onClick={onRedactarEnVivo}
         >
           Ver redacción en vivo
         </Boton>
-        <Boton
-          variante="primario"
-          cargando={cargandoPdf}
-          disabled={cargandoRedaccion}
-          onClick={onDescargarPdf}
-        >
-          Descargar PDF final
-        </Boton>
-        {metadatosPdf ? (
-          <>
-            <Boton
-              variante="fantasma"
-              onClick={() => descargarBlob(metadatosPdf.blob, metadatosPdf.nombreArchivo)}
-            >
-              Volver a descargar
-            </Boton>
-            <Boton variante="fantasma" onClick={() => abrirBlob(metadatosPdf.blob)}>
-              Abrir en otra pestaña
-            </Boton>
-          </>
-        ) : null}
+        {actaId ? (
+          <Boton
+            variante="primario"
+            cargando={cargandoGuardar}
+            disabled={cargandoRedaccion || cargandoEnvio}
+            onClick={onGuardarBorrador}
+          >
+            {esCorreccion ? 'Guardar cambios y reenviar' : 'Guardar cambios'}
+          </Boton>
+        ) : (
+          <Boton
+            variante="primario"
+            cargando={cargandoEnvio}
+            disabled={cargandoRedaccion}
+            onClick={onEnviarRevision}
+          >
+            Enviar a revisión
+          </Boton>
+        )}
         <span className="flex-1" />
-        <Boton variante="fantasma" onClick={onNuevaActa}>
-          Empezar otra acta
-        </Boton>
+        {actaId ? (
+          <Boton variante="fantasma" disabled={cargandoGuardar} onClick={onCancelarEdicion}>
+            Cancelar edición
+          </Boton>
+        ) : (
+          <Boton variante="fantasma" onClick={onNuevaActa}>
+            Empezar otra acta
+          </Boton>
+        )}
       </section>
-
-      {metadatosPdf ? (
-        <Alerta tono="exito" titulo={`PDF generado: ${metadatosPdf.nombreArchivo}`}>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
-            <span>Folio: {metadatosPdf.folio || '—'}</span>
-            <span>Versión: {metadatosPdf.version || '—'}</span>
-            <span>Páginas: {metadatosPdf.paginas || '—'}</span>
-            <span>Proveedor IA: {metadatosPdf.proveedorIa || '—'}</span>
-            <span className="inline-flex items-center gap-1">
-              Guardada:
-              <Etiqueta tono={metadatosPdf.guardada ? 'exito' : 'neutral'}>
-                {metadatosPdf.guardada ? 'sí' : 'no'}
-              </Etiqueta>
-            </span>
-          </div>
-        </Alerta>
-      ) : null}
 
       {redaccionEnVivo ? (
         <section className="tarjeta p-4">
@@ -235,8 +216,8 @@ export default function PasoRevision({
         </section>
       ) : (
         <Alerta tono="info" titulo="Aún no hay borrador redactado">
-          Pulsa «Generar borrador con IA» para que la plataforma redacte las cláusulas legales y valide
-          la consistencia del acta; después podrás descargar el PDF final.
+          Pulsa «Generar borrador con IA» para redactar las cláusulas legales y validar la consistencia
+          antes de enviar el acta a revisión.
         </Alerta>
       )}
 
