@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -35,7 +36,6 @@ from app.services import administracion, plantillas_legales
 from app.services.acta_service import (
     actualizar_estatus,
     crear_acta,
-    obtener_acta,
     redactar,
     validar_acta_almacenada,
 )
@@ -49,10 +49,15 @@ from app.services.flujo_creacion import (
     obtener_sesion,
     reiniciar_sesion,
     siguiente_faltante,
-    texto_catalogo_tipos,
+)
+from app.services.tenant_access import (
+    alcance_empresa,
+    filtrar_por_empresa,
 )
 
 logger = logging.getLogger(__name__)
+
+DIAS_HABILES_LIMITE_ATRASO = 5
 
 __all__ = [
     "es_tema_valido", "detectar_intencion", "extraer_folio",
@@ -75,7 +80,8 @@ PALABRAS_TEMA = (
     "crear", "crea", "generar", "genera", "nueva", "nuevo", "necesito",
     "quiero", "elaborar", "hazme", "cual", "cuales", "tipos", "opciones",
     "elegir", "escoger", "editar", "modificar", "pdf", "descargar",
-    "descarga", "cancelar",
+    "descarga", "cancelar", "tiempo", "duracion", "dias", "habiles",
+    "atraso", "atrasada", "atrasadas", "retraso", "retrasada", "demora",
 )
 
 PALABRAS_FUERA = (
@@ -97,6 +103,8 @@ SUGERENCIAS = [
     "Estatus de PGAC-2026-0001",
     "Valida el acta 1",
     "Cuantas actas hay por estatus?",
+    "Qué actas llevan más de 5 días hábiles?",
+    "Cuanto tarda en promedio la aprobación?",
     "Versiones del acta 1",
     "Ayuda",
 ]
@@ -124,6 +132,15 @@ def es_tema_valido(mensaje: str) -> bool:
 
 def detectar_intencion(mensaje: str) -> str:
     n = _norm(mensaje or "")
+    if any(k in n for k in (
+        "atrasad", "atraso", "retrasad", "retraso", "demora", "tiempo promedio",
+        "tiempo de aprobacion", "tiempo en revision", "dias habiles",
+        "cuanto tarda", "cuanto tiempo",
+    )) or (
+        "tiempo" in n
+        and any(etapa in n for etapa in ("revision", "abogado", "aprobacion", "correccion"))
+    ):
+        return "tiempos"
     if any(k in n for k in ("restaurar", "recuperar version", "volver a la version")):
         return "restaurar"
     if any(k in n for k in ("editar", "modificar", "modifica", "cambiar", "cambia")) and (
@@ -216,14 +233,21 @@ def extraer_estatus_destino(mensaje: str) -> Optional[str]:
     return None
 
 
-def _buscar(db: Session, folio: Optional[str], acta_id: Optional[int]) -> Optional[Acta]:
+def _buscar(
+    db: Session,
+    folio: Optional[str],
+    acta_id: Optional[int],
+    usuario=None,
+) -> Optional[Acta]:
+    consulta = filtrar_por_empresa(
+        select(Acta), alcance_empresa(usuario), Acta.empresa_codigo
+    )
     if acta_id is not None:
-        try:
-            return obtener_acta(db, acta_id)
-        except Exception:
-            pass
+        return db.scalar(consulta.where(Acta.id == acta_id))
     if folio:
-        return db.scalar(select(Acta).where(func.upper(Acta.folio) == folio.upper()))
+        return db.scalar(
+            consulta.where(func.upper(Acta.folio) == folio.upper())
+        )
     return None
 
 
@@ -241,6 +265,119 @@ def _dato_acta(acta: Acta) -> Dict[str, Any]:
             "tipo_asamblea": str(getattr(acta.tipo_asamblea, "value", acta.tipo_asamblea)),
             "fecha": acta.fecha.isoformat() if getattr(acta, "fecha", None) else None,
             "creado_por": getattr(acta, "creado_por", None)}
+
+
+def _fecha_evento(valor: Any) -> Optional[date]:
+    if isinstance(valor, datetime):
+        return valor.date()
+    if not isinstance(valor, str) or not valor.strip():
+        return None
+    try:
+        return datetime.fromisoformat(valor.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def _dias_habiles_entre(inicio: Optional[date], fin: date) -> int:
+    if inicio is None or inicio >= fin:
+        return 0
+    dias = 0
+    fecha = inicio
+    while fecha < fin:
+        fecha += timedelta(days=1)
+        if fecha.weekday() < 5:
+            dias += 1
+    return dias
+
+
+def _inicio_etapa(acta: Acta) -> Optional[date]:
+    for evento in reversed(acta.historial_revision or []):
+        if (
+            isinstance(evento, dict)
+            and evento.get("estado_resultante") == acta.estado_flujo
+        ):
+            fecha = _fecha_evento(evento.get("creado_en"))
+            if fecha:
+                return fecha
+    return _fecha_evento(acta.created_at)
+
+
+def _resumen_tiempos(db: Session, alcance, usuario, mensaje: str) -> Dict[str, Any]:
+    hoy = datetime.now(timezone.utc).date()
+    estados_activos = {"revision", "abogado", "con_errores"}
+    texto = _norm(mensaje)
+    if "revision" in texto:
+        estados_filtro = {"revision"}
+    elif any(palabra in texto for palabra in ("abogado", "aprobacion")):
+        estados_filtro = {"abogado"}
+    elif any(palabra in texto for palabra in ("correccion", "devuelta", "devueltas")):
+        estados_filtro = {"con_errores"}
+    elif getattr(usuario, "rol", None) == "revisor":
+        estados_filtro = {"revision"}
+    elif getattr(usuario, "rol", None) == "abogado_responsable":
+        estados_filtro = {"abogado"}
+    else:
+        estados_filtro = estados_activos
+
+    consulta = filtrar_por_empresa(
+        select(Acta), alcance, Acta.empresa_codigo
+    )
+    actas = list(db.scalars(consulta))
+    atrasadas = []
+    tiempos_aprobacion = []
+    for acta in actas:
+        estado = str(getattr(acta.estado_flujo, "value", acta.estado_flujo))
+        if estado in estados_filtro:
+            dias = _dias_habiles_entre(_inicio_etapa(acta), hoy)
+            if dias > DIAS_HABILES_LIMITE_ATRASO:
+                atrasadas.append((dias, acta))
+        if estado == "aprobada":
+            evento_aprobacion = next(
+                (
+                    evento
+                    for evento in reversed(acta.historial_revision or [])
+                    if isinstance(evento, dict)
+                    and evento.get("estado_resultante") == "aprobada"
+                ),
+                None,
+            )
+            fecha_aprobacion = (
+                _fecha_evento(evento_aprobacion.get("creado_en"))
+                if evento_aprobacion
+                else None
+            )
+            fecha_creacion = _fecha_evento(acta.created_at)
+            if fecha_creacion and fecha_aprobacion:
+                tiempos_aprobacion.append(
+                    _dias_habiles_entre(fecha_creacion, fecha_aprobacion)
+                )
+
+    atrasadas.sort(key=lambda elemento: elemento[0], reverse=True)
+    lineas = [
+        "Umbral de atraso: más de %s días hábiles (lunes a viernes; no se descuentan feriados)."
+        % DIAS_HABILES_LIMITE_ATRASO,
+        "Actas atrasadas en la etapa consultada: %s." % len(atrasadas),
+    ]
+    for dias, acta in atrasadas[:5]:
+        lineas.append(
+            "- %s · %s · %s días hábiles."
+            % (acta.folio, acta.estado_flujo, dias)
+        )
+    if not atrasadas:
+        lineas.append("No hay actas que superen el umbral en la etapa consultada.")
+    if tiempos_aprobacion:
+        promedio = sum(tiempos_aprobacion) / len(tiempos_aprobacion)
+        lineas.append(
+            "Tiempo promedio de creación a aprobación: %.1f días hábiles (%s actas aprobadas)."
+            % (promedio, len(tiempos_aprobacion))
+        )
+    else:
+        lineas.append("Aún no hay suficientes actas aprobadas con historial para calcular el promedio.")
+    return {
+        "respuesta": "\n".join(lineas),
+        "intencion": "tiempos",
+        "tema_valido": True,
+    }
 
 
 def _respuesta_sesion(sesion, texto, faltante_extra=None):
@@ -271,6 +408,106 @@ def _respuesta_sesion(sesion, texto, faltante_extra=None):
     return base
 
 
+def _respuesta_confirmacion_creacion(sesion, texto=None):
+    base = _respuesta_sesion(
+        sesion,
+        texto
+        or "Revisa los datos recopilados. Si son correctos, confirma para enviar el acta a revisión; también puedes indicar qué campo deseas corregir.",
+        None,
+    )
+    datos = sesion.get("datos", {})
+    etiquetas = {
+        campo["clave"]: campo["etiqueta"]
+        for campo in campos_requeridos_para_sesion(sesion)
+    }
+    resumen = {"tipo_asamblea": etiqueta_tipo_asamblea(sesion.get("tipo_asamblea") or "")}
+    for campo in campos_requeridos_para_sesion(sesion):
+        valor = datos.get(campo["clave"])
+        if valor not in (None, "", [], {}):
+            resumen[etiquetas[campo["clave"]]] = valor
+    if datos.get("rfc_sociedad"):
+        resumen["RFC de la sociedad"] = datos["rfc_sociedad"]
+    base["confirmacion_creacion"] = True
+    base["resumen_creacion"] = resumen
+    return base
+
+
+def _campo_para_cambiar(mensaje, sesion):
+    texto = _norm(mensaje)
+    for campo in sorted(
+        campos_requeridos_para_sesion(sesion),
+        key=lambda item: len(item["etiqueta"]),
+        reverse=True,
+    ):
+        clave = _norm(campo["clave"].replace("_", " "))
+        etiqueta = _norm(campo["etiqueta"])
+        if clave in texto or etiqueta in texto:
+            return campo
+    return None
+
+
+def _es_confirmacion_creacion(mensaje):
+    texto = _norm(mensaje)
+    return texto.strip(" .!") in {
+        "confirmar",
+        "confirmo",
+        "acepto",
+        "si",
+        "si enviar a revision",
+        "enviar a revision",
+        "confirmar y enviar a revision",
+        "confirmo y enviar a revision",
+    }
+
+
+def _es_cancelacion_creacion(mensaje):
+    texto = _norm(mensaje or "").strip()
+    return bool(
+        re.fullmatch(
+            r"(?:por favor\s+)?cancelar(?:\s+(?:el\s+|la\s+)?(?:proceso|creacion))?[.!?\s]*",
+            texto,
+        )
+        or texto in {"detener", "reiniciar", "empezar de nuevo"}
+    )
+
+
+def _solicita_catalogo_completo(mensaje):
+    texto = _norm(mensaje or "")
+    return any(
+        frase in texto
+        for frase in (
+            "ver todos los tipos",
+            "todos los tipos de acta",
+            "catalogo completo",
+            "ver catalogo",
+            "que tipos de acta hay",
+            "que tipos hay",
+            "que actas hay",
+        )
+    )
+
+
+def _respuesta_catalogo(sesion, completo=False):
+    recomendados = {"ordinaria", "extraordinaria", "aumento_capital", "sesion_consejo"}
+    tipos = (
+        TIPOS_GUIA
+        if completo
+        else [tipo for tipo in TIPOS_GUIA if tipo["valor"] in recomendados]
+    )
+    return {
+        "respuesta": (
+            "Estos son los tipos disponibles. Elige uno para continuar."
+            if completo
+            else "¿Qué tipo necesitas? Elige una opción o escribe el asunto principal y te orientaré."
+        ),
+        "intencion": "catalogo_tipos",
+        "tema_valido": True,
+        "sesion_id": sesion["sesion_id"],
+        "tipos_acta": tipos,
+        "catalogo_completo_disponible": not completo,
+    }
+
+
 def _cerrar_y_generar(db, sesion, autor):
     try:
         payload_dict = construir_payload_desde_sesion(sesion)
@@ -283,11 +520,20 @@ def _cerrar_y_generar(db, sesion, autor):
         payload_dict["estatus"] = EstatusActa.EN_REVISION.value
         solicitud = ActaGenerarPdfRequest(**payload_dict)
         borrador = redactar(solicitud)
-        acta = crear_acta(db, solicitud, borrador)
+        acta = crear_acta(
+            db,
+            solicitud,
+            borrador,
+            empresa_codigo=sesion.get("empresa_codigo"),
+        )
         acta.estado_flujo = "revision"
         db.commit()
         db.refresh(acta)
-        reiniciar_sesion(sesion.get("sesion_id"))
+        reiniciar_sesion(
+            sesion.get("sesion_id"),
+            usuario_id=sesion.get("usuario_id"),
+            empresa_codigo=sesion.get("empresa_codigo"),
+        )
         control = {"folio": acta.folio, "acta_id": acta.id,
             "version": acta.version,
             "fecha_acta": payload_dict.get("fecha"),
@@ -328,9 +574,10 @@ def texto_ayuda() -> str:
     return ("Soy el Asistente de Actas de PGAC. "
             "Te acompano a CREAR el acta paso a paso: dime Quiero crear un acta. "
             "Si no sabes cual crear te muestro los tipos con su descripcion. "
-            "Al terminar genero texto organizado + PDF y el control "
-            "(folio, fecha, quien la realizo, caducidad, versiones). Tambien valido, "
-            "informo estatus y muestro versiones. Prueba: Quiero crear un acta.")
+            "Antes de enviarla podras revisar y corregir los datos. El borrador pasa a revision; "
+            "el PDF final se habilita despues de la aprobacion del Abogado. Tambien valido, "
+            "informo estatus, tiempos por etapa, actas atrasadas (mas de 5 dias habiles) "
+            "y versiones. Prueba: Quiero crear un acta.")
 
 
 def _puede_avanzar(origen: str, destino: str) -> bool:
@@ -503,13 +750,32 @@ def _respuesta_edicion(sesion: Dict[str, Any], texto: str) -> Dict[str, Any]:
     }
 
 
-def _procesar_edicion(db: Session, mensaje: str, acta_id: Optional[int],
-                      sesion_id: Optional[str]) -> Dict[str, Any]:
+def _procesar_edicion(
+    db: Session,
+    mensaje: str,
+    acta_id: Optional[int],
+    sesion_id: Optional[str],
+    usuario=None,
+) -> Dict[str, Any]:
     sesion = _SESIONES_EDICION.get(sesion_id) if sesion_id else None
+    alcance = alcance_empresa(usuario)
+    if sesion is not None and (
+        sesion.get("usuario_id") != getattr(usuario, "id", None)
+        or sesion.get("empresa_codigo") != alcance.codigo
+    ):
+        return {
+            "respuesta": "La sesión de edición no existe o no pertenece a tu cuenta.",
+            "intencion": "editar",
+            "tema_valido": True,
+        }
     if sesion and acta_id and sesion["acta"].id != acta_id:
-        sesion = None
+        return {
+            "respuesta": "La sesión de edición no corresponde al acta indicada.",
+            "intencion": "editar",
+            "tema_valido": True,
+        }
     if sesion is None:
-        acta = _buscar(db, None, acta_id)
+        acta = _buscar(db, None, acta_id, usuario)
         if acta is None:
             return {
                 "respuesta": "No encontré el acta para editar. Verifica su identificador.",
@@ -522,6 +788,8 @@ def _procesar_edicion(db: Session, mensaje: str, acta_id: Optional[int],
             "acta": acta,
             "campo_actual": None,
             "cambios": {},
+            "usuario_id": getattr(usuario, "id", None),
+            "empresa_codigo": alcance.codigo,
         }
         _SESIONES_EDICION[sesion_id] = sesion
     return _respuesta_edicion(sesion, mensaje)
@@ -559,15 +827,93 @@ def _redactar_libre(mensaje: str) -> Dict[str, Any]:
             "titulo_sugerido": plantilla.titulo}
 
 
-def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
-    ses = obtener_sesion(sesion_id) if sesion_id else None
+def _flujo_creacion(db, texto, sesion_id, autor, empresa=None, usuario=None):
+    alcance = alcance_empresa(usuario)
+    owner_id = getattr(usuario, "id", None)
+    ses = (
+        obtener_sesion(
+            sesion_id,
+            usuario_id=owner_id,
+            empresa_codigo=alcance.codigo,
+        )
+        if sesion_id
+        else None
+    )
     if ses is not None:
-        if empresa and empresa.get("usar_info_empresa"):
+        if (
+            empresa
+            and empresa.get("usar_info_empresa")
+            and ses.get("etapa") not in ("confirmacion", "correccion")
+        ):
             ses.setdefault("datos", {}).update({
                 clave: valor for clave, valor in empresa.items() if valor not in (None, "")
             })
+        if ses.get("etapa") == "confirmacion":
+            if _es_confirmacion_creacion(texto):
+                return _cerrar_y_generar(db, ses, autor)
+            campo = _campo_para_cambiar(texto, ses)
+            if campo and any(
+                palabra in _norm(texto)
+                for palabra in ("cambiar", "corregir", "editar", "modificar")
+            ):
+                ses["etapa"] = "correccion"
+                ses["campo_edicion"] = campo["clave"]
+                return _respuesta_sesion(
+                    ses,
+                    "De acuerdo. Proporciona el nuevo valor para %s.\n\n%s"
+                    % (campo["etiqueta"], campo["pregunta"]),
+                    campo,
+                )
+            return _respuesta_confirmacion_creacion(
+                ses,
+                "Para continuar, confirma el envío a revisión o indica qué dato deseas cambiar.",
+            )
+        if ses.get("etapa") == "correccion":
+            clave = ses.get("campo_edicion")
+            nuevos = extraer_datos(texto, clave)
+            if not nuevos or clave not in nuevos:
+                campo = next(
+                    (
+                        item
+                        for item in campos_requeridos_para_sesion(ses)
+                        if item["clave"] == clave
+                    ),
+                    None,
+                )
+                return _respuesta_sesion(
+                    ses,
+                    "No pude identificar ese valor. %s"
+                    % (campo["pregunta"] if campo else "Intenta de nuevo."),
+                    campo,
+                )
+            if clave == "tipo_sociedad" and not acta_aplicable(
+                nuevos["tipo_sociedad"], ses.get("tipo_asamblea") or "ordinaria"
+            ):
+                campo = next(
+                    item
+                    for item in campos_requeridos_para_sesion(ses)
+                    if item["clave"] == clave
+                )
+                return _respuesta_sesion(
+                    ses,
+                    "Ese tipo societario no permite el acta seleccionada. Proporciona otro tipo de sociedad compatible.",
+                    campo,
+                )
+            ses["datos"].update(nuevos)
+            ses.setdefault("respuestas", []).append({
+                "campo": clave,
+                "pregunta": "¿Qué valor debe usarse para %s?" % clave.replace("_", " "),
+                "respuesta": texto,
+            })
+            ses.pop("campo_edicion", None)
+            ses["etapa"] = "confirmacion"
+            return _respuesta_confirmacion_creacion(
+                ses, "Dato actualizado. Revisa el resumen antes de confirmar el envío."
+            )
         # Si aún no hay tipo (venía del catálogo), el mensaje es la elección.
         if not ses.get("tipo_asamblea"):
+            if _solicita_catalogo_completo(texto):
+                return _respuesta_catalogo(ses, completo=True)
             elegido = detectar_tipo_en_texto(texto)
             if elegido:
                 ses["tipo_asamblea"] = elegido
@@ -581,9 +927,7 @@ def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
                 falt = siguiente_faltante(ses)
                 return _respuesta_sesion(ses, "Perfecto, creamos %s paso a paso.\n\n%s"
                                          % (etiqueta, falt["pregunta"]), falt)
-            return {"respuesta": texto_catalogo_tipos() + "\nSesion %s: dime cual crear." % ses["sesion_id"],
-                    "intencion": "catalogo_tipos", "tema_valido": True,
-                    "sesion_id": ses["sesion_id"], "tipos_acta": TIPOS_GUIA}
+            return _respuesta_catalogo(ses)
         nuevo = detectar_tipo_en_texto(texto)
         if nuevo and len((texto or "").strip()) < 40:
             ses["tipo_asamblea"] = nuevo
@@ -609,25 +953,36 @@ def _flujo_creacion(db, texto, sesion_id, autor, empresa=None):
                 })
                 falt2 = siguiente_faltante(ses)
                 if falt2 is None:
-                    return _cerrar_y_generar(db, ses, autor)
+                    ses["etapa"] = "confirmacion"
+                    return _respuesta_confirmacion_creacion(
+                        ses,
+                        "Ya reuní la información necesaria. Revisa el resumen y confirma antes de enviar el acta a revisión.",
+                    )
                 etiqueta = etiqueta_tipo_asamblea(ses.get("tipo_asamblea") or "")
                 return _respuesta_sesion(ses, "Anotado. Seguimos con %s.\n\n%s"
                                          % (etiqueta, falt2["pregunta"]), falt2)
             return _respuesta_sesion(ses, "No entendi ese dato para %s. %s Ejemplo: %s"
                                      % (falt["etiqueta"], falt["pregunta"], falt.get("ejemplo", "")), falt)
-        return _cerrar_y_generar(db, ses, autor)
+        if siguiente_faltante(ses) is None:
+            ses["etapa"] = "confirmacion"
+            return _respuesta_confirmacion_creacion(ses)
+        return _respuesta_sesion(ses, texto)
     tipo = detectar_tipo_en_texto(texto)
     if tipo is None:
         # No sabe qué acta crear (o no dijo el tipo) -> catálogo con descripciones.
-        ses2 = crear_sesion(None)
+        ses2 = crear_sesion(
+            None, usuario_id=owner_id, empresa_codigo=alcance.codigo
+        )
         if empresa and empresa.get("usar_info_empresa"):
             ses2["datos"].update({
                 clave: valor for clave, valor in empresa.items() if valor not in (None, "")
             })
-        return {"respuesta": texto_catalogo_tipos() + "\nSesion %s: dime cual crear." % ses2["sesion_id"],
-                "intencion": "catalogo_tipos", "tema_valido": True,
-                "sesion_id": ses2["sesion_id"], "tipos_acta": TIPOS_GUIA}
-    ses3 = crear_sesion(tipo or "ordinaria")
+        return _respuesta_catalogo(ses2, completo=_solicita_catalogo_completo(texto))
+    ses3 = crear_sesion(
+        tipo or "ordinaria",
+        usuario_id=owner_id,
+        empresa_codigo=alcance.codigo,
+    )
     ses3.setdefault("respuestas", []).append({
         "campo": "tipo_asamblea",
         "pregunta": "¿Qué tipo de acta quieres crear?",
@@ -648,8 +1003,20 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                       autor: Optional[str] = None, usuario=None, empresa=None,
                       modo: str = "general") -> Dict[str, Any]:
     texto = (mensaje or "").strip()
+    alcance = alcance_empresa(usuario)
     if modo == "edicion":
-        return _procesar_edicion(db, texto, acta_id, sesion_id)
+        return _procesar_edicion(db, texto, acta_id, sesion_id, usuario)
+    if _es_cancelacion_creacion(texto):
+        reiniciar_sesion(
+            sesion_id,
+            usuario_id=getattr(usuario, "id", None),
+            empresa_codigo=alcance.codigo,
+        )
+        return {
+            "respuesta": "Creación cancelada. Cuando quieras empezar de nuevo, escribe «Quiero un acta».",
+            "intencion": "cancelar_creacion",
+            "tema_valido": True,
+        }
     if empresa is None and detectar_intencion(texto) == "crear":
         return {
             "respuesta": "No se ha asignado empresa",
@@ -657,9 +1024,15 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
             "tema_valido": True,
         }
     # Sesión de creación en curso (incluye catálogo->elección de tipo).
-    if sesion_id and obtener_sesion(sesion_id) is not None:
+    if sesion_id and obtener_sesion(
+        sesion_id,
+        usuario_id=getattr(usuario, "id", None),
+        empresa_codigo=alcance.codigo,
+    ) is not None:
         autor_efectivo = (usuario.email if usuario is not None else None) or autor
-        return _flujo_creacion(db, texto, sesion_id, autor_efectivo, empresa)
+        return _flujo_creacion(
+            db, texto, sesion_id, autor_efectivo, empresa, usuario
+        )
     if not es_tema_valido(texto):
         return {"respuesta": MENSAJE_FUERA, "intencion": "fuera_de_tema",
                 "tema_valido": False,
@@ -668,11 +1041,17 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
     if inten in ("crear", "catalogo_tipos", "cancelar_creacion"):
         if inten == "cancelar_creacion":
             if sesion_id:
-                reiniciar_sesion(sesion_id)
+                reiniciar_sesion(
+                    sesion_id,
+                    usuario_id=getattr(usuario, "id", None),
+                    empresa_codigo=alcance.codigo,
+                )
             return {"respuesta": "Creación cancelada. Dime «Quiero crear un acta» cuando quieras empezar.",
                     "intencion": "cancelar_creacion", "tema_valido": True}
         autor_efectivo = (usuario.email if usuario is not None else None) or autor
-        return _flujo_creacion(db, texto, sesion_id, autor_efectivo, empresa)
+        return _flujo_creacion(
+            db, texto, sesion_id, autor_efectivo, empresa, usuario
+        )
     fol = folio or extraer_folio(texto)
     aid = acta_id if acta_id is not None else extraer_id(texto)
     if inten == "ayuda":
@@ -680,7 +1059,7 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                 "tema_valido": True,
                 "acciones": [{"etiqueta": "Ver resumen", "accion": "resumen"}]}
     if inten == "resumen":
-        r = administracion.resumen_administracion(db)
+        r = administracion.resumen_administracion(db, alcance)
         lin = ["Total actas: %s (versiones: %s)." % (r["total_actas"], r["total_versiones"]),
                "Por estatus:"]
         lin += ["  - %s: %s" % (k, v) for k, v in r["por_estatus"].items()]
@@ -688,16 +1067,20 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
         lin.append("Vigencia: %s vigentes, %s por vencer, %s vencidas, %s sin fecha."
                    % (v["vigentes"], v["por_vencer"], v["vencidas"], v["sin_fecha"]))
         if v["vencidas"]:
-            venc = administracion.actas_por_vigencia(db, estado="vencida", limite=5)
+            venc = administracion.actas_por_vigencia(
+                db, estado="vencida", limite=5, alcance=alcance
+            )
             lin.append("Vencidas: " + "; ".join(_linea(a) for a in venc))
         return {"respuesta": "\n".join(lin), "intencion": "resumen",
                 "tema_valido": True, "resumen": r,
                 "acciones": [{"etiqueta": "Ver administracion", "accion": "ir_admin"}]}
+    if inten == "tiempos":
+        return _resumen_tiempos(db, alcance, usuario, texto)
     if inten == "redactar" and fol is None and aid is None:
         out = _redactar_libre(texto)
         out["tema_valido"] = True
         return out
-    acta = _buscar(db, fol, aid)
+    acta = _buscar(db, fol, aid, usuario)
     if acta is None:
         if fol or aid:
             ref = fol or ("id %s" % aid)

@@ -65,6 +65,9 @@ class AsistenteChatResponse(BaseModel):
     texto_organizado: Optional[str] = None
     campos_edicion: Optional[List[Dict[str, str]]] = None
     cambios_propuestos: Optional[Dict[str, Any]] = None
+    confirmacion_creacion: bool = False
+    resumen_creacion: Optional[Dict[str, Any]] = None
+    catalogo_completo_disponible: bool = False
 
 
 @router.post("/chat", response_model=AsistenteChatResponse, summary="Conversar con el asistente")
