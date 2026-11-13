@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.usuario import Usuario
 from app.schemas.usuario import TokenDatos
+from app.services.tenant_access import alcance_empresa
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", scheme_name="JWT")
 
@@ -138,12 +139,23 @@ def registrar_bitacora(
     datos_antes: Optional[dict] = None,
     datos_despues: Optional[dict] = None,
     request: Optional[Request] = None,
+    empresa_codigo: Optional[str] = None,
 ) -> None:
     """Escribe una entrada en la bitácora de cambios."""
     from app.models.usuario import BitacoraCambios
 
+    if empresa_codigo is None and entidad == "actas" and entidad_id is not None:
+        from app.models.acta import Acta
+
+        acta = db.get(Acta, entidad_id)
+        if acta is not None:
+            empresa_codigo = acta.empresa_codigo
+    if empresa_codigo is None and usuario is not None:
+        empresa_codigo = alcance_empresa(usuario).codigo
+
     entrada = BitacoraCambios(
         usuario_id=usuario.id if usuario else None,
+        empresa_codigo=empresa_codigo,
         accion=accion,
         entidad=entidad,
         entidad_id=entidad_id,
