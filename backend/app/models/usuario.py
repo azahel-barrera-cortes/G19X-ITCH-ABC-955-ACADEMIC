@@ -81,6 +81,7 @@ class BitacoraCambios(Base):
     usuario_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    empresa_codigo: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     accion: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     entidad: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     entidad_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)

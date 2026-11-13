@@ -92,6 +92,7 @@ class Acta(Base):
     historial_revision: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list)
     # --- Control de autoría (quién la realizó; listo para integración de usuarios)
     creado_por: Mapped[Optional[str]] = mapped_column(String(150), nullable=True, index=True)
+    empresa_codigo: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
 
     # --- Información de la empresa / sociedad (RF-10) ---
     tipo_sociedad: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
