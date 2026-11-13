@@ -1,3 +1,4 @@
+import { forwardRef } from 'react'
 import Indicador from './Indicador.jsx'
 
 /**
@@ -8,12 +9,15 @@ import Indicador from './Indicador.jsx'
  */
 const VARIANTES = {
   primario:
-    'bg-corporativo-500 text-white shadow-sm hover:bg-corporativo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-corporativo-500',
+    'bg-corporativo-700 text-white shadow-sm hover:bg-corporativo-800 focus-visible:outline-corporativo-700',
   secundario:
-    'bg-white text-corporativo-600 ring-1 ring-inset ring-corporativo-200 hover:bg-corporativo-50',
-  acento: 'bg-acento-500 text-white shadow-sm hover:bg-acento-600',
-  peligro: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
-  fantasma: 'bg-transparent text-slate-600 hover:bg-slate-100',
+    'bg-white text-corporativo-700 ring-1 ring-inset ring-corporativo-200 hover:bg-corporativo-50 focus-visible:outline-corporativo-700',
+  acento:
+    'bg-corporativo-600 text-white shadow-sm hover:bg-corporativo-700 focus-visible:outline-corporativo-700',
+  peligro:
+    'bg-red-700 text-white shadow-sm hover:bg-red-800 focus-visible:outline-red-700',
+  fantasma:
+    'bg-transparent text-slate-600 hover:bg-slate-100 focus-visible:outline-corporativo-700',
 }
 
 const TAMANOS = {
@@ -22,26 +26,30 @@ const TAMANOS = {
   lg: 'gap-2 px-5 py-2.5 text-sm',
 }
 
-export default function Boton({
-  variante = 'primario',
-  tamano = 'md',
-  cargando = false,
-  icono = null,
-  className = '',
-  children,
-  ...propiedades
-}) {
+const Boton = forwardRef(function Boton({
+    variante = 'primario',
+    tamano = 'md',
+    cargando = false,
+    icono = null,
+    className = '',
+    disabled = false,
+    children,
+    ...propiedades
+  }, ref) {
   return (
     <button
-      type="button"
-      className={`inline-flex items-center justify-center rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+      ref={ref}
+      {...propiedades}
+      type={propiedades.type || 'button'}
+      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-corporativo-600 disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transform-none motion-reduce:transition-none ${
         VARIANTES[variante] || VARIANTES.primario
       } ${TAMANOS[tamano] || TAMANOS.md} ${className}`}
-      disabled={cargando || propiedades.disabled}
-      {...propiedades}
+      disabled={cargando || disabled}
     >
       {cargando ? <Indicador /> : icono}
       {children}
     </button>
   )
-}
+})
+
+export default Boton

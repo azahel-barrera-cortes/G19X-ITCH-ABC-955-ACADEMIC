@@ -1,18 +1,45 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Alerta from '../ui/Alerta.jsx'
 import Boton from '../ui/Boton.jsx'
 import Etiqueta from '../ui/Etiqueta.jsx'
+import IconoAsistenteIA from '../ui/IconoAsistenteIA.jsx'
 import { Tarjeta, TarjetaCuerpo, TarjetaEncabezado } from '../ui/Tarjeta.jsx'
-import { chatearAsistente, descargarPdfGuardado, descargarBlob, mensajeDeError, obtenerAyudaAsistente } from '../../api/client.js'
+import { chatearAsistente, descargarPdfGuardado, descargarBlob, mensajeDeError } from '../../api/client.js'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { etiquetaRol, tieneAcceso } from '../../constants/roles.js'
 
-const SUGERENCIAS = [
-  'Quiero crear un acta',
-  'Qué tipos de acta hay?',
-  'Crear acta ordinaria',
-  'Valida el acta 1',
-  'Estatus de PGAC-2026-0001',
-  'Cuantas actas hay por estatus?',
-]
+const SUGERENCIAS_POR_ROL = {
+  capturista: [
+    'Quiero crear un acta',
+    'Qué tipos de acta hay?',
+    'Cuantas actas hay por estatus?',
+    'Qué actas llevan más de 5 días hábiles?',
+  ],
+  revisor: [
+    'Qué actas llevan más de 5 días hábiles en revisión?',
+    'Cuantas actas hay por estatus?',
+    'Valida el acta 1',
+    'Qué puedo revisar en un acta?',
+  ],
+  abogado_responsable: [
+    'Qué actas llevan más de 5 días hábiles pendientes de aprobación?',
+    'Cuanto tarda en promedio la aprobación?',
+    'Valida el acta 1',
+    'Cuantas actas hay por estatus?',
+  ],
+  Administrador: [
+    'Cuantas actas hay por estatus?',
+    'Qué actas llevan más de 5 días hábiles?',
+    'Qué actas están por vencer?',
+    'Estatus de PGAC-2026-0001',
+  ],
+  SuperAdministrador: [
+    'Cuantas actas hay por estatus?',
+    'Qué actas llevan más de 5 días hábiles?',
+    'Cuanto tarda en promedio la aprobación?',
+    'Estatus de PGAC-2026-0001',
+  ],
+}
 const SUGERENCIAS_EDICION = [
   'Quiero cambiar la fecha',
   'Quiero cambiar el lugar',
@@ -20,10 +47,60 @@ const SUGERENCIAS_EDICION = [
   'Quiero cambiar las observaciones',
 ]
 
+const ETIQUETAS_CAMPO = {
+  tipo_asamblea: 'Tipo de acta',
+  tipo_sociedad: 'Tipo de sociedad',
+  'tipo de sociedad': 'Tipo de sociedad',
+  sociedad: 'Razón social',
+  'sociedad (razon social)': 'Razón social',
+  'rfc de la sociedad': 'RFC de la sociedad',
+  fecha: 'Fecha',
+  'fecha (AAAA-MM-DD)': 'Fecha',
+  lugar: 'Lugar',
+  presidente: 'Presidente',
+  secretario: 'Secretario',
+  asistentes: 'Asistentes y acciones',
+  'asistentes y acciones': 'Asistentes y acciones',
+  orden_y_acuerdos: 'Orden del día y acuerdos',
+  'orden del dia y acuerdos': 'Orden del día y acuerdos',
+}
+
+function mostrarValor(valor) {
+  if (typeof valor === 'boolean') return valor ? 'Sí' : 'No'
+  if (valor && typeof valor === 'object') return JSON.stringify(valor)
+  return String(valor ?? '—')
+}
+
+function sugerenciasPara(rol, mensaje, modoEdicion, sesionActiva) {
+  if (modoEdicion) return SUGERENCIAS_EDICION
+  if (sesionActiva || mensaje?.confirmacionCreacion) return []
+  if (mensaje?.control) {
+    return [
+      `Estatus de ${mensaje.control.folio}`,
+      'Quiero crear un acta',
+      'Cuantas actas hay por estatus?',
+    ]
+  }
+  if (mensaje?.acta) {
+    return [
+      `Valida el acta ${mensaje.acta.id}`,
+      `Versiones del acta ${mensaje.acta.id}`,
+      'Qué actas llevan más de 5 días hábiles?',
+    ]
+  }
+  if (mensaje?.intencion === 'tiempos') {
+    return [
+      'Cuanto tarda en promedio la aprobación?',
+      'Cuantas actas hay por estatus?',
+    ]
+  }
+  return SUGERENCIAS_POR_ROL[rol] || SUGERENCIAS_POR_ROL.capturista
+}
+
 function burbujaClase(origen) {
   return origen === 'usuario'
-    ? 'ml-auto bg-corporativo-700 text-white'
-    : 'mr-auto bg-white text-slate-700 ring-1 ring-inset ring-slate-200'
+    ? 'ml-auto border-transparent bg-corporativo-700 text-white'
+    : 'mr-auto border-corporativo-100 bg-corporativo-50 text-slate-700 ring-1 ring-inset ring-corporativo-100'
 }
 
 export default function AsistenteChat({
@@ -36,33 +113,47 @@ export default function AsistenteChat({
   onEditarActa = null,
   onIrAMisActas = null,
   datosAsistente = null,
+  abierto,
+  onCambiarAbierto = null,
 }) {
+  const { usuario } = useAuth()
+  const rol = usuario?.rol || 'capturista'
+  const flotante = modo === 'burbuja'
+  const puedeCambiarEstatus = tieneAcceso(rol, 'abogado_responsable')
+  const [abiertoInterno, setAbiertoInterno] = useState(false)
+  const estaAbierto = abierto ?? abiertoInterno
+  const cambiarAbierto = (valor) => {
+    setAbiertoInterno(valor)
+    onCambiarAbierto?.(valor)
+  }
   const [mensajes, setMensajes] = useState(() => [
     {
       origen: 'ia',
       texto: modoEdicion
         ? `Edición asistida del acta ${actaId}. Indícame qué campo quieres cambiar; el tipo de acta y la sociedad permanecen bloqueados.`
-        : 'Hola, te acompaño a crear tu acta paso a paso. Dime «Quiero crear un acta» o «Qué tipos de acta hay?» y empezamos. El borrador se envía al flujo de revisión; el PDF final se habilita después de la aprobación del Abogado.',
+        : `Hola, ${etiquetaRol(rol)}. Puedo ayudarte con las tareas de actas de tu rol: consultar estatus, revisar tiempos y, si corresponde, crear o validar documentos. Las decisiones legales siguen requiriendo revisión humana.`,
     },
   ])
   const [entrada, setEntrada] = useState('')
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState(null)
-  const [ejemplos, setEjemplos] = useState(modoEdicion ? SUGERENCIAS_EDICION : SUGERENCIAS)
   const [sesionId, setSesionId] = useState(null)
   const [descargando, setDescargando] = useState(false)
+  const [cambioEnRevision, setCambioEnRevision] = useState(null)
   const finRef = useRef(null)
-  const compacto = modo === 'compacto'
+  const compacto = modo === 'compacto' || flotante
+  const ultimoMensajeIA = [...mensajes].reverse().find((mensaje) => mensaje.origen === 'ia')
+  const ejemplos = useMemo(
+    () => sugerenciasPara(rol, ultimoMensajeIA, modoEdicion, Boolean(sesionId)),
+    [rol, ultimoMensajeIA, modoEdicion, sesionId],
+  )
 
   useEffect(() => {
-    if (modoEdicion) return
-    obtenerAyudaAsistente()
-      .then((d) => { if (d?.sugerencias?.length) setEjemplos(d.sugerencias.slice(0, 6)) })
-      .catch(() => {})
-  }, [modoEdicion])
-
-  useEffect(() => {
-    finRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    const movimientoReducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    finRef.current?.scrollIntoView({
+      behavior: movimientoReducido ? 'auto' : 'smooth',
+      block: 'end',
+    })
   }, [mensajes, cargando])
 
   const enviar = async (libre = null) => {
@@ -88,6 +179,11 @@ export default function AsistenteChat({
         control: r.control_acta || null, progreso: r.progreso || null,
         tipoSociedad: r.tipo_sociedad || null,
         marcoNormativo: r.marco_normativo || null,
+        intencion: r.intencion || null,
+        confirmacionCreacion: Boolean(r.confirmacion_creacion),
+        resumenCreacion: r.resumen_creacion || null,
+        catalogoCompletoDisponible: Boolean(r.catalogo_completo_disponible),
+        campoSolicitado: r.campo_solicitado || null,
         actaId: r.acta_id || r.acta?.id || null,
         camposEdicion: r.campos_edicion || null,
         cambiosPropuestos: r.cambios_propuestos || null,
@@ -124,18 +220,89 @@ export default function AsistenteChat({
     if (a.accion === 'aprobar' && a.acta_id) { enviar(`Pasa el acta ${a.acta_id} a ${a.estatus || 'revision'}`) }
   }
 
+  if (flotante && !estaAbierto) {
+    return (
+      <div className="fixed bottom-5 right-5 z-[70]">
+        <button
+          type="button"
+          aria-label={sesionId ? 'Continuar creación de acta' : 'Abrir asistente IA'}
+          aria-expanded="false"
+          onClick={() => cambiarAbierto(true)}
+          className="pgac-assistant-bubble group relative flex h-16 w-16 items-center justify-center rounded-full bg-corporativo-700 text-white shadow-xl shadow-corporativo-800/25 ring-4 ring-white transition hover:bg-corporativo-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-corporativo-300 motion-reduce:transition-none"
+        >
+          <IconoAsistenteIA className="h-7 w-7" />
+          <span className={`absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full border-2 border-white ${sesionId ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+          <span className="pointer-events-none absolute bottom-full right-0 mb-3 translate-y-1 whitespace-nowrap rounded-lg bg-corporativo-800 px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+            {sesionId ? 'Continuar creación de acta' : 'Abrir asistente'}
+          </span>
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full space-y-4 bg-slate-100 min-h-screen">
+    <div className={flotante
+      ? 'pgac-assistant-panel fixed bottom-5 right-5 z-[70] flex h-[min(88vh,720px)] w-[min(94vw,430px)] flex-col overflow-hidden rounded-3xl border border-corporativo-100 bg-slate-50 shadow-2xl shadow-corporativo-800/20'
+      : `w-full space-y-4 bg-slate-100 ${compacto ? 'min-h-0' : 'min-h-[70vh]'}`}>
+      {flotante ? (
+        <div className="flex shrink-0 items-center justify-between bg-corporativo-700 px-4 py-3 text-white">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white ring-1 ring-white/25">
+              <IconoAsistenteIA className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold">Asistente PGAC</p>
+              <p className="truncate text-[11px] text-corporativo-50">
+                {sesionId ? 'Creación de acta en curso' : `${etiquetaRol(rol)} · conversación activa`}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Minimizar asistente"
+            title="Minimizar"
+            onClick={() => cambiarAbierto(false)}
+            className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl leading-none transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            <span aria-hidden="true">−</span>
+          </button>
+        </div>
+      ) : null}
       {!compacto ? (
         <header className="mb-2">
           <h1 className="text-lg font-semibold text-corporativo-700 flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-corporativo-100 text-corporativo-700 text-sm font-bold">IA</span>
-            {titulo || 'Asistente IA de actas'}
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-corporativo-100 text-corporativo-700">
+              <IconoAsistenteIA className="h-4 w-4" />
+            </span>
+            {titulo || `Asistente IA · ${etiquetaRol(rol)}`}
           </h1>
-          <p className="text-sm text-slate-500">Te acompaña a crear el acta y la envía a revisión; el PDF final se habilita tras la aprobación legal.</p>
+          <p className="text-sm text-slate-500">Opciones y consultas adaptadas a tu rol y al contexto de la conversación.</p>
         </header>
       ) : null}
-      {sesionId ? <Alerta tono="info" titulo={`Creación en curso · sesión ${sesionId}`}>Responde el dato pedido o escribe «cancelar» para empezar de nuevo.</Alerta> : null}
+      {sesionId && !modoEdicion ? (
+        <Alerta tono="info" titulo="Creación de acta en curso">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              {ultimoMensajeIA?.campoSolicitado
+                ? `Dato pendiente: ${ETIQUETAS_CAMPO[ultimoMensajeIA.campoSolicitado] || ultimoMensajeIA.campoSolicitado}.`
+                : ultimoMensajeIA?.tipos?.length
+                  ? 'Selecciona un tipo de acta para continuar.'
+                  : 'Responde el dato pedido para continuar.'}
+              {ultimoMensajeIA?.progreso?.total
+                ? ` ${ultimoMensajeIA.progreso.completados}/${ultimoMensajeIA.progreso.total} datos reunidos.`
+                : ''}
+            </span>
+            <button
+              type="button"
+              disabled={cargando}
+              onClick={() => enviar('Cancelar')}
+              className="rounded-lg border border-corporativo-200 bg-white px-3 py-1.5 text-xs font-semibold text-corporativo-700 transition hover:bg-corporativo-50 disabled:opacity-50"
+            >
+              Cancelar creación
+            </button>
+          </div>
+        </Alerta>
+      ) : null}
       {error ? <Alerta tono="error" titulo="Sin conexión al asistente">{error}</Alerta> : null}
       {modoEdicion && datosAsistente?.respuestas?.length ? (
         <details className="rounded-xl border border-corporativo-100 bg-white px-4 py-3 text-sm">
@@ -153,23 +320,39 @@ export default function AsistenteChat({
         </details>
       ) : null}
 
-      {/* Contenedor principal con borde arcoíris animado */}
-      <div className="relative rounded-3xl bg-white overflow-hidden">
-        {/* Borde de arcoíris que se mueve (gradiente cónico rotativo) detrás del contenido */}
-        <div
-          className="absolute inset-[-3px] rounded-[calc(3xl+3px)] bg-[conic-gradient(from_0deg_at_50%_50%_,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#8b00ff,#ff0000)] animate-[spin_4s_linear_infinite] pointer-events-none -z-10 opacity-100"
-          aria-hidden="true"
-        ></div>
-        <div className="relative z-10 overflow-hidden flex flex-col h-full" border="4">
-          <Tarjeta className="border-none shadow-none p-0 mb-0">
-            <TarjetaEncabezado
-              titulo="¿Que haremos hoy?"
-              descripcion="Creación guiada de actas"
-              acciones={<Etiqueta tono="info">IA interna</Etiqueta>}
-            />
-            <TarjetaCuerpo className="p-0">
-          {/* Espacio grande para ver los mensajes entre el usuario y la IA */}
-          <div className="flex-1 min-h-[320px] max-h-[520px] overflow-y-auto p-6 space-y-5">
+      <div className={`relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white transition-shadow ${
+        flotante ? 'border-0' : 'rounded-3xl border'
+      } ${
+        cargando
+          ? 'border-corporativo-200 shadow-md ring-2 ring-corporativo-100'
+          : flotante ? 'shadow-none' : 'border-slate-200 shadow-sm'
+      }`}>
+        <div className="relative z-10 flex h-full flex-col overflow-hidden">
+          <Tarjeta className={`border-none shadow-none p-0 mb-0 ${flotante ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
+            {!flotante ? (
+              <TarjetaEncabezado
+                titulo={rol === 'revisor'
+                  ? 'Asistencia para revisión'
+                  : rol === 'abogado_responsable'
+                    ? 'Asistencia para aprobación'
+                    : '¿Qué haremos hoy?'}
+                descripcion={modoEdicion ? 'Edición asistida con confirmación antes de aplicar cambios' : 'Consultas y acciones según tu rol'}
+                acciones={<Etiqueta tono="info">{etiquetaRol(rol)}</Etiqueta>}
+              />
+            ) : null}
+            <TarjetaCuerpo className={`p-0 ${flotante ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
+          <div
+            className={`flex-1 overflow-y-auto p-6 space-y-5 ${
+              flotante
+                ? 'min-h-0 p-4'
+                : compacto
+                  ? 'min-h-[240px] max-h-[440px]'
+                  : 'min-h-[320px] max-h-[520px]'
+            }`}
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+          >
             {mensajes.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
                 <p className="font-medium">Sin mensajes aún</p>
@@ -178,7 +361,7 @@ export default function AsistenteChat({
             ) : (
               <>
                 {mensajes.map((m, i) => (
-                  <div key={i} className={`max-w-[90%] rounded-2xl px-4 py-3.5 text-sm ${burbujaClase(m.origen)} shadow-sm border`}>
+                  <div key={i} className={`pgac-chat-message max-w-[90%] rounded-2xl px-4 py-3.5 text-sm ${burbujaClase(m.origen)} shadow-sm border`}>
                     <p className="whitespace-pre-line leading-relaxed">{m.texto}</p>
                     {m.marcoNormativo || m.tipoSociedad ? (
                       <div className="mt-3 rounded-lg border border-corporativo-100 bg-corporativo-50 px-3 py-2 text-xs text-corporativo-800">
@@ -189,9 +372,22 @@ export default function AsistenteChat({
                         </p>
                       </div>
                     ) : null}
-                    {m.progreso ? <p className="mt-2 text-xs opacity-80">Progreso: {m.progreso.completados}/{m.progreso.total} datos</p> : null}
+                    {m.progreso && m.progreso.total > 0 ? (
+                      <div className="mt-3" aria-label={`Progreso: ${m.progreso.completados} de ${m.progreso.total} datos`}>
+                        <div className="mb-1 flex justify-between text-xs opacity-80">
+                          <span>Datos recopilados</span>
+                          <span>{m.progreso.completados}/{m.progreso.total}</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/70">
+                          <div
+                            className="h-full rounded-full bg-corporativo-500 transition-[width] duration-500 motion-reduce:transition-none"
+                            style={{ width: `${Math.min(100, (m.progreso.completados / m.progreso.total) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                     {m.tipos?.length ? (
-                      <ul className="mt-3 space-y-2">
+                      <ul className={`mt-3 space-y-2 ${m.tipos.length > 4 ? 'max-h-56 overflow-y-auto pr-1' : ''}`}>
                         {m.tipos.map((t) => (
                           <li key={t.valor}>
                             <button
@@ -204,6 +400,16 @@ export default function AsistenteChat({
                           </li>
                         ))}
                       </ul>
+                    ) : null}
+                    {m.catalogoCompletoDisponible ? (
+                      <button
+                        type="button"
+                        disabled={cargando}
+                        onClick={() => enviar('Ver todos los tipos')}
+                        className="mt-3 rounded-lg border border-corporativo-200 bg-corporativo-50 px-3 py-2 text-xs font-semibold text-corporativo-700 transition hover:border-corporativo-300 hover:bg-corporativo-100 disabled:opacity-50"
+                      >
+                        Ver todos los tipos
+                      </button>
                     ) : null}
                     {m.camposEdicion?.length ? (
                       <div className="mt-3">
@@ -227,16 +433,92 @@ export default function AsistenteChat({
                       <div className="mt-3">
                         <Boton
                           tamano="sm"
-                          variante="primario"
+                          variante="secundario"
                           disabled={cargando}
-                          onClick={() => onAplicarCambios({
-                            actaId: m.actaId || actaId,
-                            cambios: m.cambiosPropuestos,
-                          })}
+                          onClick={() => setCambioEnRevision(
+                            cambioEnRevision?.indice === i
+                              ? null
+                              : { indice: i, actaId: m.actaId || actaId, cambios: m.cambiosPropuestos },
+                          )}
                         >
-                          Aplicar cambios al formulario
+                          {cambioEnRevision?.indice === i ? 'Ocultar cambios' : 'Revisar cambios propuestos'}
                         </Boton>
+                        {cambioEnRevision?.indice === i ? (
+                          <div className="mt-3 rounded-lg border border-corporativo-100 bg-corporativo-50/60 p-3">
+                            <p className="text-xs font-semibold text-corporativo-800">
+                              Confirma que estos valores son correctos antes de aplicarlos:
+                            </p>
+                            <ul className="mt-2 space-y-1.5">
+                              {Object.entries(cambioEnRevision.cambios).map(([campo, valor]) => (
+                                <li key={campo} className="text-xs text-slate-700">
+                                  <span className="font-semibold">{ETIQUETAS_CAMPO[campo] || campo}:</span>{' '}
+                                  <span className="break-words">{mostrarValor(valor)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <Boton
+                              tamano="sm"
+                              variante="primario"
+                              className="mt-3"
+                              disabled={cargando}
+                              onClick={() => {
+                                onAplicarCambios({
+                                  actaId: cambioEnRevision.actaId,
+                                  cambios: cambioEnRevision.cambios,
+                                })
+                                setCambioEnRevision(null)
+                              }}
+                            >
+                              Confirmar y aplicar al formulario
+                            </Boton>
+                          </div>
+                        ) : null}
                       </div>
+                    ) : null}
+                    {m.confirmacionCreacion && m.resumenCreacion ? (
+                      <section className="mt-3 rounded-xl border border-corporativo-100 bg-corporativo-50/60 p-3">
+                        <h3 className="text-xs font-semibold text-corporativo-800">Revisa los datos del acta</h3>
+                        <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {Object.entries(m.resumenCreacion).map(([campo, valor]) => (
+                            <div key={campo} className="rounded-lg bg-white/80 px-2.5 py-2">
+                              <dt className="text-[11px] font-semibold text-slate-500">
+                                {ETIQUETAS_CAMPO[campo] || campo}
+                              </dt>
+                              <dd className="mt-0.5 break-words text-xs text-slate-700">{mostrarValor(valor)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Boton
+                            tamano="sm"
+                            variante="primario"
+                            disabled={cargando}
+                            onClick={() => enviar('Confirmar y enviar a revisión')}
+                          >
+                            Confirmar y enviar a revisión
+                          </Boton>
+                          <details className="text-xs">
+                            <summary className="cursor-pointer rounded-lg border border-corporativo-200 bg-white px-3 py-2 font-semibold text-corporativo-700 hover:bg-corporativo-50">
+                              Corregir un dato
+                            </summary>
+                            <div className="mt-2 flex max-w-xl flex-wrap gap-1.5">
+                              {Object.keys(m.resumenCreacion)
+                                .filter((campo) => !['tipo_asamblea', 'RFC de la sociedad'].includes(campo))
+                                .map((campo) => (
+                                  <button
+                                    key={campo}
+                                    type="button"
+                                    disabled={cargando}
+                                    onClick={() => enviar(`Cambiar campo ${campo}`)}
+                                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700 hover:border-corporativo-300 hover:bg-corporativo-50 disabled:opacity-50"
+                                  >
+                                    {ETIQUETAS_CAMPO[campo] || campo}
+                                  </button>
+                                ))}
+                            </div>
+                          </details>
+                        </div>
+                      </section>
                     ) : null}
                     {m.acta ? (
                       <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 border border-slate-100">
@@ -260,9 +542,11 @@ export default function AsistenteChat({
                     {m.borrador && onUsarBorrador ? (
                       <div className="mt-3"><Boton tamano="sm" variante="secundario" onClick={() => onUsarBorrador(m)}>Usar en formulario</Boton></div>
                     ) : null}
-                    {m.acciones?.length ? (
+                    {m.acciones?.filter((accion) => accion.accion !== 'aprobar' || puedeCambiarEstatus).length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {m.acciones.map((a, j) => (
+                        {m.acciones
+                          .filter((accion) => accion.accion !== 'aprobar' || puedeCambiarEstatus)
+                          .map((a, j) => (
                           <button
                             key={j}
                             type="button"
@@ -271,15 +555,15 @@ export default function AsistenteChat({
                           >
                             {a.etiqueta}
                           </button>
-                        ))}
+                          ))}
                       </div>
                     ) : null}
                   </div>
                 ))}
                 {cargando ? (
                   <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <span className="h-3 w-3 rounded-full border-2 border-corporativo-500 border-t-transparent animate-spin"></span>
-                    El asistente está pensando…
+                    <span className="h-3 w-3 rounded-full border-2 border-corporativo-500 border-t-transparent motion-safe:animate-spin motion-reduce:animate-none"></span>
+                    <span className="motion-safe:animate-pulse motion-reduce:animate-none">Preparando respuesta…</span>
                   </div>
                 ) : null}
                 <div ref={finRef} />
@@ -287,24 +571,26 @@ export default function AsistenteChat({
             )}
           </div>
           {/* Opciones en botones (sugerencias rápidas) */}
-          <div className="p-6 border-t border-slate-100 bg-slate-50/50">
-            <div className="flex flex-wrap gap-2 pb-3">
-              {ejemplos.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={cargando}
-                  onClick={() => enviar(s)}
-                  className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm border border-slate-200 hover:bg-corporativo-50 hover:text-corporativo-700 hover:border-corporativo-300 transition disabled:opacity-50"
-                >
-                  {s}
-                </button>
-              ))}
+          {ejemplos.length ? (
+            <div className={`border-t border-slate-100 bg-slate-50/50 ${flotante ? 'p-3' : 'p-6'}`}>
+              <div className="flex flex-wrap gap-2">
+                {ejemplos.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={cargando}
+                    onClick={() => enviar(s)}
+                    className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm border border-slate-200 hover:bg-corporativo-50 hover:text-corporativo-700 hover:border-corporativo-300 transition disabled:opacity-50"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {/* Entrada de texto para pedir el acta */}
-          <form className="p-6 border-t border-slate-100 bg-white" onSubmit={(e) => { e.preventDefault(); enviar() }}>
+          <form className={`border-t border-slate-100 bg-white ${flotante ? 'p-3' : 'p-6'}`} onSubmit={(e) => { e.preventDefault(); enviar() }}>
             <div className="flex gap-2">
               <input
                 className="campo flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:ring-2 focus:ring-corporativo-500 focus:border-transparent outline-none transition"

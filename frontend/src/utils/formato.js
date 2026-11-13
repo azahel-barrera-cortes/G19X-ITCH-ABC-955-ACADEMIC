@@ -17,6 +17,54 @@ function comoFecha(valor) {
   return Number.isNaN(fecha.getTime()) ? null : fecha
 }
 
+function fechaUTC(valor) {
+  if (!valor) return null
+  let entrada = valor
+  if (
+    typeof entrada === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(?:\.\d+)?)?$/.test(entrada)
+  ) {
+    entrada = `${entrada}Z`
+  }
+  const fecha = entrada instanceof Date ? entrada : new Date(entrada)
+  if (Number.isNaN(fecha.getTime())) return null
+  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()))
+}
+
+/** Cuenta días hábiles de lunes a viernes, sin descontar feriados. */
+export function diasHabilesEntre(inicio, fin = new Date()) {
+  const fechaInicio = fechaUTC(inicio)
+  const fechaFin = fechaUTC(fin)
+  if (!fechaInicio || !fechaFin || fechaInicio >= fechaFin) return 0
+
+  let dias = 0
+  const fecha = new Date(fechaInicio)
+  while (fecha < fechaFin) {
+    fecha.setUTCDate(fecha.getUTCDate() + 1)
+    const diaSemana = fecha.getUTCDay()
+    if (diaSemana !== 0 && diaSemana !== 6) dias += 1
+  }
+  return dias
+}
+
+/** Fecha del último movimiento que inició la etapa actual del flujo. */
+export function inicioEtapaActa(acta) {
+  const estado = acta?.estado_flujo
+  const historial = Array.isArray(acta?.historial_revision) ? acta.historial_revision : []
+  const evento = [...historial].reverse().find(
+    (item) => item?.estado_resultante === estado && item?.creado_en,
+  )
+  return evento?.creado_en || acta?.created_at || null
+}
+
+/** Fecha de aprobación final, si existe un evento de aprobación en el historial. */
+export function fechaAprobacionActa(acta) {
+  const historial = Array.isArray(acta?.historial_revision) ? acta.historial_revision : []
+  return [...historial].reverse().find(
+    (item) => item?.estado_resultante === 'aprobada' && item?.creado_en,
+  )?.creado_en || null
+}
+
 /** ``15 de marzo de 2026``. */
 export function fechaLarga(valor) {
   const fecha = comoFecha(valor)

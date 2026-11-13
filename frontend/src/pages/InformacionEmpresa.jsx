@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Boton from '../components/ui/Boton.jsx'
 import Campo from '../components/ui/Campo.jsx'
 import Alerta from '../components/ui/Alerta.jsx'
+import DialogoConfirmacion from '../components/ui/DialogoConfirmacion.jsx'
 import Tarjeta from '../components/ui/Tarjeta.jsx'
 import { TIPOS_SOCIEDAD } from '../constants/catalogos.js'
 import { actualizarInfoEmpresa, obtenerInfoEmpresa } from '../api/auth.js'
@@ -30,6 +31,7 @@ export default function InformacionEmpresa({
   const [aviso, setAviso] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [actualizandoUso, setActualizandoUso] = useState(false)
+  const [confirmarEliminarLogo, setConfirmarEliminarLogo] = useState(false)
 
   useEffect(() => {
     if (!token) return undefined
@@ -366,7 +368,13 @@ export default function InformacionEmpresa({
                   <div className="mt-2 flex items-center gap-3">
                     <img src={info.logo_empresa} alt="Logo" className="h-10 w-auto rounded border border-slate-200" />
                     {puedeEditar && (
-                      <Boton variante="secundario" tamano="sm" onClick={eliminarLogo}>Eliminar logo</Boton>
+                      <Boton
+                        variante="peligro"
+                        tamano="sm"
+                        onClick={() => setConfirmarEliminarLogo(true)}
+                      >
+                        Eliminar logo
+                      </Boton>
                     )}
                   </div>
                 )}
@@ -414,7 +422,7 @@ export default function InformacionEmpresa({
 
       {puedeEditar ? (
         <div className="flex justify-end px-1">
-          <Boton variante="primero" onClick={handleGuardar} cargando={cargando}>
+          <Boton variante="primario" onClick={handleGuardar} cargando={cargando}>
             Guardar información de la sociedad
           </Boton>
         </div>
@@ -423,6 +431,16 @@ export default function InformacionEmpresa({
           Solo el Administrador puede editar o guardar la información de la empresa o sociedad.
         </div>
       )}
+      <DialogoConfirmacion
+        abierto={confirmarEliminarLogo}
+        titulo="¿Eliminar el logo de la sociedad?"
+        descripcion="El logo se quitará del formulario. Guarda los cambios para aplicar la eliminación en el sistema."
+        onCancelar={() => setConfirmarEliminarLogo(false)}
+        onConfirmar={() => {
+          eliminarLogo()
+          setConfirmarEliminarLogo(false)
+        }}
+      />
     </div>
   )
 }

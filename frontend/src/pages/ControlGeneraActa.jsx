@@ -1,122 +1,205 @@
 /**
  * Panel «Generar acta»: punto de entrada para la creación de actas.
- * Muestra «Plantillas de actas» (las más usadas, como hojas) y debajo
- * las acciones «Generar nueva acta» y «Generar acta con IA».
- * Usa el sistema de diseño: tarjeta, Boton, Etiqueta y Tarjeta*.
  */
+import { useMemo, useState } from 'react'
 import Boton from '../components/ui/Boton.jsx'
 import Etiqueta from '../components/ui/Etiqueta.jsx'
+import IconoAsistenteIA from '../components/ui/IconoAsistenteIA.jsx'
 import { Tarjeta, TarjetaCuerpo, TarjetaEncabezado } from '../components/ui/Tarjeta.jsx'
 import { TIPOS_ASAMBLEA } from '../constants/catalogos.js'
 
-const PLANTILLAS_MAS_USADAS = [
-  { tipo: 'ordinaria', usos: 124, destacada: true },
-  { tipo: 'extraordinaria', usos: 86, destacada: false },
-  { tipo: 'constitutiva', usos: 52, destacada: false },
-  { tipo: 'aumento_capital', usos: 38, destacada: false },
-  { tipo: 'sesion_consejo', usos: 31, destacada: false },
-  { tipo: 'mixta', usos: 27, destacada: false },
+const PLANTILLAS_SUGERIDAS = [
+  'ordinaria',
+  'extraordinaria',
+  'constitutiva',
+  'aumento_capital',
+  'sesion_consejo',
+  'mixta',
 ]
 
-function datosPlantilla(tipo) {
+function normalizar(texto) {
+  return String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function IconoDocumento({ className = 'h-6 w-6' }) {
   return (
-    TIPOS_ASAMBLEA.find((item) => item.valor === tipo) || {
-      valor: tipo, etiqueta: tipo, descripcion: '', articulos: [],
-    }
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 3.75h7l4 4v12.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 3.75v4h4M8.5 12h7M8.5 15.5h7" />
+    </svg>
   )
 }
 
-function MiniHoja({ destacada }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={`relative mx-auto h-44 w-full max-w-[180px] overflow-hidden rounded-md border bg-white shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-tarjeta ${destacada ? 'border-acento-400' : 'border-slate-200'}`}
-    >
-      <div className="flex items-center gap-1.5 bg-corporativo-700 px-2.5 py-2">
-        <span className="flex h-4 w-4 items-center justify-center rounded bg-white/15 text-[7px] font-bold text-white">GC</span>
-        <div className="min-w-0 flex-1">
-          <p className="h-1.5 w-16 rounded-full bg-white/80" />
-          <p className="mt-1 h-1 w-10 rounded-full bg-white/40" />
-        </div>
-        <span className="h-3 w-3 rounded-full bg-acento-400" />
-      </div>
-      <div className="space-y-1.5 px-3 py-2.5">
-        <p className="mx-auto h-1.5 w-3/4 rounded-full bg-corporativo-100" />
-        <p className="h-1 w-full rounded-full bg-slate-200" />
-        <p className="h-1 w-full rounded-full bg-slate-200" />
-        <p className="h-1 w-11/12 rounded-full bg-slate-200" />
-        <p className="h-1 w-full rounded-full bg-slate-100" />
-        <p className="h-1 w-10/12 rounded-full bg-slate-100" />
-        <div className="flex gap-1 pt-1">
-          <span className="h-3 w-8 rounded bg-corporativo-50 ring-1 ring-inset ring-corporativo-100" />
-          <span className="h-3 w-8 rounded bg-slate-50 ring-1 ring-inset ring-slate-200" />
-        </div>
-        <p className="h-1 w-full rounded-full bg-slate-100" />
-        <p className="h-1 w-2/3 rounded-full bg-slate-100" />
-      </div>
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between border-t border-slate-100 bg-slate-50 px-2.5 py-1.5">
-        <span className="h-1 w-12 rounded-full bg-slate-300" />
-        <span className="h-3 w-10 rounded-full bg-acento-100 ring-1 ring-inset ring-acento-400/40" />
-      </div>
-    </div>
-  )
-}
-export default function ControlGeneraActa({ onGenerarNueva, onGenerarConIA, onUsarPlantilla }) {
+export default function ControlGeneraActa({ onGenerarNueva, onAbrirAsistente, onUsarPlantilla }) {
+  const [busqueda, setBusqueda] = useState('')
+  const [mostrarTodas, setMostrarTodas] = useState(false)
+
+  const plantillas = useMemo(() => {
+    const disponibles = mostrarTodas
+      ? TIPOS_ASAMBLEA
+      : PLANTILLAS_SUGERIDAS
+        .map((valor) => TIPOS_ASAMBLEA.find((tipo) => tipo.valor === valor))
+        .filter(Boolean)
+    const criterio = normalizar(busqueda)
+    if (!criterio) return disponibles
+    return disponibles.filter((tipo) =>
+      normalizar(`${tipo.etiqueta} ${tipo.descripcion} ${tipo.valor} ${(tipo.articulos || []).join(' ')}`)
+        .includes(criterio),
+    )
+  }, [busqueda, mostrarTodas])
+
   const irFormulario = (tipo) => {
-    if (tipo && onUsarPlantilla) { onUsarPlantilla(tipo); return }
-    if (onGenerarNueva) onGenerarNueva()
+    if (tipo && onUsarPlantilla) {
+      onUsarPlantilla(tipo)
+      return
+    }
+    onGenerarNueva?.()
   }
+
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-lg font-semibold text-corporativo-700">Generar acta</h1>
-        <p className="text-sm text-slate-500">Elige una plantilla frecuente o inicia desde cero: manual o con IA.</p>
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-corporativo-200 pb-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-corporativo-600">Creación documental</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-corporativo-800">Generar acta</h1>
+          <p className="mt-1 text-sm text-slate-600">Elige cómo iniciar y continúa con una guía clara hasta la revisión.</p>
+        </div>
+        <Etiqueta tono="info">Plantillas y captura asistida</Etiqueta>
       </header>
 
-      <Tarjeta>
-        <TarjetaEncabezado titulo="Crear acta" descripcion="Elige como empezar tu documento" />
-        <TarjetaCuerpo>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="flex flex-col rounded-xl border border-corporativo-200 bg-corporativo-50/60 p-4">
-              <h3 className="text-sm font-semibold text-corporativo-700">Formulario manual</h3>
-              <p className="mt-1 flex-1 text-xs text-slate-500">Captura por pasos con validacion y PDF.</p>
-              <Boton variante="primario" tamano="lg" className="mt-3 w-full" onClick={() => irFormulario(null)}>Generar nueva acta</Boton>
+      <section aria-labelledby="metodo-creacion">
+        <div className="mb-3">
+          <h2 id="metodo-creacion" className="text-base font-semibold text-slate-800">¿Cómo quieres comenzar?</h2>
+          <p className="mt-1 text-sm text-slate-500">Puedes capturar los datos directamente o reunirlos con ayuda del asistente.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <article className="flex flex-col rounded-2xl border border-corporativo-200 bg-white p-5 shadow-sm transition hover:border-corporativo-400 hover:shadow-tarjeta">
+            <div className="flex items-start gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-corporativo-50 text-corporativo-700">
+                <IconoDocumento />
+              </span>
+              <div>
+                <h3 className="font-semibold text-corporativo-800">Formulario manual</h3>
+                <p className="mt-1 text-sm leading-5 text-slate-600">
+                  Captura por pasos, valida los campos y revisa el borrador antes de enviarlo.
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col rounded-xl border border-acento-400/50 bg-acento-100/40 p-4">
-              <h3 className="text-sm font-semibold text-corporativo-700">Redaccion asistida</h3>
-              <p className="mt-1 flex-1 text-xs text-slate-500">Describe tu asamblea y la IA propone el borrador.</p>
-              <Boton variante="acento" tamano="lg" className="mt-3 w-full" onClick={() => onGenerarConIA && onGenerarConIA()}>Generar acta con IA</Boton>
-            </div>
-          </div>
-        </TarjetaCuerpo>
-      </Tarjeta>
-      <Tarjeta>
-        <TarjetaEncabezado titulo="Plantillas de actas" descripcion="Las actas establecidas en el proyecto mas usadas." acciones={<Etiqueta tono="info">6 plantillas frecuentes</Etiqueta>} />
-        <TarjetaCuerpo>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {PLANTILLAS_MAS_USADAS.map(({ tipo, usos, destacada }) => {
-              const info = datosPlantilla(tipo)
-              return (
-                <li key={tipo} className={`group flex flex-col rounded-xl border bg-slate-50/60 p-4 transition hover:border-corporativo-200 hover:bg-corporativo-50/40 hover:shadow-tarjeta ${destacada ? 'border-acento-400/60' : 'border-slate-200'}`}>
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <Etiqueta tono={destacada ? 'advertencia' : 'info'}>{destacada ? 'Mas usada' : `${usos} usos`}</Etiqueta>
-                    {destacada ? <span className="text-[11px] text-slate-400">{usos} usos</span> : null}
-                  </div>
-                  <button type="button" onClick={() => irFormulario(info.valor)} title={`Usar: ${info.etiqueta}`} className="rounded-lg py-2">
-                    <MiniHoja destacada={destacada} />
-                  </button>
-                  <h3 className="mt-3 text-sm font-semibold text-corporativo-700">{info.etiqueta}</h3>
-                  <p className="mt-1 min-h-[2.5rem] text-xs text-slate-500">{info.descripcion}</p>
-                  <div className="mt-3"><Boton variante={destacada ? 'acento' : 'secundario'} tamano="sm" className="w-full" onClick={() => irFormulario(info.valor)}>Usar plantilla</Boton></div>
-                </li>
-              )
-            })}
-          </ul>
-        </TarjetaCuerpo>
-      </Tarjeta>
+            <Boton variante="primario" tamano="lg" className="mt-5 w-full" onClick={() => irFormulario(null)}>
+              Iniciar formulario
+            </Boton>
+          </article>
 
+          <article className="flex flex-col rounded-2xl border border-corporativo-700 bg-corporativo-700 p-5 text-white shadow-sm transition hover:bg-corporativo-800 hover:shadow-tarjeta">
+            <div className="flex items-start gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-inset ring-white/20">
+                <IconoAsistenteIA className="h-6 w-6" />
+              </span>
+              <div>
+                <h3 className="font-semibold">Redacción asistida</h3>
+                <p className="mt-1 text-sm leading-5 text-corporativo-50">
+                  Consulta actas o inicia una creación guiada desde el mismo asistente de la barra lateral.
+                </p>
+              </div>
+            </div>
+            <Boton variante="secundario" tamano="lg" className="mt-5 w-full" onClick={() => onAbrirAsistente?.()}>
+              Abrir asistente IA
+            </Boton>
+          </article>
+        </div>
+      </section>
+
+      <Tarjeta>
+        <TarjetaEncabezado
+          titulo="Plantillas de actas"
+          descripcion="Busca por tipo o asunto, usa una sugerencia o explora el catálogo completo."
+          acciones={
+            <Etiqueta tono="info" aria-live="polite">
+              {plantillas.length} {plantillas.length === 1 ? 'plantilla' : 'plantillas'}
+            </Etiqueta>
+          }
+        />
+        <TarjetaCuerpo>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Buscar plantillas por tipo o asunto</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400">
+                <circle cx="10.8" cy="10.8" r="6.8" />
+                <path strokeLinecap="round" d="m16 16 4.5 4.5" />
+              </svg>
+              <input
+                type="search"
+                value={busqueda}
+                onChange={(evento) => setBusqueda(evento.target.value)}
+                placeholder="Ej.: ordinaria, capital, consejo…"
+                className="campo pl-10"
+              />
+            </label>
+            <Boton
+              type="button"
+              variante="secundario"
+              aria-pressed={mostrarTodas}
+              onClick={() => setMostrarTodas((actual) => !actual)}
+              className="shrink-0"
+            >
+              {mostrarTodas ? 'Mostrar sugeridas' : `Ver catálogo completo (${TIPOS_ASAMBLEA.length})`}
+            </Boton>
+          </div>
+
+          {plantillas.length ? (
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {plantillas.map((plantilla) => (
+                <li
+                  key={plantilla.valor}
+                  className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 transition hover:border-corporativo-300 hover:bg-corporativo-50/40 hover:shadow-tarjeta"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-corporativo-50 text-corporativo-700">
+                      <IconoDocumento className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-corporativo-600">Plantilla de asamblea</p>
+                      <h3 className="mt-0.5 text-sm font-semibold leading-5 text-corporativo-800">{plantilla.etiqueta}</h3>
+                    </div>
+                  </div>
+                  <p className="mt-3 flex-1 text-sm leading-5 text-slate-600">{plantilla.descripcion}</p>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    className="mt-4 w-full"
+                    onClick={() => irFormulario(plantilla.valor)}
+                  >
+                    Usar plantilla
+                  </Boton>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div role="status" aria-live="polite" className="rounded-xl border border-dashed border-corporativo-200 bg-corporativo-50/50 px-4 py-8 text-center">
+              <p className="font-semibold text-corporativo-800">No encontramos plantillas con esa búsqueda</p>
+              <p className="mt-1 text-sm text-slate-600">Prueba con otro tipo de asamblea o tema.</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {!mostrarTodas ? (
+                  <Boton
+                    variante="primario"
+                    tamano="sm"
+                    onClick={() => setMostrarTodas(true)}
+                  >
+                    Buscar en el catálogo completo
+                  </Boton>
+                ) : null}
+                <Boton variante="secundario" tamano="sm" onClick={() => setBusqueda('')}>
+                  Limpiar búsqueda
+                </Boton>
+              </div>
+            </div>
+          )}
+        </TarjetaCuerpo>
+      </Tarjeta>
     </div>
   )
 }
-
-

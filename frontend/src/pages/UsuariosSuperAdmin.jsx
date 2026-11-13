@@ -12,6 +12,7 @@ import {
 import Alerta from '../components/ui/Alerta.jsx'
 import Boton from '../components/ui/Boton.jsx'
 import Campo from '../components/ui/Campo.jsx'
+import DialogoConfirmacion from '../components/ui/DialogoConfirmacion.jsx'
 import Etiqueta from '../components/ui/Etiqueta.jsx'
 import Indicador from '../components/ui/Indicador.jsx'
 
@@ -60,6 +61,7 @@ export default function UsuariosSuperAdmin() {
     estatus: 'todos',
   })
   const [actualizandoId, setActualizandoId] = useState(null)
+  const [usuarioPendienteEliminar, setUsuarioPendienteEliminar] = useState(null)
   const [alerta, setAlerta] = useState(null)
   const [panel, setPanel] = useState(null)
   const [formulario, setFormulario] = useState(FORMULARIO_INICIAL)
@@ -200,11 +202,7 @@ export default function UsuariosSuperAdmin() {
   }
 
   const borrarUsuario = async (usuario) => {
-    if (esYo(usuario.id)) return
-    const confirmado = window.confirm(
-      `¿Eliminar a ${usuario.nombre_completo}? Esta acción no se puede deshacer.`,
-    )
-    if (!confirmado) return
+    if (!usuario || esYo(usuario.id)) return
 
     setActualizandoId(usuario.id)
     setAlerta(null)
@@ -218,6 +216,7 @@ export default function UsuariosSuperAdmin() {
       setAlerta({ tono: 'error', mensaje: detalle })
     } finally {
       setActualizandoId(null)
+      setUsuarioPendienteEliminar(null)
     }
   }
 
@@ -469,7 +468,7 @@ export default function UsuariosSuperAdmin() {
                             tamano="sm"
                             className="min-w-[78px]"
                             disabled={actualizandoId === usuario.id || esYo(usuario.id)}
-                            onClick={() => borrarUsuario(usuario)}
+                            onClick={() => setUsuarioPendienteEliminar(usuario)}
                             title={esYo(usuario.id) ? 'No puedes eliminar tu propio usuario' : undefined}
                           >
                             Eliminar
@@ -610,6 +609,20 @@ export default function UsuariosSuperAdmin() {
           )}
         </aside>
       </div>
+      <DialogoConfirmacion
+        abierto={Boolean(usuarioPendienteEliminar)}
+        titulo="¿Eliminar este usuario?"
+        descripcion={
+          usuarioPendienteEliminar
+            ? `Se eliminará el perfil de ${usuarioPendienteEliminar.nombre_completo}. Esta acción no se puede deshacer.`
+            : ''
+        }
+        cargando={Boolean(
+          usuarioPendienteEliminar && actualizandoId === usuarioPendienteEliminar.id,
+        )}
+        onCancelar={() => setUsuarioPendienteEliminar(null)}
+        onConfirmar={() => borrarUsuario(usuarioPendienteEliminar)}
+      />
     </div>
   )
 }

@@ -18,6 +18,7 @@
   /* Tarjeta base reutilizada por todos los paneles de la interfaz. */
   .tarjeta {
     @apply rounded-xl border border-slate-200 bg-white shadow-tarjeta;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
   }
 
   /* Campo de formulario estándar (inputs, selects y textareas). */
@@ -30,5 +31,92 @@
   /* Etiqueta de campo. */
   .etiqueta-campo {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+
+  .pgac-chat-message {
+    animation: pgac-message-in 180ms ease-out both;
+  }
+
+  .pgac-assistant-bubble {
+    animation: pgac-bubble-float 3s ease-in-out infinite;
+  }
+
+  .pgac-assistant-panel {
+    transform-origin: bottom right;
+    animation: pgac-panel-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .pgac-dialog-backdrop {
+    animation: pgac-dialog-fade-in 150ms ease-out both;
+  }
+
+  .pgac-confirmation-dialog {
+    animation: pgac-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+@keyframes pgac-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pgac-bubble-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes pgac-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pgac-dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pgac-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pgac-chat-message,
+  .pgac-assistant-bubble,
+  .pgac-assistant-panel,
+  .pgac-dialog-backdrop,
+  .pgac-confirmation-dialog {
+    animation: none;
+  }
+
+  .tarjeta {
+    transition: none;
   }
 }

@@ -113,10 +113,6 @@ export function useHistorialActas() {
       setOperando(acta.id)
       setError(null)
       try {
-        const confirmado =
-          typeof window === 'undefined' ||
-          window.confirm(`¿Eliminar el acta ${acta.folio}? Esta acción no se puede deshacer.`)
-        if (!confirmado) return
         const respuesta = await eliminarActa(acta.id)
         setAviso(respuesta?.mensaje || `Acta ${acta.folio} eliminada.`)
         await cargar(filtros)

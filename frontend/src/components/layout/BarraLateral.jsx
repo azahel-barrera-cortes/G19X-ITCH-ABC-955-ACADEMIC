@@ -6,6 +6,8 @@
  * navegación pasa a una fila horizontal sobre el contenido (ver `App.jsx`).
  */
 import { etiquetaGuiaRol } from '../../constants/roles.js'
+import IconoAsistenteIA from '../ui/IconoAsistenteIA.jsx'
+import Boton from '../ui/Boton.jsx'
 
 const SECCIONES = [
   {
@@ -22,13 +24,8 @@ const SECCIONES = [
   {
     id: 'asistente',
     etiqueta: 'Asistente IA',
-    descripcion: 'Chat de actas: redacta y crea guiado',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-13.2 8L3 21l1.1-4.4A9 9 0 1121 12z" />
-      </svg>
-    ),
+    descripcion: 'Asistente por rol: redacción, estatus y tiempos',
+    icono: <IconoAsistenteIA />,
   },
   {
     id: 'mis-actas',
@@ -274,13 +271,13 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
 
       <div className="border-t border-slate-200 px-5 py-3 space-y-3">
         {onCerrarSesion && (
-          <button
-            type="button"
+          <Boton
+            variante="peligro"
             onClick={() => onCerrarSesion()}
-            className="w-full rounded-xl px-3 py-2.5 text-left text-red-600 font-medium border border-red-100 background-color: red "
+            className="w-full"
           >
             Cerrar sesión
-          </button>
+          </Boton>
         )}
         <p className="text-[11px] leading-snug text-slate-400">
           La IA asiste la redacción; la revisión legal final corresponde al abogado responsable.

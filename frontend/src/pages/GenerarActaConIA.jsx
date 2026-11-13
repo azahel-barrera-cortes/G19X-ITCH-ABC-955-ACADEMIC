@@ -23,7 +23,7 @@ export default function GenerarActaConIA({
           <p className="text-sm text-slate-500 mt-1">
             {esEdicion
               ? 'Solicita cambios sobre los datos originales. Después podrás revisarlos en el formulario y guardar una nueva versión.'
-              : 'Describe tu asamblea y el asistente propone el borrador con fundamento LGSM.'}
+              : 'Describe tu asamblea; la IA recopila los datos, te muestra un resumen para revisar y pide tu confirmación antes de enviarla a revisión.'}
           </p>
         </div>
         {onVolver ? (
@@ -41,8 +41,8 @@ export default function GenerarActaConIA({
           <TarjetaEncabezado
             titulo={esEdicion ? 'Edición asistida' : 'Asistente de redacción'}
             descripcion={esEdicion
-              ? 'Indica qué campos deseas modificar. El asistente preparará los cambios para revisarlos.'
-              : 'Conversa con la IA para crear tu acta paso a paso'}
+              ? 'Indica qué campos deseas modificar y confirma los cambios antes de aplicarlos al formulario.'
+              : 'Creación guiada con vista previa y confirmación antes de enviar a revisión.'}
           />
           <TarjetaCuerpo className="pt-0">
             <AsistenteChat
