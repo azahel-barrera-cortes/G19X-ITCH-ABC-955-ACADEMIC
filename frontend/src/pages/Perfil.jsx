@@ -93,6 +93,7 @@ export default function Perfil() {
       await cambiarPassword(token, password.nueva)
       setAvisoPassword('Contraseña actualizada. Inicia sesión de nuevo.')
       setPassword({ actual: '', nueva: '', confirmar: '' })
+      await cerrarSesion(false)
     } catch (fallo) { setErrorPassword(fallo.message || 'Error al cambiar contraseña.') }
     finally { setCargandoPassword(false) }
   }

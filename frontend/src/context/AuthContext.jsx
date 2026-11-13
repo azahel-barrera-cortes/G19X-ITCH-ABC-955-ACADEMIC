@@ -60,10 +60,10 @@ export function AuthProvider({ children }) {
   }, [])
 
   /** Registra y cierra la sesión, sin bloquear la salida si el backend no responde. */
-  const cerrarSesion = useCallback(async () => {
+  const cerrarSesion = useCallback(async (registrarEnServidor = true) => {
     const tokenActual = localStorage.getItem(CLAVE_TOKEN)
     try {
-      if (tokenActual) await registrarCierreSesion(tokenActual)
+      if (registrarEnServidor && tokenActual) await registrarCierreSesion(tokenActual)
     } catch (fallo) {
       console.error('No se pudo registrar el cierre de sesión:', fallo)
     } finally {

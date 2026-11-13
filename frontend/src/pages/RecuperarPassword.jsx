@@ -5,7 +5,7 @@ import Tarjeta from '../components/ui/Tarjeta.jsx'
 import Alerta from '../components/ui/Alerta.jsx'
 import { solicitarResetPassword, confirmarResetPassword } from '../api/auth.js'
 
-/** Página para recuperar contraseña (paso 1: enviar correo). */
+/** Página para recuperar contraseña con token enviado por correo. */
 export default function RecuperarPassword({ onCambiarVista = null }) {
   const [etapa, setEtapa] = useState('enviar') // enviar | confirmar
   const [formulario, setFormulario] = useState({ email: '', token: '', nuevo_password: '', confirmar: '' })
@@ -22,13 +22,7 @@ export default function RecuperarPassword({ onCambiarVista = null }) {
     setCargando(true)
     try {
       const respuesta = await solicitarResetPassword(formulario.email)
-      // Mientras no haya servicio de correo, el backend (en modo DEBUG) puede
-      // devolver el token en `detalle` para probar el flujo completo.
-      setAviso(
-        respuesta.detalle
-          ? `${respuesta.mensaje} ${respuesta.detalle}`
-          : respuesta.mensaje || 'Si el correo está registrado, se generó un token de recuperación.',
-      )
+      setAviso(respuesta.mensaje || 'Si el correo está registrado, recibirás instrucciones para recuperar tu contraseña.')
       setEtapa('confirmar')
     } catch (fallo) {
       setError(fallo.message || 'No se pudo enviar el token de recuperación.')
@@ -67,7 +61,7 @@ export default function RecuperarPassword({ onCambiarVista = null }) {
       <Tarjeta className="w-full max-w-md">
         <header className="mb-6 text-center">
           <h1 className="text-xl font-semibold text-corporativo-700">Recuperar contraseña</h1>
-          <p className="text-sm text-slate-500">Genera un token para cambiar tu contraseña</p>
+          <p className="text-sm text-slate-500">Recibe por correo un token para cambiar tu contraseña</p>
         </header>
 
         {error && (
@@ -103,20 +97,20 @@ export default function RecuperarPassword({ onCambiarVista = null }) {
                 ← Volver al inicio de sesión
               </button>
               <Boton type="submit" variante="primario" cargando={cargando}>
-                Enviar token
+                Enviar código
               </Boton>
             </div>
           </form>
         ) : (
           <form onSubmit={manejarConfirmar} className="space-y-4">
-            <Campo etiqueta="Token de recuperación" htmlFor="token" ayuda="Código que recibiste por correo.">
+            <Campo etiqueta="Token de recuperación" htmlFor="token" ayuda="Código enviado a tu correo. Vence en 60 minutos.">
               <input
                 id="token"
                 type="text"
                 className="campo"
                 value={formulario.token}
                 onChange={(e) => manejarCambio('token', e.target.value)}
-                placeholder="Token de 32 caracteres"
+                placeholder="Pega el código recibido por correo"
                 required
               />
             </Campo>
