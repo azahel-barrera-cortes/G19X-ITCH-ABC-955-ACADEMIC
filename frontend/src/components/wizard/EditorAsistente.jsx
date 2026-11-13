@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import Campo from '../ui/Campo.jsx'
 import Boton from '../ui/Boton.jsx'
+import DialogoConfirmacion from '../ui/DialogoConfirmacion.jsx'
 import { CARACTERES_ASISTENTE } from '../../constants/catalogos.js'
 import { porcentaje } from '../../utils/formato.js'
 
@@ -14,6 +16,7 @@ export default function EditorAsistente({
   onCambiar,
   onEliminar,
 }) {
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false)
   const actualizar = (cambios) => onCambiar(indice, cambios)
 
   /** Marca de forma exclusiva el papel de presidente/secretario de la asamblea. */
@@ -34,7 +37,7 @@ export default function EditorAsistente({
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Asistente {indice + 1}
         </p>
-        <Boton variante="fantasma" tamano="sm" onClick={() => onEliminar(indice)}>
+        <Boton variante="peligro" tamano="sm" onClick={() => setConfirmarQuitar(true)}>
           Quitar
         </Boton>
       </div>
@@ -148,6 +151,17 @@ export default function EditorAsistente({
           Firma el acta
         </label>
       </div>
+      <DialogoConfirmacion
+        abierto={confirmarQuitar}
+        titulo="¿Quitar este asistente?"
+        descripcion={`Se quitará a ${asistente.nombre || `Asistente ${indice + 1}`} del borrador del acta.`}
+        etiquetaConfirmar="Quitar asistente"
+        onCancelar={() => setConfirmarQuitar(false)}
+        onConfirmar={() => {
+          onEliminar(indice)
+          setConfirmarQuitar(false)
+        }}
+      />
     </div>
   )
 }

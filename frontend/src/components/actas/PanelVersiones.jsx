@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Alerta from '../ui/Alerta.jsx'
 import Boton from '../ui/Boton.jsx'
+import DialogoConfirmacion from '../ui/DialogoConfirmacion.jsx'
 import Etiqueta from '../ui/Etiqueta.jsx'
 import VisorActa from './VisorActa.jsx'
 import {
@@ -25,6 +26,7 @@ export default function PanelVersiones({ acta, onCambio = null, soloLectura = fa
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [operando, setOperando] = useState(false)
+  const [versionPendienteRestaurar, setVersionPendienteRestaurar] = useState(null)
 
   const cargar = useCallback(async () => {
     if (!acta?.id) return
@@ -56,14 +58,9 @@ export default function PanelVersiones({ acta, onCambio = null, soloLectura = fa
     }
   }
 
-  const restaurar = async (numero) => {
-    const confirmado =
-      typeof window === 'undefined' ||
-      window.confirm(
-        `¿Restaurar la versión ${numero} del acta ${acta.folio}? ` +
-          'Se emitirá una versión nueva con ese contenido.',
-      )
-    if (!confirmado) return
+  const restaurar = async () => {
+    if (versionPendienteRestaurar === null) return
+    const numero = versionPendienteRestaurar
 
     setOperando(true)
     setError(null)
@@ -78,6 +75,7 @@ export default function PanelVersiones({ acta, onCambio = null, soloLectura = fa
       setError(await mensajeDeError(fallo))
     } finally {
       setOperando(false)
+      setVersionPendienteRestaurar(null)
     }
   }
 
@@ -132,7 +130,7 @@ export default function PanelVersiones({ acta, onCambio = null, soloLectura = fa
                         tamano="sm"
                         variante="secundario"
                         cargando={operando && detalle?.version === version.version}
-                        onClick={() => restaurar(version.version)}
+                        onClick={() => setVersionPendienteRestaurar(version.version)}
                       >
                         Restaurar
                       </Boton>
@@ -154,6 +152,20 @@ export default function PanelVersiones({ acta, onCambio = null, soloLectura = fa
           onCerrar={() => setDetalle(null)}
         />
       ) : null}
+      <DialogoConfirmacion
+        abierto={versionPendienteRestaurar !== null}
+        titulo="¿Restaurar esta versión?"
+        descripcion={
+          versionPendienteRestaurar !== null
+            ? `Se creará una versión nueva del acta ${acta.folio} usando el contenido de la versión ${versionPendienteRestaurar}.`
+            : ''
+        }
+        etiquetaConfirmar="Restaurar versión"
+        varianteConfirmar="primario"
+        cargando={operando}
+        onCancelar={() => setVersionPendienteRestaurar(null)}
+        onConfirmar={restaurar}
+      />
     </section>
   )
 }

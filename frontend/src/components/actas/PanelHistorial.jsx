@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import Alerta from '../ui/Alerta.jsx'
 import Boton from '../ui/Boton.jsx'
+import DialogoConfirmacion from '../ui/DialogoConfirmacion.jsx'
 import PanelValidacion from './PanelValidacion.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { tieneAcceso } from '../../constants/roles.js'
@@ -41,6 +42,7 @@ export default function PanelHistorial({ catalogos = null }) {
   const tipos = catalogos?.tipos_asamblea || TIPOS_ASAMBLEA
   const estatusDisponibles = catalogos?.estatus_acta || ESTATUS_ACTA
   const [actaVisible, setActaVisible] = useState(null)
+  const [actaPendienteEliminar, setActaPendienteEliminar] = useState(null)
   const [validaciones, setValidaciones] = useState({})
   const [validacionesAbiertas, setValidacionesAbiertas] = useState({})
 
@@ -217,7 +219,7 @@ export default function PanelHistorial({ catalogos = null }) {
                                 tamano="sm"
                                 variante="peligro"
                                 disabled={operando === acta.id}
-                                onClick={() => borrar(acta)}
+                                onClick={() => setActaPendienteEliminar(acta)}
                               >
                                 Eliminar
                               </Boton>
@@ -265,6 +267,22 @@ export default function PanelHistorial({ catalogos = null }) {
       {actaVisible ? (
         <VisorActa acta={actaVisible} onCerrar={() => setActaVisible(null)} />
       ) : null}
+      <DialogoConfirmacion
+        abierto={Boolean(actaPendienteEliminar)}
+        titulo="¿Eliminar esta acta?"
+        descripcion={
+          actaPendienteEliminar
+            ? `Se eliminará el acta ${actaPendienteEliminar.folio} del historial. Esta acción no se puede deshacer.`
+            : ''
+        }
+        cargando={Boolean(actaPendienteEliminar && operando === actaPendienteEliminar.id)}
+        onCancelar={() => setActaPendienteEliminar(null)}
+        onConfirmar={async () => {
+          if (!actaPendienteEliminar) return
+          await borrar(actaPendienteEliminar)
+          setActaPendienteEliminar(null)
+        }}
+      />
     </div>
   )
 }

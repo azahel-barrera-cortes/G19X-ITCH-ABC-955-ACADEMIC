@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import Alerta from '../ui/Alerta.jsx'
 import Boton from '../ui/Boton.jsx'
 import Campo from '../ui/Campo.jsx'
+import DialogoConfirmacion from '../ui/DialogoConfirmacion.jsx'
 import EditorAcuerdo from './EditorAcuerdo.jsx'
 import { numero } from '../../utils/formato.js'
 
@@ -18,6 +20,7 @@ const normalizar = (texto) =>
  * que es la inconsistencia más frecuente y ya la valida el backend.
  */
 export default function PasoOrdenDelDia({ estado, actualizarCampo, despachar, calculos, errores = {} }) {
+  const [puntoPendienteEliminar, setPuntoPendienteEliminar] = useState(null)
   const titulosPuntos = estado.orden_del_dia.map((punto) => normalizar(punto.titulo))
   const acuerdosHuerfanos = estado.acuerdos.filter(
     (acuerdo) =>
@@ -97,9 +100,9 @@ export default function PasoOrdenDelDia({ estado, actualizarCampo, despachar, ca
                   Requiere votación
                 </label>
                 <Boton
-                  variante="fantasma"
+                  variante="peligro"
                   tamano="sm"
-                  onClick={() => despachar({ tipo: 'punto.eliminar', indice })}
+                  onClick={() => setPuntoPendienteEliminar(indice)}
                 >
                   Quitar
                 </Boton>
@@ -169,6 +172,22 @@ export default function PasoOrdenDelDia({ estado, actualizarCampo, despachar, ca
         />
       </Campo>
 
+      <DialogoConfirmacion
+        abierto={puntoPendienteEliminar !== null}
+        titulo="¿Quitar este punto del orden del día?"
+        descripcion={
+          puntoPendienteEliminar !== null
+            ? `Se quitará «${estado.orden_del_dia[puntoPendienteEliminar]?.titulo || `Punto ${puntoPendienteEliminar + 1}`}» del borrador del acta.`
+            : ''
+        }
+        etiquetaConfirmar="Quitar punto"
+        onCancelar={() => setPuntoPendienteEliminar(null)}
+        onConfirmar={() => {
+          if (puntoPendienteEliminar === null) return
+          despachar({ tipo: 'punto.eliminar', indice: puntoPendienteEliminar })
+          setPuntoPendienteEliminar(null)
+        }}
+      />
     </div>
   )
 }

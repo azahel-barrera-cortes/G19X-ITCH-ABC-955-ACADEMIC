@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import Campo from '../ui/Campo.jsx'
 import Boton from '../ui/Boton.jsx'
+import DialogoConfirmacion from '../ui/DialogoConfirmacion.jsx'
 import { TIPOS_MAYORIA } from '../../constants/catalogos.js'
 
 /**
@@ -8,6 +10,7 @@ import { TIPOS_MAYORIA } from '../../constants/catalogos.js'
  * dejar constancia de la base de cómputo exigida por la LGSM.
  */
 export default function EditorAcuerdo({ acuerdo, indice, onCambiar, onVotacion, onEliminar }) {
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false)
   const votacion = acuerdo.votacion || {}
 
   /** Al cambiar la mayoría se propone automáticamente el porcentaje requerido. */
@@ -30,7 +33,7 @@ export default function EditorAcuerdo({ acuerdo, indice, onCambiar, onVotacion, 
             </span>
           ) : null}
         </p>
-        <Boton variante="fantasma" tamano="sm" onClick={() => onEliminar(indice)}>
+        <Boton variante="peligro" tamano="sm" onClick={() => setConfirmarQuitar(true)}>
           Quitar
         </Boton>
       </div>
@@ -146,6 +149,17 @@ export default function EditorAcuerdo({ acuerdo, indice, onCambiar, onVotacion, 
         ) : null}
       </div>
 
+      <DialogoConfirmacion
+        abierto={confirmarQuitar}
+        titulo="¿Quitar este acuerdo?"
+        descripcion={`Se quitará «${acuerdo.titulo || `Acuerdo ${indice + 1}`}» del borrador del acta.`}
+        etiquetaConfirmar="Quitar acuerdo"
+        onCancelar={() => setConfirmarQuitar(false)}
+        onConfirmar={() => {
+          onEliminar(indice)
+          setConfirmarQuitar(false)
+        }}
+      />
     </div>
   )
 }
