@@ -13,27 +13,85 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import (
     RequiereCapturista,
     RequiereRevisor,
+    RequiereSuperAdministrador,
     get_db,
     registrar_bitacora,
 )
 from app.db.session import get_db
+from app.models.acta import Acta
+from app.models.usuario import BitacoraCambios
 from app.schemas.acta import (
     ActaRead,
     CaducidadRequest,
+    ReasignarEmpresaActaRequest,
     ResumenAdministracion,
     VersionActaDetalle,
     VersionActaResumen,
     VigenciaActa,
 )
-from app.services import acta_service, administracion
+from app.services import administracion
+from app.services.tenant_access import alcance_empresa, obtener_acta_autorizada
+from app.services.auth_service import obtener_administrador_empresa
 
 router = APIRouter(prefix="/administracion", tags=["Administración"])
+
+
+@router.patch(
+    "/actas/{acta_id}/empresa",
+    response_model=ActaRead,
+    summary="Asignar un acta en cuarentena a una empresa (SuperAdministrador).",
+)
+def reasignar_empresa_acta(
+    acta_id: int,
+    payload: ReasignarEmpresaActaRequest,
+    usuario_actual: RequiereSuperAdministrador,
+    db: Session = Depends(get_db),
+) -> ActaRead:
+    """Asigna explícitamente registros históricos sin empresa a un tenant activo."""
+    administrador = obtener_administrador_empresa(db, payload.codigo_empresa)
+    if administrador is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No existe una empresa activa con ese código.",
+        )
+    acta = db.query(Acta).filter(
+        Acta.id == acta_id,
+        Acta.empresa_codigo.is_(None),
+    ).first()
+    if acta is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No existe un acta en cuarentena con ese identificador.",
+        )
+
+    acta.empresa_codigo = administrador.codigo_empresa
+    db.query(BitacoraCambios).filter(
+        BitacoraCambios.entidad == "actas",
+        BitacoraCambios.entidad_id == acta_id,
+        BitacoraCambios.empresa_codigo.is_(None),
+    ).update(
+        {"empresa_codigo": administrador.codigo_empresa},
+        synchronize_session=False,
+    )
+    db.commit()
+    db.refresh(acta)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="reasignar_empresa",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={"empresa_codigo": None},
+        datos_despues={"empresa_codigo": administrador.codigo_empresa},
+        empresa_codigo=administrador.codigo_empresa,
+    )
+    return ActaRead.model_validate(acta)
 
 
 # ---------------------------------------------------------------------------
@@ -45,11 +103,13 @@ router = APIRouter(prefix="/administracion", tags=["Administración"])
     summary="Estadísticas globales: actas, versiones y estado de vigencia",
 )
 def resumen(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     db: Session = Depends(get_db),
 ) -> ResumenAdministracion:
     """Totales por estatus y clasificación de caducidad de todo el repositorio."""
-    return ResumenAdministracion(**administracion.resumen_administracion(db))
+    return ResumenAdministracion(
+        **administracion.resumen_administracion(db, alcance_empresa(usuario_actual))
+    )
 
 
 @router.get(
@@ -58,7 +118,7 @@ def resumen(
     summary="Actas clasificadas por vigencia (vencidas primero)",
 )
 def por_vigencia(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     estado: Optional[str] = Query(
         None,
         description="Filtro: vencida | por_vencer | vigente | sin_fecha",
@@ -67,7 +127,9 @@ def por_vigencia(
     db: Session = Depends(get_db),
 ) -> List[VigenciaActa]:
     """Lista las actas ordenadas por prioridad de atención: vencidas al inicio."""
-    actas = administracion.actas_por_vigencia(db, estado=estado, limite=limite)
+    actas = administracion.actas_por_vigencia(
+        db, estado=estado, limite=limite, alcance=alcance_empresa(usuario_actual)
+    )
     return [VigenciaActa.model_validate(acta) for acta in actas]
 
 
@@ -80,11 +142,12 @@ def por_vigencia(
     summary="Historial de versiones de un acta (más reciente primero)",
 )
 def listar_versiones(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     acta_id: int,
     db: Session = Depends(get_db),
 ) -> List[VersionActaResumen]:
     """Devuelve el listado de instantáneas registradas para el acta indicado."""
+    obtener_acta_autorizada(db, acta_id, usuario_actual)
     return [
         VersionActaResumen.model_validate(version)
         for version in administracion.listar_versiones(db, acta_id)
@@ -97,14 +160,14 @@ def listar_versiones(
     summary="Contenido completo de una versión concreta",
 )
 def detalle_version(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     acta_id: int,
     numero: int,
     db: Session = Depends(get_db),
 ) -> VersionActaDetalle:
     """Recupera el retrato completo del acta tal como quedó en esa versión."""
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     version = administracion.obtener_version(db, acta_id, numero)
-    acta = acta_service.obtener_acta(db, acta_id)
     # Se construye un dict explícito: `version.__dict__` incluye el estado interno
     # de SQLAlchemy (`_sa_instance_state`), que Pydantic no puede serializar.
     return VersionActaDetalle(
@@ -135,6 +198,7 @@ def restaurar(
     El historial nunca retrocede: al restaurar se emite una versión nueva con el
     contenido recuperado, de modo que la auditoría completa queda intacta.
     """
+    obtener_acta_autorizada(db, acta_id, usuario_actual)
     acta = administracion.restaurar_version(db, acta_id, numero)
     registrar_bitacora(
         db,
@@ -166,6 +230,7 @@ def fijar_caducidad(
     Enviar ``fecha_caducidad`` vacío elimina el plazo (el acta queda sin
     caducidad) y deja constancia del motivo en el historial.
     """
+    obtener_acta_autorizada(db, acta_id, usuario_actual)
     acta = administracion.fijar_caducidad(
         db, acta_id, payload.fecha_caducidad, payload.motivo
     )

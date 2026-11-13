@@ -451,6 +451,17 @@ class CaducidadRequest(BaseSchema):
     motivo: Optional[str] = Field(default=None, max_length=300)
 
 
+class ReasignarEmpresaActaRequest(BaseSchema):
+    """Vincula un acta en cuarentena con un código empresarial existente."""
+
+    codigo_empresa: str = Field(min_length=1, max_length=32)
+
+    @field_validator("codigo_empresa")
+    @classmethod
+    def _normalizar_codigo_empresa(cls, valor: str) -> str:
+        return valor.strip().upper()
+
+
 class VigenciaActa(BaseSchema):
     """Resumen de una acta para el módulo de caducidad."""
 
