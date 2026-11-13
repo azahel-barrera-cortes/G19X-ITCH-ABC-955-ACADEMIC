@@ -11,8 +11,9 @@ Coordina los tres servicios especializados sin mezclar responsabilidades:
 from __future__ import annotations
 
 import logging
+import json
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from sqlalchemy import func, or_, select
@@ -36,6 +37,7 @@ from app.schemas.acta import (
     ActaBase,
     ActaGenerarPdfRequest,
     ActaRead,
+    AnalisisRevisionActa,
     ActaRedaccionRequest,
     ActaRedaccionResponse,
     ActaResumen,
@@ -43,7 +45,11 @@ from app.schemas.acta import (
 )
 from app.services import plantillas_legales as plantillas
 from app.services.ai_service import AIService, crear_servicio_ia
-from app.services.administracion import registrar_version
+from app.services.administracion import (
+    contenido_del_acta,
+    listar_versiones,
+    registrar_version,
+)
 from app.services.pdf_generator import build_acta_pdf, nombre_archivo_acta
 
 logger = logging.getLogger(__name__)
@@ -57,6 +63,31 @@ CLAVES_FIJAS = (
     "declaracion_instalacion",
     "cierre",
     "declaracion_protocolizacion",
+)
+
+_CAMPOS_ANALISIS_REVISION = (
+    ("rfc_sociedad", "RFC de la sociedad"),
+    ("tipo_sociedad", "Tipo de sociedad"),
+    ("datos_especificos", "Datos jurídicos específicos"),
+    ("titulo", "Título"),
+    ("fecha", "Fecha de asamblea"),
+    ("hora", "Hora"),
+    ("lugar", "Lugar"),
+    ("convocatoria_fecha", "Fecha de convocatoria"),
+    ("convocatoria_medio", "Medio de convocatoria"),
+    ("convocatoria_quien", "Quién convoca"),
+    ("capital_social", "Capital social"),
+    ("acciones_totales", "Acciones totales"),
+    ("capital_presente", "Capital presente"),
+    ("quorum_porcentaje", "Porcentaje de quórum"),
+    ("presidente", "Presidente"),
+    ("secretario", "Secretario"),
+    ("asistentes", "Asistentes"),
+    ("orden_del_dia", "Orden del día"),
+    ("acuerdos", "Acuerdos"),
+    ("clausulas", "Cláusulas legales"),
+    ("texto_legal", "Texto legal"),
+    ("observaciones", "Observaciones"),
 )
 
 
@@ -322,6 +353,9 @@ def _volcar_payload(
     # Información de la empresa / sociedad (RF-10).
     modelo.tipo_sociedad = payload.tipo_sociedad
     modelo.datos_especificos = dict(payload.datos_especificos or {})
+    datos_asistente = getattr(payload, "datos_asistente", None)
+    if datos_asistente is not None:
+        modelo.datos_asistente = dict(datos_asistente)
     modelo.logo_empresa = payload.logo_empresa
     modelo.firma_electronica = payload.firma_electronica
     modelo.usar_info_empresa = payload.usar_info_empresa
@@ -351,6 +385,7 @@ def crear_acta(db: Session, payload: ActaBase, borrador: Mapping[str, Any]) -> A
     for intento in range(3):
         modelo = Acta(folio=generar_folio(db, payload.fecha), version=1)
         _volcar_payload(modelo, payload, borrador)
+        modelo.estado_flujo = "revision"
         db.add(modelo)
         try:
             db.commit()
@@ -679,6 +714,120 @@ def actualizar_estatus(db: Session, acta_id: int, estatus: str) -> Acta:
     return acta
 
 
+def listar_bandeja(
+    db: Session, *, rol: str, email: str
+) -> List[Acta]:
+    """Lista las actas visibles en la bandeja correspondiente al rol."""
+    consulta = select(Acta)
+    if rol == "capturista":
+        consulta = consulta.where(Acta.creado_por == email)
+    elif rol == "revisor":
+        consulta = consulta.where(Acta.estado_flujo == "revision")
+    elif rol == "abogado_responsable":
+        consulta = consulta.where(Acta.estado_flujo.in_(("abogado", "aprobada")))
+    elif rol in ("Administrador", "SuperAdministrador"):
+        consulta = consulta.where(
+            Acta.estado_flujo.in_(("revision", "abogado", "con_errores", "aprobada"))
+        )
+    else:
+        return []
+    return list(db.scalars(consulta.order_by(Acta.updated_at.desc(), Acta.id.desc())))
+
+
+def decidir_flujo(
+    db: Session,
+    acta: Acta,
+    *,
+    rol: str,
+    usuario: str,
+    accion: str,
+    comentario: Optional[str] = None,
+) -> Acta:
+    """Registra una decisión, respetando la etapa de revisión vigente."""
+    etapa = acta.estado_flujo
+    puede_revisar = etapa == "revision" and rol in (
+        "revisor",
+        "Administrador",
+        "SuperAdministrador",
+    )
+    puede_aprobar = etapa == "abogado" and rol in (
+        "abogado_responsable",
+        "Administrador",
+        "SuperAdministrador",
+    )
+    if not (puede_revisar or puede_aprobar):
+        raise ValueError("El acta no está pendiente de una decisión para este rol.")
+
+    if accion == "devolver":
+        acta.estado_flujo = "con_errores"
+        acta.estatus = EstatusActa.BORRADOR.value
+        acta.comentario_revision = (comentario or "").strip()
+    elif puede_revisar:
+        acta.estado_flujo = "abogado"
+        acta.estatus = EstatusActa.EN_REVISION.value
+        acta.comentario_revision = None
+    else:
+        acta.estado_flujo = "aprobada"
+        acta.estatus = EstatusActa.APROBADA.value
+        acta.comentario_revision = None
+
+    historial = list(acta.historial_revision or [])
+    historial.append(
+        {
+            "accion": accion,
+            "etapa": etapa,
+            "estado_resultante": acta.estado_flujo,
+            "rol": rol,
+            "usuario": usuario,
+            "comentario": (comentario or "").strip() or None,
+            "version": acta.version,
+            "creado_en": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    acta.historial_revision = historial
+    db.commit()
+    db.refresh(acta)
+    return acta
+
+
+def reenviar_correccion(db: Session, acta: Acta, *, usuario: str) -> Acta:
+    """Reenvía la corrección a la etapa que solicitó los cambios."""
+    if acta.estado_flujo != "con_errores":
+        raise ValueError("El acta no está en espera de correcciones.")
+    historial = list(acta.historial_revision or [])
+    ultima_devolucion = next(
+        (
+            evento
+            for evento in reversed(historial)
+            if isinstance(evento, dict) and evento.get("accion") == "devolver"
+        ),
+        None,
+    )
+    destino = (
+        "abogado"
+        if ultima_devolucion and ultima_devolucion.get("etapa") == "abogado"
+        else "revision"
+    )
+    historial.append(
+        {
+            "accion": "reenviar",
+            "etapa": destino,
+            "estado_resultante": destino,
+            "rol": "capturista",
+            "usuario": usuario,
+            "version": acta.version,
+            "creado_en": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    acta.estado_flujo = destino
+    acta.estatus = EstatusActa.EN_REVISION.value
+    acta.comentario_revision = None
+    acta.historial_revision = historial
+    db.commit()
+    db.refresh(acta)
+    return acta
+
+
 def validar_acta_almacenada(
     db: Session, acta_id: int, ia: Optional[AIService] = None
 ) -> ValidacionActa:
@@ -690,6 +839,69 @@ def validar_acta_almacenada(
     db.commit()
     db.refresh(acta)
     return validacion
+
+
+def analizar_revision_acta_almacenada(
+    db: Session, acta_id: int, ia: Optional[AIService] = None
+) -> AnalisisRevisionActa:
+    """Analiza el contenido actual y, cuando existe, sus cambios respecto a la versión previa."""
+    acta = obtener_acta(db, acta_id)
+    version_anterior = next(
+        (version for version in listar_versiones(db, acta_id) if version.version < acta.version),
+        None,
+    )
+    cambios: List[str] = []
+    contexto: List[str] = []
+
+    if version_anterior is None:
+        contexto.append("No existe una versión anterior para comparar; analiza el acta completa.")
+    else:
+        anterior = version_anterior.contenido or {}
+        actual = contenido_del_acta(acta)
+        contexto.append(
+            f"La versión actual es la {acta.version}; se compara con la versión {version_anterior.version}."
+        )
+        for campo, etiqueta in _CAMPOS_ANALISIS_REVISION:
+            if campo not in anterior or anterior.get(campo) == actual.get(campo):
+                continue
+            cambios.append(etiqueta)
+            antes = json.dumps(anterior.get(campo), ensure_ascii=False, default=str)
+            despues = json.dumps(actual.get(campo), ensure_ascii=False, default=str)
+            contexto.append(
+                f"- {etiqueta}: antes={antes[:1600]}; ahora={despues[:1600]}"
+            )
+            if sum(len(linea) for linea in contexto) > 12000:
+                contexto.append("- Se omitieron cambios adicionales por límite de contexto.")
+                break
+        if not cambios:
+            contexto.append("No se detectaron cambios en los campos comparables.")
+
+    ultima_devolucion = next(
+        (
+            evento
+            for evento in reversed(acta.historial_revision or [])
+            if evento.get("accion") == "devolver"
+        ),
+        None,
+    )
+    if ultima_devolucion and ultima_devolucion.get("comentario"):
+        contexto.append(
+            f"Observación previa del {ultima_devolucion.get('rol') or 'revisor'}: "
+            f"{str(ultima_devolucion['comentario'])[:2000]}"
+        )
+
+    servicio = ia or crear_servicio_ia()
+    validacion = servicio.validar_acta(
+        payload_desde_acta(acta),
+        dict(acta.clausulas or {}),
+        contexto_revision="\n".join(contexto),
+    )
+    return AnalisisRevisionActa(
+        version_actual=acta.version,
+        version_comparada=version_anterior.version if version_anterior else None,
+        cambios=cambios,
+        validacion=validacion,
+    )
 
 
 def respuesta_redaccion(

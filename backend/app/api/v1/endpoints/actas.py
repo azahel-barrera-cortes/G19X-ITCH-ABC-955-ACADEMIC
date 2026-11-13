@@ -3,10 +3,10 @@
 Se exponen dos rutas principales:
 
 * ``POST /api/v1/actas/redactar``      -> borrador con IA + validación (JSON).
-* ``POST /api/v1/actas/generar-pdf``   -> redacción + persistencia + PDF binario.
+* ``POST /api/v1/actas/generar-pdf``   -> vista previa no persistida.
 
-El resto del recurso cubre el CRUD del historial, la regeneración del PDF y la
-validación de consistencia de actas ya guardadas.
+El resto del recurso cubre el flujo de revisión, el historial y el PDF final
+disponible después de la aprobación legal.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import json
 from typing import Any, Iterator, List, Mapping, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -29,19 +29,23 @@ from app.api.v1.deps import (
     get_db,
     registrar_bitacora,
 )
+from app.core import security
 from app.core.catalogos import catalogos as obtener_catalogos_dominio
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.acta import Acta
+from app.models.enums import EstatusActa
 from app.schemas.acta import (
     ActaActualizarRequest,
     ActaGenerarPdfRequest,
     ActaRead,
+    AnalisisRevisionActa,
     ActaRedaccionRequest,
     ActaRedaccionResponse,
     ActaResumen,
     ApiMensaje,
     CatalogosResponse,
+    DecisionFlujoRequest,
     ValidacionActa,
 )
 from app.services import acta_service
@@ -214,15 +218,13 @@ def generar_pdf(
     usuario_actual: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    """Solicita la redacción a la IA, compila el PDF con ReportLab y lo retorna."""
+    """Genera una vista previa no persistida; el PDF final se emite tras aprobar."""
+    if payload.guardar or payload.actualizar_acta_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El PDF final solo puede generarse desde un acta aprobada por el Abogado.",
+        )
     datos_antes = None
-    if payload.actualizar_acta_id:
-        acta_anterior = acta_service.obtener_acta(db, payload.actualizar_acta_id)
-        datos_antes = {
-            "folio": acta_anterior.folio,
-            "estatus": acta_anterior.estatus,
-            "version": acta_anterior.version,
-        }
     pdf, metadatos = acta_service.generar_pdf(payload, db)
     if metadatos["guardada"]:
         registrar_bitacora(
@@ -265,19 +267,32 @@ def generar_pdf(
 )
 def crear_acta(
     payload: ActaGenerarPdfRequest,
-    usuario_actual: UsuarioActual,
+    usuario_actual: RequiereCapturista,
     db: Session = Depends(get_db),
 ) -> ActaRead:
-    """Persiste el acta aplicando la redacción asistida configurada."""
-    borrador = acta_service.redactar(payload)
-    modelo = acta_service.crear_acta(db, payload, borrador)
+    """Persiste el acta como pendiente de revisión, sin emitir el PDF final."""
+    solicitud = payload.model_copy(
+        update={
+            "creado_por": usuario_actual.email,
+            "estatus": "en_revision",
+        }
+    )
+    borrador = acta_service.redactar(solicitud)
+    modelo = acta_service.crear_acta(db, solicitud, borrador)
+    modelo.estado_flujo = "revision"
+    db.commit()
+    db.refresh(modelo)
     registrar_bitacora(
         db,
         usuario=usuario_actual,
         accion="crear",
         entidad="actas",
         entidad_id=modelo.id,
-        datos_despues={"folio": modelo.folio, "sociedad": modelo.sociedad},
+        datos_despues={
+            "folio": modelo.folio,
+            "sociedad": modelo.sociedad,
+            "estado_flujo": modelo.estado_flujo,
+        },
     )
     return ActaRead.model_validate(modelo)
 
@@ -312,14 +327,39 @@ def listar_actas(
 # ---------------------------------------------------------------------------
 # Consulta y mantenimiento de un acta concreta
 # ---------------------------------------------------------------------------
+@router.get(
+    "/bandeja",
+    response_model=List[ActaRead],
+    summary="Listar actas de la bandeja correspondiente al rol",
+)
+def listar_bandeja_actas(
+    usuario_actual: UsuarioActual,
+    db: Session = Depends(get_db),
+) -> List[ActaRead]:
+    """Devuelve solo actas propias o pendientes de la etapa del usuario."""
+    actas = acta_service.listar_bandeja(
+        db, rol=usuario_actual.rol, email=usuario_actual.email
+    )
+    return [ActaRead.model_validate(acta) for acta in actas]
+
+
 @router.get("/{acta_id}", response_model=ActaRead, summary="Obtener un acta por identificador")
 def obtener_acta(
-    _usuario: RequiereRevisor,
+    usuario_actual: UsuarioActual,
     acta_id: int,
     db: Session = Depends(get_db),
 ) -> ActaRead:
-    """Devuelve el acta completa, incluidas sus cláusulas y su validación."""
-    return ActaRead.model_validate(acta_service.obtener_acta(db, acta_id))
+    """Devuelve el acta a los revisores o a su Capturista autor."""
+    acta = acta_service.obtener_acta(db, acta_id)
+    if (
+        not security.tiene_nivel_minimo(usuario_actual.rol, "revisor")
+        and acta.creado_por != usuario_actual.email
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puedes consultar actas que tú hayas creado.",
+        )
+    return ActaRead.model_validate(acta)
 
 
 @router.put(
@@ -340,6 +380,28 @@ def actualizar_acta(
     se completan con plantillas locales las que falten.
     """
     datos_antes = acta_service.obtener_acta(db, acta_id)
+    if usuario_actual.rol != "capturista":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el Capturista autor puede corregir el contenido del acta.",
+        )
+    if datos_antes.creado_por != usuario_actual.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puedes corregir actas que tú hayas creado.",
+        )
+    if datos_antes.estado_flujo != "con_errores":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El acta solo se puede editar cuando fue devuelta con errores.",
+        )
+    tipo_actual = getattr(datos_antes.tipo_asamblea, "value", datos_antes.tipo_asamblea)
+    tipo_propuesto = getattr(payload.tipo_asamblea, "value", payload.tipo_asamblea)
+    if payload.sociedad != datos_antes.sociedad or tipo_propuesto != tipo_actual:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se puede modificar el nombre de la sociedad ni el tipo del acta.",
+        )
     modelo = acta_service.actualizar_acta(db, acta_id, payload)
     registrar_bitacora(
         db,
@@ -363,6 +425,141 @@ def actualizar_acta(
     return ActaRead.model_validate(modelo)
 
 
+@router.post(
+    "/{acta_id}/decision",
+    response_model=ActaRead,
+    summary="Aprobar o devolver un acta según la etapa de revisión",
+)
+def decidir_acta(
+    usuario_actual: UsuarioActual,
+    acta_id: int,
+    payload: DecisionFlujoRequest,
+    db: Session = Depends(get_db),
+) -> ActaRead:
+    """Registra la revisión del Revisor o la decisión final del Abogado."""
+    acta = acta_service.obtener_acta(db, acta_id)
+    estado_anterior = acta.estado_flujo
+    try:
+        actualizada = acta_service.decidir_flujo(
+            db,
+            acta,
+            rol=usuario_actual.rol,
+            usuario=usuario_actual.email,
+            accion=payload.accion,
+            comentario=payload.comentario,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion=f"acta_{payload.accion}",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={"estado_flujo": estado_anterior},
+        datos_despues={
+            "estado_flujo": actualizada.estado_flujo,
+            "comentario": payload.comentario,
+            "version": actualizada.version,
+        },
+    )
+    return ActaRead.model_validate(actualizada)
+
+
+@router.post(
+    "/{acta_id}/analizar-revision",
+    response_model=AnalisisRevisionActa,
+    summary="Analizar un acta y sus cambios para apoyar la revisión humana",
+)
+def analizar_revision_acta(
+    usuario_actual: UsuarioActual,
+    acta_id: int,
+    db: Session = Depends(get_db),
+) -> AnalisisRevisionActa:
+    """Analiza el acta vigente sin modificar su contenido ni su etapa de flujo."""
+    if usuario_actual.rol not in {"revisor", "abogado_responsable"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el Revisor o el Abogado Responsable pueden analizar un acta.",
+        )
+
+    acta = acta_service.obtener_acta(db, acta_id)
+    if usuario_actual.rol == "revisor" and acta.estado_flujo != "revision":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El análisis del Revisor solo está disponible durante la etapa de revisión.",
+        )
+    if usuario_actual.rol == "abogado_responsable" and acta.estado_flujo not in {
+        "abogado",
+        "aprobada",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El análisis del Abogado solo está disponible en su etapa o después de aprobar.",
+        )
+
+    resultado = acta_service.analizar_revision_acta_almacenada(db, acta_id)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="analizar_revision",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_despues={
+            "version_actual": resultado.version_actual,
+            "version_comparada": resultado.version_comparada,
+            "cambios_detectados": len(resultado.cambios),
+            "generado_por_ia": resultado.validacion.generado_por_ia,
+        },
+    )
+    return resultado
+
+
+@router.post(
+    "/{acta_id}/reenviar",
+    response_model=ActaRead,
+    summary="Enviar una corrección a la etapa que devolvió el acta",
+)
+def reenviar_acta(
+    usuario_actual: RequiereCapturista,
+    acta_id: int,
+    db: Session = Depends(get_db),
+) -> ActaRead:
+    """Permite al autor reenviar una corrección después de guardar su versión."""
+    if usuario_actual.rol != "capturista":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el Capturista puede reenviar una corrección.",
+        )
+    acta = acta_service.obtener_acta(db, acta_id)
+    if acta.creado_por != usuario_actual.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puedes reenviar actas que tú hayas creado.",
+        )
+    estado_anterior = acta.estado_flujo
+    try:
+        actualizada = acta_service.reenviar_correccion(
+            db, acta, usuario=usuario_actual.email
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="reenviar_revision",
+        entidad="actas",
+        entidad_id=acta_id,
+        datos_antes={"estado_flujo": estado_anterior},
+        datos_despues={
+            "estado_flujo": actualizada.estado_flujo,
+            "version": actualizada.version,
+        },
+    )
+    return ActaRead.model_validate(actualizada)
+
+
 @router.patch(
     "/{acta_id}/estatus",
     response_model=ActaRead,
@@ -374,8 +571,23 @@ def actualizar_estatus(
     estatus: str = Query(..., description="Nuevo estatus del acta"),
     db: Session = Depends(get_db),
 ) -> ActaRead:
-    """Avanza el acta dentro de su ciclo de vida documental."""
+    """Registra solo los estados posteriores a la aprobación final."""
+    if estatus not in {estado.value for estado in EstatusActa}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"El estatus «{estatus}» no es válido.",
+        )
+    if estatus not in ("firmada", "archivada"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Las etapas de revisión y aprobación se gestionan desde sus bandejas.",
+        )
     datos_antes = acta_service.obtener_acta(db, acta_id)
+    if datos_antes.estado_flujo != "aprobada":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El acta requiere aprobación final antes de cambiar su estado de cierre.",
+        )
     modelo = acta_service.actualizar_estatus(db, acta_id, estatus)
     registrar_bitacora(
         db,
@@ -396,7 +608,7 @@ def actualizar_estatus(
     responses={200: {"content": {"application/pdf": {}}}},
 )
 def descargar_pdf(
-    _usuario: RequiereRevisor,
+    _usuario: RequiereAbogado,
     acta_id: int,
     incluir_tabla_asistentes: bool = Query(True),
     incluir_hoja_firmas: bool = Query(True),
@@ -405,6 +617,11 @@ def descargar_pdf(
 ) -> StreamingResponse:
     """Regenera el documento desde la base de datos, sin invocar a la IA."""
     acta = acta_service.obtener_acta(db, acta_id)
+    if acta.estado_flujo != "aprobada":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El PDF final estará disponible cuando el Abogado apruebe el acta.",
+        )
     pdf, metadatos = acta_service.pdf_de_acta(
         acta,
         {

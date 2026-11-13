@@ -78,8 +78,10 @@ export function useHistorialActas() {
           `Acta ${acta.folio}: puntaje de consistencia ${Number(validacion.puntaje).toFixed(2)}/100.`,
         )
         await cargar(filtros)
+        return validacion
       } catch (fallo) {
-        setError(mensajeDeError(fallo))
+        setError(await mensajeDeError(fallo))
+        return null
       } finally {
         setOperando(null)
       }

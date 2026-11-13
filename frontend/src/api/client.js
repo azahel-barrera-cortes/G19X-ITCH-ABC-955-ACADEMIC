@@ -203,6 +203,30 @@ export async function crearActa(payload) {
   return data
 }
 
+/** Lista la bandeja de actas permitida para el rol autenticado. */
+export async function obtenerBandejaActas() {
+  const { data } = await http.get('/actas/bandeja')
+  return data
+}
+
+/** Aprueba o devuelve un acta desde la etapa correspondiente al rol. */
+export async function decidirActa(actaId, { accion, comentario = '' }) {
+  const { data } = await http.post(`/actas/${actaId}/decision`, { accion, comentario })
+  return data
+}
+
+/** Analiza el acta vigente y la compara con su versión anterior, si existe. */
+export async function analizarRevisionActa(actaId) {
+  const { data } = await http.post(`/actas/${actaId}/analizar-revision`)
+  return data
+}
+
+/** Reenvía una corrección guardada como nueva versión a la etapa solicitante. */
+export async function reenviarActa(actaId) {
+  const { data } = await http.post(`/actas/${actaId}/reenviar`)
+  return data
+}
+
 /** Lista el historial de actas con filtros opcionales. */
 export async function listarActas(filtros = {}) {
   const { data } = await http.get('/actas', { params: filtros })
@@ -297,13 +321,17 @@ export async function fijarCaducidad(actaId, { fechaCaducidad = null, motivo = '
 }
 
 /** Conversa con el Asistente IA interno de actas (solo temas de actas). */
-export async function chatearAsistente(mensaje, { folio = null, actaId = null, sesionId = null, autor = null } = {}) {
+export async function chatearAsistente(
+  mensaje,
+  { folio = null, actaId = null, sesionId = null, autor = null, modo = 'general' } = {},
+) {
   const { data } = await http.post('/asistente/chat', {
     mensaje,
     folio: folio || undefined,
     acta_id: actaId || undefined,
     sesion_id: sesionId || undefined,
     autor: autor || undefined,
+    modo,
   })
   return data
 }

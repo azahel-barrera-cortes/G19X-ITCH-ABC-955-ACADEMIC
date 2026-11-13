@@ -8,7 +8,7 @@ consume el generador de PDF de ReportLab.
 from __future__ import annotations
 
 from datetime import date, datetime, time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -240,6 +240,10 @@ class ActaGenerarPdfRequest(ActaRedaccionRequest):
     """Petición del endpoint principal ``POST /actas/generar-pdf``."""
 
     guardar: bool = Field(default=True, description="Persistir el acta en la base de datos")
+    datos_asistente: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Datos originales recopilados durante la creación guiada por el asistente.",
+    )
     actualizar_acta_id: Optional[int] = Field(
         default=None, ge=1, description="Al regenerar el PDF de un acta existente, su identificador"
     )
@@ -280,6 +284,15 @@ class ValidacionActa(BaseSchema):
     fecha_validacion: datetime = Field(default_factory=datetime.utcnow)
 
 
+class AnalisisRevisionActa(BaseSchema):
+    """Resultado del análisis asistido de una versión y sus cambios."""
+
+    version_actual: int
+    version_comparada: Optional[int] = None
+    cambios: List[str] = Field(default_factory=list)
+    validacion: ValidacionActa
+
+
 # ---------------------------------------------------------------------------
 # Respuestas
 # ---------------------------------------------------------------------------
@@ -308,6 +321,8 @@ class ActaResumen(BaseSchema):
     titulo: Optional[str] = None
     fecha: date
     estatus: EstatusActa
+    estado_flujo: str = "revision"
+    comentario_revision: Optional[str] = None
     version: int
     proveedor_ia: Optional[ProveedorIA] = None
     # Control: quién la realizó y cuándo (hoy texto/asistente; mañana usuario).
@@ -326,8 +341,12 @@ class ActaRead(ActaBase):
     id: int
     folio: str
     version: int
+    estado_flujo: str = "revision"
+    comentario_revision: Optional[str] = None
+    historial_revision: List[Dict[str, Any]] = Field(default_factory=list)
     clausulas: Dict[str, str] = Field(default_factory=dict)
     texto_legal: str = ""
+    datos_asistente: Dict[str, Any] = Field(default_factory=dict)
     validacion_ia: Optional[ValidacionActa] = None
     proveedor_ia: Optional[ProveedorIA] = None
     # Control: quién la realizó y cuándo (listo para integración de usuarios).
@@ -339,6 +358,16 @@ class ActaRead(ActaBase):
     dias_para_caducar: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    @field_validator("datos_especificos", "datos_asistente", mode="before")
+    @classmethod
+    def _normalizar_datos_json_nulos(cls, valor: Any) -> Dict[str, Any]:
+        return valor if valor is not None else {}
+
+    @field_validator("historial_revision", mode="before")
+    @classmethod
+    def _normalizar_historial_revision_nulo(cls, valor: Any) -> List[Dict[str, Any]]:
+        return valor if valor is not None else []
 
 
 class MetadatosPdf(BaseSchema):
@@ -446,5 +475,18 @@ class ResumenAdministracion(BaseSchema):
     total_versiones: int = 0
     por_estatus: Dict[str, int] = Field(default_factory=dict)
     vigencia: Dict[str, int] = Field(default_factory=dict)
+
+
+class DecisionFlujoRequest(BaseSchema):
+    """Decisión de revisión o aprobación legal."""
+
+    accion: Literal["aprobar", "devolver"]
+    comentario: Optional[str] = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _exigir_comentario_al_devolver(self) -> "DecisionFlujoRequest":
+        if self.accion == "devolver" and not (self.comentario or "").strip():
+            raise ValueError("Indica los cambios requeridos para devolver el acta.")
+        return self
 
 

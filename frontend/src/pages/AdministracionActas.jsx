@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import Alerta from '../components/ui/Alerta.jsx'
 import Boton from '../components/ui/Boton.jsx'
 import Etiqueta from '../components/ui/Etiqueta.jsx'
 import PanelVersiones from '../components/actas/PanelVersiones.jsx'
 import {
   fijarCaducidad,
+  listarBitacora,
   mensajeDeError,
   obtenerActasPorVigencia,
   obtenerResumenAdministracion,
@@ -28,7 +29,10 @@ import { fechaCorta, vigencia } from '../utils/formato.js'
  * 3. **Versiones** — historial completo de cada expediente con detalle y
  *    restauración de versiones previas.
  */
-export default function AdministracionActas({ onEditar = null }) {
+export default function AdministracionActas({
+  versionActaInicial = null,
+  onVersionActaInicialMostrada = null,
+}) {
   const [resumen, setResumen] = useState(null)
   const [actas, setActas] = useState([])
   const [filtro, setFiltro] = useState('')
@@ -40,6 +44,22 @@ export default function AdministracionActas({ onEditar = null }) {
 
   // Formularios de caducidad abiertos: { actaId: { fecha, motivo } }.
   const [formularios, setFormularios] = useState({})
+  const [bitacora, setBitacora] = useState([])
+  const [cargandoBitacora, setCargandoBitacora] = useState(true)
+  const [errorBitacora, setErrorBitacora] = useState(null)
+
+  const cargarBitacora = useCallback(async () => {
+    setCargandoBitacora(true)
+    setErrorBitacora(null)
+    try {
+      const datos = await listarBitacora({ entidad: 'actas', limite: 50 })
+      setBitacora(Array.isArray(datos) ? datos : [])
+    } catch (fallo) {
+      setErrorBitacora(await mensajeDeError(fallo))
+    } finally {
+      setCargandoBitacora(false)
+    }
+  }, [])
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -65,6 +85,20 @@ export default function AdministracionActas({ onEditar = null }) {
   useEffect(() => {
     cargar()
   }, [cargar])
+
+  useEffect(() => {
+    cargarBitacora()
+  }, [cargarBitacora])
+
+  useEffect(() => {
+    if (versionActaInicial == null || !actas.length) return
+    const acta = actas.find(
+      (elemento) => String(elemento.id) === String(versionActaInicial),
+    )
+    if (!acta) return
+    setSeleccionada(acta)
+    onVersionActaInicialMostrada?.()
+  }, [actas, onVersionActaInicialMostrada, versionActaInicial])
 
   const editarCampo = (actaId, campo, valor) =>
     setFormularios((previo) => ({
@@ -187,20 +221,27 @@ const totalVencidas = resumen?.vigencia?.vencidas ?? 0
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {actas.map((acta) => (
-                  <FilaActa
-                    key={acta.id}
-                    acta={acta}
-                    formulario={formularios[acta.id] || null}
-                    operando={operando === acta.id}
-                    seleccionada={seleccionada?.id === acta.id}
-                    onEditarCampo={editarCampo}
-                    onGuardar={guardarCaducidad}
-                    onCerrarFormulario={cerrarFormulario}
-                    onSeleccionar={() =>
-                      setSeleccionada(seleccionada?.id === acta.id ? null : acta)
-                    }
-                    onEditar={onEditar}
-                  />
+                  <Fragment key={acta.id}>
+                    <FilaActa
+                      acta={acta}
+                      formulario={formularios[acta.id] || null}
+                      operando={operando === acta.id}
+                      seleccionada={seleccionada?.id === acta.id}
+                      onEditarCampo={editarCampo}
+                      onGuardar={guardarCaducidad}
+                      onCerrarFormulario={cerrarFormulario}
+                      onSeleccionar={() =>
+                        setSeleccionada(seleccionada?.id === acta.id ? null : acta)
+                      }
+                    />
+                    {seleccionada?.id === acta.id ? (
+                      <tr>
+                        <td colSpan={4} className="bg-slate-50 p-3">
+                          <PanelVersiones acta={acta} onCambio={cargar} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -208,8 +249,57 @@ const totalVencidas = resumen?.vigencia?.vencidas ?? 0
         )}
       </section>
 
-      {/* --- Historial de versiones ------------------------------------------ */}
-      {seleccionada ? <PanelVersiones acta={seleccionada} onCambio={cargar} /> : null}
+      <section className="tarjeta overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-corporativo-600">
+              Bitácora de actas
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Actividad reciente sobre creación, revisión y cambios de los expedientes.
+            </p>
+          </div>
+          <Boton
+            tamano="sm"
+            variante="secundario"
+            cargando={cargandoBitacora}
+            onClick={cargarBitacora}
+          >
+            Actualizar
+          </Boton>
+        </div>
+        {errorBitacora ? (
+          <div className="p-4"><Alerta tono="error">{errorBitacora}</Alerta></div>
+        ) : cargandoBitacora && !bitacora.length ? (
+          <p className="px-4 py-8 text-sm text-slate-500">Cargando actividad…</p>
+        ) : !bitacora.length ? (
+          <p className="px-4 py-8 text-sm text-slate-500">Aún no hay actividad registrada en actas.</p>
+        ) : (
+          <ol className="divide-y divide-slate-100">
+            {bitacora.map((entrada) => {
+              const datos = entrada.datos_despues || entrada.datos_antes || {}
+              const folio = datos.folio || `Acta #${entrada.entidad_id || 'general'}`
+              return (
+                <li key={entrada.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800">
+                      <span className="capitalize">{entrada.accion.replaceAll('_', ' ')}</span>
+                      <span className="mx-1.5 text-slate-300">·</span>
+                      <span className="font-mono text-xs text-corporativo-700">{folio}</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {entrada.usuario_nombre || 'Usuario'} · {entrada.usuario_rol || 'sin rol'}
+                    </p>
+                  </div>
+                  <time className="text-xs text-slate-500">
+                    {entrada.created_at ? new Date(entrada.created_at).toLocaleString('es-MX') : 'Fecha no disponible'}
+                  </time>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </section>
 
       <p className="text-xs text-slate-500">
         Cada cambio de contenido o de caducidad genera una versión nueva, por lo que el historial
@@ -249,7 +339,6 @@ function FilaActa({
   onGuardar,
   onCerrarFormulario,
   onSeleccionar,
-  onEditar,
 }) {
   const info = vigencia(acta.estado_caducidad, acta.dias_para_caducar)
   const [fechaLocal, setFechaLocal] = useState(formulario?.fecha ?? acta.fecha_caducidad ?? '')
@@ -358,11 +447,6 @@ function FilaActa({
             {seleccionada ? 'Ocultar versiones' : 'Versiones'}
           </Boton>
 
-          {onEditar ? (
-            <Boton tamano="sm" variante="fantasma" onClick={() => onEditar(acta)}>
-              Editar
-            </Boton>
-          ) : null}
         </div>
       </td>
     </tr>

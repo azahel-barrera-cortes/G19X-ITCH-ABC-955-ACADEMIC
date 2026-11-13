@@ -87,12 +87,16 @@ class Acta(Base):
     estatus: Mapped[EstatusActa] = mapped_column(
         enum_column(EstatusActa, "estatus_acta"), default=EstatusActa.BORRADOR, index=True
     )
+    estado_flujo: Mapped[str] = mapped_column(String(30), default="revision", index=True)
+    comentario_revision: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    historial_revision: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list)
     # --- Control de autoría (quién la realizó; listo para integración de usuarios)
     creado_por: Mapped[Optional[str]] = mapped_column(String(150), nullable=True, index=True)
 
     # --- Información de la empresa / sociedad (RF-10) ---
     tipo_sociedad: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     datos_especificos: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    datos_asistente: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     logo_empresa: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     firma_electronica: Mapped[bool] = mapped_column(default=False, nullable=False)
     usar_info_empresa: Mapped[bool] = mapped_column(default=False, nullable=False)

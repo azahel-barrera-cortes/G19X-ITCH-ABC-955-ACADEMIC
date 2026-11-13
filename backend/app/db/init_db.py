@@ -71,6 +71,10 @@ _COLUMNAS_NUEVAS = {
         ("creado_por", "VARCHAR(150)"),
         ("tipo_sociedad", "VARCHAR(60)"),
         ("datos_especificos", "JSON"),
+        ("datos_asistente", "JSON"),
+        ("estado_flujo", "VARCHAR(30) DEFAULT 'revision'"),
+        ("comentario_revision", "TEXT"),
+        ("historial_revision", "JSON"),
         ("logo_empresa", "TEXT"),
         ("firma_electronica", "BOOLEAN DEFAULT 0"),
         ("usar_info_empresa", "BOOLEAN DEFAULT 0"),
@@ -105,6 +109,15 @@ def _aplicar_migraciones_ligeras() -> None:
                 if nombre not in existentes:
                     conexion.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}"))
                     logger.info("Columna %s.%s agregada por migración ligera", tabla, nombre)
+                    if tabla == "actas" and nombre == "estado_flujo":
+                        conexion.execute(
+                            text(
+                                "UPDATE actas SET estado_flujo = CASE "
+                                "WHEN estatus IN ('aprobada', 'firmada', 'archivada') THEN 'aprobada' "
+                                "WHEN estatus = 'en_revision' THEN 'revision' "
+                                "ELSE 'borrador' END"
+                            )
+                        )
 
     _asignar_codigos_empresa()
 

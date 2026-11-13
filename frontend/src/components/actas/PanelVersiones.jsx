@@ -1,45 +1,24 @@
 /**
  * Panel de versiones de un acta: historial completo con su motivo y contenido.
  *
- * Al seleccionar una versión se muestra un desglose de la instantánea y se ofrece
- * restaurarla. Restaurar **no** retrocede el contador: el backend emite una
+ * Cada versión puede abrirse como documento y las versiones anteriores pueden
+ * restaurarse. Restaurar **no** retrocede el contador: el backend emite una
  * versión nueva con el contenido recuperado, para no romper la auditoría.
  */
 import { useCallback, useEffect, useState } from 'react'
 import Alerta from '../ui/Alerta.jsx'
 import Boton from '../ui/Boton.jsx'
 import Etiqueta from '../ui/Etiqueta.jsx'
+import VisorActa from './VisorActa.jsx'
 import {
   mensajeDeError,
   obtenerVersion,
   obtenerVersiones,
   restaurarVersion,
 } from '../../api/client.js'
-import { fechaCorta, marcaTiempo } from '../../utils/formato.js'
+import { marcaTiempo } from '../../utils/formato.js'
 
-const CAMPOS_VISIBLES = [
-  ['sociedad', 'Sociedad'],
-  ['fecha', 'Fecha de la asamblea'],
-  ['estatus', 'Estatus'],
-  ['presidente', 'Presidente'],
-  ['secretario', 'Secretario'],
-  ['quorum_porcentaje', 'Quórum (%)'],
-  ['texto_legal', 'Cuerpo legal'],
-]
-
-/** Muestra el valor de un campo de la instantánea en formato legible. */
-function mostrarValor(campo, valor) {
-  if (valor === null || valor === undefined || valor === '') return '—'
-  if (Array.isArray(valor)) return `${valor.length} elemento(s)`
-  if (typeof valor === 'object') return JSON.stringify(valor).slice(0, 80)
-  if (['fecha', 'fecha_caducidad', 'convocatoria_fecha'].includes(campo)) {
-    return fechaCorta(valor)
-  }
-  if (campo === 'texto_legal') return `${String(valor).length} caracteres`
-  return String(valor)
-}
-
-export default function PanelVersiones({ acta, onCambio = null }) {
+export default function PanelVersiones({ acta, onCambio = null, soloLectura = false }) {
   const [versiones, setVersiones] = useState([])
   const [detalle, setDetalle] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -100,7 +79,9 @@ export default function PanelVersiones({ acta, onCambio = null }) {
     } finally {
       setOperando(false)
     }
-return (
+  }
+
+  return (
     <section className="tarjeta p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-corporativo-600">
@@ -146,7 +127,7 @@ return (
                     >
                       Ver
                     </Boton>
-                    {!vigente ? (
+                    {!vigente && !soloLectura ? (
                       <Boton
                         tamano="sm"
                         variante="secundario"
@@ -155,9 +136,9 @@ return (
                       >
                         Restaurar
                       </Boton>
-                    ) : (
+                    ) : vigente ? (
                       <Etiqueta tono="info">Vigente</Etiqueta>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </li>
@@ -167,23 +148,12 @@ return (
       )}
 
       {detalle ? (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            Contenido de la versión {detalle.version}
-          </h4>
-          <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-            {CAMPOS_VISIBLES.map(([campo, etiqueta]) => (
-              <div key={campo} className="flex justify-between gap-2">
-                <dt className="text-slate-500">{etiqueta}</dt>
-                <dd className="text-right text-slate-700">
-                  {mostrarValor(campo, detalle.contenido?.[campo])}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+        <VisorActa
+          acta={acta}
+          documentoVersion={detalle}
+          onCerrar={() => setDetalle(null)}
+        />
       ) : null}
     </section>
   )
 }
-  }

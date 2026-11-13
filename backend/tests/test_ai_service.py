@@ -208,6 +208,7 @@ class ProveedorFalso:
         self.texto = texto
         self.falla = falla
         self.llamadas = 0
+        self.ultimo_usuario = ""
 
     def chat(
         self,
@@ -218,6 +219,7 @@ class ProveedorFalso:
         max_tokens: Optional[int] = None,
     ) -> ResultadoLLM:
         self.llamadas += 1
+        self.ultimo_usuario = usuario
         if self.falla:
             raise ErrorLLM("Proveedor no disponible", proveedor=self.nombre, intentos=3)
         return ResultadoLLM(
@@ -310,15 +312,23 @@ def test_validacion_con_llm_combina_hallazgos(
             "recomendaciones": ["Anexar la cédula de convocatoria."],
         }
     )
-    servicio = _con_proveedor(monkeypatch, ProveedorFalso(respuesta))
+    proveedor = ProveedorFalso(respuesta)
+    servicio = _con_proveedor(monkeypatch, proveedor)
     acta = ActaRedaccionRequest(**_sin_guardar(payload_acta))
 
-    validacion = servicio.validar_acta(acta)
+    validacion = servicio.validar_acta(
+        acta,
+        {"cuerpo": "Texto íntegro de la cláusula revisada."},
+        contexto_revision="Cambio entre versiones: convocatoria actualizada.",
+    )
 
     assert validacion.generado_por_ia is True
     assert validacion.puntaje == 71.5
     assert any(h.campo == "convocatoria" for h in validacion.hallazgos)
     assert "Anexar la cédula de convocatoria." in validacion.recomendaciones
+    assert proveedor.llamadas == 1
+    assert "Texto íntegro de la cláusula revisada." in proveedor.ultimo_usuario
+    assert "Cambio entre versiones: convocatoria actualizada." in proveedor.ultimo_usuario
 
 
 def test_streaming_devuelve_fragmentos(
