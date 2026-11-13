@@ -362,7 +362,7 @@ export default function GenerarActa({
             <p className="text-sm text-slate-500">
               {actaInicial
                 ? 'Corrige las observaciones y guarda una nueva versión; se enviará al rol que solicitó los cambios.'
-                : 'Captura los datos en tres pasos y envía el acta a revisión. El PDF final se habilita después de la aprobación del Abogado.'}
+                : 'Captura los datos, revisa el borrador y envía el acta a revisión. El PDF final se habilita después de la aprobación legal.'}
             </p>
           </div>
           {onVolver ? (

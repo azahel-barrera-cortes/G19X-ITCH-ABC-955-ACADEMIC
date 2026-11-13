@@ -5,7 +5,7 @@ Roles soportados:
 - Administrador: acceso total a los endpoints de la empresa y gestión de perfiles de usuarios (capturista, revisor, abogado responsable).
 - capturista: puede crear, leer y editar actas propias.
 - revisor: puede leer todas las actas y cambiar su estatus.
-- abogado_responsable: puede leer todas las actas, aprobarlas y firmarlas.
+- abogado_responsable: puede leer todas las actas, revisarlas y aprobarlas.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated=["bcrypt"])
 
 
 def hash_password(password: str) -> str:

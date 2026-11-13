@@ -19,6 +19,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 CLAVE_DE_EJEMPLO = "cambiar_en_produccion_clave_secreta_minimo_32_caracteres"
+PASSWORD_ADMIN_EJEMPLO = "Admin123!seguro"
 
 class Settings(BaseSettings):
     """Parámetros de ejecución de la API, la base de datos, el PDF y la IA."""
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
     seed_admin_email: str = "admin@pgac.com"
-    seed_admin_password: str = "Admin123!seguro"
+    seed_admin_password: str = PASSWORD_ADMIN_EJEMPLO
     seed_admin_nombre: str = "Super Administrador del Sistema"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
@@ -106,8 +107,18 @@ class Settings(BaseSettings):
     def _validar_secret_key(self) -> "Settings":
         if not self.secret_key.strip():
             raise ValueError("SECRET_KEY está vacía: genérala como dice backend/.env.example")
-        if self.environment == "production" and self.secret_key == CLAVE_DE_EJEMPLO:
-            raise ValueError("Cambia SECRET_KEY antes de usar producción.")
+        if self.environment == "production":
+            if self.secret_key == CLAVE_DE_EJEMPLO or len(self.secret_key) < 32:
+                raise ValueError(
+                    "En producción, SECRET_KEY debe ser única y tener al menos 32 caracteres."
+                )
+            if (
+                self.seed_admin_password == PASSWORD_ADMIN_EJEMPLO
+                or len(self.seed_admin_password) < 16
+            ):
+                raise ValueError(
+                    "En producción, SEED_ADMIN_PASSWORD debe ser única y tener al menos 16 caracteres."
+                )
         return self
 
     @property

@@ -119,7 +119,10 @@ SEED_ADMIN_PASSWORD=Admin123!seguro
 ```
 
 Estos son únicamente los valores por defecto de desarrollo documentados en
-`.env.example`; en producción deben cambiarse antes de iniciar la aplicación.
+`.env.example`; no los uses en producción. En ese entorno la aplicación exige
+una `SECRET_KEY` única de al menos 32 caracteres y una `SEED_ADMIN_PASSWORD`
+única de al menos 16 caracteres; el arranque falla si se mantienen valores
+predeterminados o demasiado cortos.
 Al arrancar con `AUTO_CREATE_TABLES=true`, PGAC crea ese usuario si la base de
 datos está vacía. Si ya existe un usuario con ese correo, el script
 `backend/scripts/crear_super_admin.py` puede promoverlo a
@@ -181,6 +184,8 @@ npm.cmd run preview      # sirve dist/ en http://localhost:4173
    `SuperAdministrador`; todos los usuarios pueden cambiar su contraseña desde
    `PUT /api/v1/auth/me`. La administración de usuarios se reserva al
    `SuperAdministrador` desde `UsuariosSuperAdmin`.
+   Las contraseñas nuevas requieren al menos 12 caracteres en el registro,
+   cambios de perfil, recuperación y administración de usuarios.
    Tras un acceso correcto se abre **Mi perfil** para los usuarios operativos;
    el `SuperAdministrador` entra directamente a **UsuariosSuperAdmin** y no
    muestra Perfil. La barra lateral y la navegación móvil muestran únicamente

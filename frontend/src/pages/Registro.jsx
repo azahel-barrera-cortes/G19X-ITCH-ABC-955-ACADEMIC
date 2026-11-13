@@ -173,7 +173,7 @@ export default function Registro({ onCambiarVista = null }) {
               <div className="mb-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-corporativo-500">03</p>
                 <h2 className="mt-1 text-base font-semibold text-slate-800">Seguridad de acceso</h2>
-                <p className="mt-1 text-sm text-slate-500">Usa una contraseña de al menos 6 caracteres.</p>
+                <p className="mt-1 text-sm text-slate-500">Usa una contraseña de al menos 12 caracteres.</p>
               </div>
               <div className="space-y-5">
                 <Campo etiqueta="Contraseña" htmlFor="password">
@@ -183,9 +183,9 @@ export default function Registro({ onCambiarVista = null }) {
                     className="campo"
                     value={formulario.password}
                     onChange={(e) => manejarCambio('password', e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mínimo 12 caracteres"
                     autoComplete="new-password"
-                    minLength={6}
+                    minLength={12}
                     required
                   />
                 </Campo>

@@ -80,6 +80,8 @@ async def obtener_usuario_opcional(
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
     if usuario is None or not usuario.activo:
         return None
+    if payload.get("token_version", 0) != usuario.token_version:
+        return None
     return usuario
 
 

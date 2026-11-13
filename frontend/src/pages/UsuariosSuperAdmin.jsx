@@ -578,7 +578,7 @@ export default function UsuariosSuperAdmin() {
                 etiqueta={panel === 'crear' ? 'Contraseña' : 'Nueva contraseña'}
                 htmlFor="usuario-password"
                 requerido={panel === 'crear'}
-                ayuda={panel === 'crear' ? 'Mínimo 6 caracteres.' : 'Déjalo vacío para conservarla.'}
+                ayuda={panel === 'crear' ? 'Mínimo 12 caracteres.' : 'Déjalo vacío para conservarla.'}
               >
                 <input
                   id="usuario-password"
@@ -586,8 +586,8 @@ export default function UsuariosSuperAdmin() {
                   className="campo"
                   value={formulario.password}
                   onChange={(e) => cambiarFormulario('password', e.target.value)}
-                  placeholder={panel === 'crear' ? 'Mínimo 6 caracteres' : 'Sin cambios'}
-                  minLength={6}
+                  placeholder={panel === 'crear' ? 'Mínimo 12 caracteres' : 'Sin cambios'}
+                  minLength={12}
                   required={panel === 'crear'}
                   autoComplete="new-password"
                 />

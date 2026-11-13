@@ -16,7 +16,7 @@ se conserva la separación de responsabilidades exigida por el proyecto.
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select
@@ -188,6 +188,8 @@ def restaurar_version(db: Session, acta_id: int, numero: int) -> Acta:
             continue
         if campo in ("fecha", "convocatoria_fecha"):
             valor = date.fromisoformat(valor) if valor else None
+        elif campo == "hora":
+            valor = time.fromisoformat(valor) if valor else None
         setattr(acta, campo, valor)
 
     acta.version = int(acta.version or 1) + 1

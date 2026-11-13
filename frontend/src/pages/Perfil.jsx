@@ -224,7 +224,7 @@ export default function Perfil() {
                   <Campo etiqueta="Nueva contraseña" htmlFor="password_nueva">
                     <input id="password_nueva" type="password" className="campo"
                       value={password.nueva} onChange={(e) => manejarCambioPassword('nueva', e.target.value)}
-                      placeholder="Mínimo 6 caracteres" autoComplete="new-password" minLength={6} required />
+                      placeholder="Mínimo 12 caracteres" autoComplete="new-password" minLength={12} required />
                   </Campo>
                   <Campo etiqueta="Confirmar nueva contraseña" htmlFor="password_confirmar">
                     <input id="password_confirmar" type="password" className="campo"

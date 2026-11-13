@@ -27,7 +27,7 @@ class UsuarioBase(BaseModel):
 class UsuarioCrear(UsuarioBase):
     """Petición de creación de usuario."""
 
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
 
 
 class InformacionEmpresa(BaseModel):
@@ -53,7 +53,7 @@ class PerfilActualizar(BaseModel):
     """Lo único que un usuario puede cambiar de sí mismo."""
 
     nombre_completo: Optional[str] = Field(default=None, min_length=3, max_length=200)
-    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
+    password: Optional[str] = Field(default=None, min_length=12, max_length=128)
 
 
 class UsuarioActualizar(BaseModel):
@@ -62,7 +62,7 @@ class UsuarioActualizar(BaseModel):
     nombre_completo: Optional[str] = Field(default=None, min_length=3, max_length=200)
     rol: Optional[str] = None
     activo: Optional[bool] = None
-    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
+    password: Optional[str] = Field(default=None, min_length=12, max_length=128)
 
 
 class UsuarioRespuesta(UsuarioBase):
@@ -105,7 +105,7 @@ class ConfirmarResetPassword(BaseModel):
     """Confirmación de recuperación con el token recibido."""
 
     token: str = Field(min_length=10, max_length=128)
-    nuevo_password: str = Field(min_length=6, max_length=128)
+    nuevo_password: str = Field(min_length=12, max_length=128)
 
 
 class BitacoraCambiosRespuesta(BaseModel):

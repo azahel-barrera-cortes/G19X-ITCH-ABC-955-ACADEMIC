@@ -24,7 +24,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad y endpoint `PATCH /actas/{acta_id}/empresa` para reasignar actas en cuarentena (SuperAdministrador) |
 | Aislamiento por tenant | `tenant_access.py`: `AlcanceEmpresa`, `alcance_empresa()`, `filtrar_por_empresa()` y `obtener_acta_autorizada()` para filtrado fail-closed por `empresa_codigo` en todos los endpoints de actas, administración, notaría y expediente |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
-| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: semilla inicial de SuperAdministrador vía `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`, registro público vinculado a empresa para capturista/revisor/abogado responsable, JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
+| Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: semilla inicial de SuperAdministrador vía `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`, registro público vinculado a empresa para capturista/revisor/abogado responsable, JWT HS256, perfil, recuperación de contraseña, contraseñas nuevas de al menos 12 caracteres, hash bcrypt_sha256 y actualización de hashes bcrypt heredados al iniciar sesión, `requiere_rol` y dependencias por rol; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
 | Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
 | Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
@@ -50,14 +50,16 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 - Suite de pruebas automatizadas, con desglose por archivo:
   - `test_administracion.py`: 11
   - `test_ai_service.py`: 23
-  - `test_api_actas.py`: 9
-  - `test_asistente.py`: 6
-  - `test_auth.py`: 11
-  - `test_flujo_creacion.py`: 3
+  - `test_api_actas.py`: 11
+  - `test_asistente.py`: 10
+  - `test_auth.py`: 25
+  - `test_config.py`: 4
+  - `test_email_service.py`: 1
+  - `test_flujo_creacion.py`: 7
   - `test_pdf_generator.py`: 5
-  - `test_plantillas_legales.py`: 17
-- `test_tenant_isolation.py`: 3
-  - Total histórico documentado: 88
+  - `test_plantillas_legales.py`: 21
+  - `test_tenant_isolation.py`: 3
+  - Total actual: 121
 - Build del frontend exitoso (Vite)
 
 ---

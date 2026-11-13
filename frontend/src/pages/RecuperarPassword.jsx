@@ -122,9 +122,9 @@ export default function RecuperarPassword({ onCambiarVista = null }) {
                 className="campo"
                 value={formulario.nuevo_password}
                 onChange={(e) => manejarCambio('nuevo_password', e.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 12 caracteres"
                 autoComplete="new-password"
-                minLength={6}
+                minLength={12}
                 required
               />
             </Campo>

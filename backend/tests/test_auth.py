@@ -11,6 +11,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from passlib.context import CryptContext
 from fastapi.testclient import TestClient
 
 from app.core import security
@@ -61,8 +62,8 @@ def _restablecer_admin(sesion) -> None:
 # ---------------------------------------------------------------------------
 # Registro público y arranque del sistema
 # ---------------------------------------------------------------------------
-def test_primer_usuario_se_crea_como_administrador(cliente_anonimo, sesion) -> None:
-    """Con la base vacía, el primer registro arranca la plataforma como admin."""
+def test_primer_usuario_se_crea_como_superadministrador(cliente_anonimo, sesion) -> None:
+    """Con la base vacía, el primer registro arranca la plataforma como superadmin."""
     sesion.query(Usuario).delete()
     sesion.commit()
     try:
@@ -72,18 +73,18 @@ def test_primer_usuario_se_crea_como_administrador(cliente_anonimo, sesion) -> N
                 "email": "primero@pgac.com",
                 "nombre_completo": "Primer Usuario",
                 "rol": "capturista",  # se ignora: el primero siempre es admin
-                "password": "secreto-1",
+                "password": "clave-segura-123",
             },
         )
         assert respuesta.status_code == 201, respuesta.text
-        assert respuesta.json()["rol"] == "Administrador"
+        assert respuesta.json()["rol"] == "SuperAdministrador"
     finally:
         _borrar_usuario(sesion, "primero@pgac.com")
         _restablecer_admin(sesion)
 
 
-def test_autoregistro_anonimo_fuerza_rol_capturista(cliente_anonimo, cliente_autenticado, sesion) -> None:
-    """Un visitante no puede elevarse el rol: siempre queda como capturista."""
+def test_autoregistro_anonimo_rechaza_rol_privilegiado(cliente_anonimo, sesion) -> None:
+    """Un visitante no puede registrarse con un rol reservado."""
     try:
         respuesta = cliente_anonimo.post(
             "/api/v1/auth/registro",
@@ -91,13 +92,37 @@ def test_autoregistro_anonimo_fuerza_rol_capturista(cliente_anonimo, cliente_aut
                 "email": "visitante@pgac.com",
                 "nombre_completo": "Visitante Anonimo",
                 "rol": "Administrador",  # intento de escalación: debe ignorarse
-                "password": "secreto-1",
+                "password": "clave-segura-123",
+            },
+        )
+        assert respuesta.status_code == 422, respuesta.text
+    finally:
+        _borrar_usuario(sesion, "visitante@pgac.com")
+
+
+def test_autoregistro_anonimo_vincula_usuario_a_empresa(cliente_anonimo, sesion) -> None:
+    email_admin = "admin-registro@pgac.com"
+    codigo_empresa = "PGAC-EMPRESA-REGISTRO"
+    admin = _crear_usuario(sesion, email_admin, "Administrador")
+    admin.codigo_empresa = codigo_empresa
+    sesion.commit()
+    try:
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/registro",
+            json={
+                "email": "capturista-registrado@pgac.com",
+                "nombre_completo": "Capturista Registrado",
+                "rol": "capturista",
+                "codigo_empresa": codigo_empresa,
+                "password": "clave-segura-123",
             },
         )
         assert respuesta.status_code == 201, respuesta.text
         assert respuesta.json()["rol"] == "capturista"
+        assert respuesta.json()["empresa_codigo"] == codigo_empresa
     finally:
-        _borrar_usuario(sesion, "visitante@pgac.com")
+        _borrar_usuario(sesion, "capturista-registrado@pgac.com")
+        _borrar_usuario(sesion, email_admin)
 
 
 def test_admin_autenticado_crea_usuario_en_su_empresa(cliente_autenticado, sesion) -> None:
@@ -108,7 +133,7 @@ def test_admin_autenticado_crea_usuario_en_su_empresa(cliente_autenticado, sesio
                 "email": "revisor@pgac.com",
                 "nombre_completo": "Revisor Designado",
                 "rol": "revisor",
-                "password": "secreto-1",
+                "password": "clave-segura-123",
             },
         )
         assert respuesta.status_code == 201, respuesta.text
@@ -116,6 +141,45 @@ def test_admin_autenticado_crea_usuario_en_su_empresa(cliente_autenticado, sesio
         assert respuesta.json()["empresa_codigo"].startswith("PGAC-")
     finally:
         _borrar_usuario(sesion, "revisor@pgac.com")
+
+
+def test_registro_no_acepta_token_revocado_para_asignar_empresa(
+    cliente_anonimo, sesion
+) -> None:
+    email_admin = "admin-token-revocado@pgac.com"
+    admin = _crear_usuario(sesion, email_admin, "Administrador")
+    admin.codigo_empresa = "PGAC-EMPRESA-TOKEN-REVOCADO"
+    sesion.commit()
+    try:
+        login = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email_admin, "password": "secreto-1"},
+        )
+        token_anterior = login.json()["access_token"]
+        admin.token_version += 1
+        sesion.commit()
+
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/registro",
+            json={
+                "email": "capturista-token-revocado@pgac.com",
+                "nombre_completo": "Capturista",
+                "rol": "capturista",
+                "password": "clave-segura-123",
+            },
+            headers={"Authorization": f"Bearer {token_anterior}"},
+        )
+
+        assert respuesta.status_code == 422
+        assert (
+            sesion.query(Usuario)
+            .filter(Usuario.email == "capturista-token-revocado@pgac.com")
+            .first()
+            is None
+        )
+    finally:
+        _borrar_usuario(sesion, "capturista-token-revocado@pgac.com")
+        _borrar_usuario(sesion, email_admin)
 
 
 def test_admin_no_puede_crear_otro_administrador(cliente_autenticado, sesion) -> None:
@@ -126,7 +190,7 @@ def test_admin_no_puede_crear_otro_administrador(cliente_autenticado, sesion) ->
                 "email": "admin-empresa@pgac.com",
                 "nombre_completo": "Administrador de Empresa",
                 "rol": "Administrador",
-                "password": "secreto-1",
+                "password": "clave-segura-123",
             },
         )
         assert respuesta.status_code == 422, respuesta.text
@@ -152,7 +216,7 @@ def test_superadministrador_creando_administrador_genera_codigo(
                 "email": "admin-desde-super@pgac.com",
                 "nombre_completo": "Administrador desde SuperAdmin",
                 "rol": "Administrador",
-                "password": "secreto-1",
+                "password": "clave-segura-123",
             },
             headers={"Authorization": f"Bearer {login.json()['access_token']}"},
         )
@@ -254,7 +318,20 @@ def test_registro_con_email_duplicado_devuelve_422(cliente_anonimo, cliente_aute
             "email": ADMIN_EMAIL,
             "nombre_completo": "Otro Usuario",
             "rol": "capturista",
-            "password": "secreto-1",
+            "password": "clave-segura-123",
+        },
+    )
+    assert respuesta.status_code == 422
+
+
+def test_registro_rechaza_password_corta(cliente_anonimo) -> None:
+    respuesta = cliente_anonimo.post(
+        "/api/v1/auth/registro",
+        json={
+            "email": "password-corta@pgac.com",
+            "nombre_completo": "Usuario de Prueba",
+            "rol": "capturista",
+            "password": "corta123",
         },
     )
     assert respuesta.status_code == 422
@@ -285,6 +362,34 @@ def test_login_con_password_incorrecta_devuelve_401(cliente_anonimo, cliente_aut
         json={"email": ADMIN_EMAIL, "password": "incorrecta"},
     )
     assert respuesta.status_code == 401
+
+
+def test_hash_password_no_trunca_entradas_mayores_a_72_bytes() -> None:
+    password = "a" * 73
+    password_hash = security.hash_password(password)
+
+    assert security.verify_password(password, password_hash)
+    assert not security.verify_password(password[:72], password_hash)
+
+
+def test_login_actualiza_hash_bcrypt_legacy(cliente_anonimo, sesion) -> None:
+    email = "bcrypt-legacy@pgac.com"
+    password = "clave-segura-123"
+    usuario = _crear_usuario(sesion, email, "capturista", password)
+    usuario.password_hash = CryptContext(schemes=["bcrypt"]).hash(password)
+    sesion.commit()
+
+    try:
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password},
+        )
+
+        assert respuesta.status_code == 200
+        sesion.refresh(usuario)
+        assert security.pwd_context.identify(usuario.password_hash) == "bcrypt_sha256"
+    finally:
+        _borrar_usuario(sesion, email)
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +467,7 @@ def test_flujo_recuperacion_de_password(
         )
         assert confirmacion.status_code == 200, confirmacion.text
         assert "access_token" not in confirmacion.json()
+        sesion.refresh(usuario)
         assert usuario.reset_token is None
         assert usuario.token_version == 1
         assert cliente_anonimo.get(

@@ -171,6 +171,7 @@ def test_actualizar_acta_genera_nueva_version(sesion, payload_acta: dict) -> Non
 def test_restaurar_version_emite_version_nueva(sesion, payload_acta: dict) -> None:
     acta = _crear(sesion, payload_acta)
     lugar_original = acta.lugar
+    hora_original = acta.hora
     datos = {
         **_payload(payload_acta).model_dump(mode="json"),
         "motivo_cambio": "Cambio de sede",
@@ -181,6 +182,7 @@ def test_restaurar_version_emite_version_nueva(sesion, payload_acta: dict) -> No
 
     assert int(restaurada.version) == 3  # el historial siempre avanza
     assert restaurada.lugar == lugar_original
+    assert restaurada.hora == hora_original
     assert len(administracion.listar_versiones(sesion, acta.id)) == 3
 
 

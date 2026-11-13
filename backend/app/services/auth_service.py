@@ -37,6 +37,9 @@ def autenticar_usuario(db: Session, email: str, password: str) -> Optional[Usuar
         return None
     if not security.verify_password(password, usuario.password_hash):
         return None
+    if security.pwd_context.needs_update(usuario.password_hash):
+        usuario.password_hash = security.hash_password(password)
+        db.commit()
     return usuario
 
 

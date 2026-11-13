@@ -372,7 +372,7 @@ export default function AdministracionUsuarios() {
               etiqueta={panel === 'crear' ? 'Contraseña temporal' : 'Nueva contraseña'}
               htmlFor="usuario-password"
               requerido={panel === 'crear'}
-              ayuda={panel === 'crear' ? 'Mínimo 6 caracteres.' : 'Déjala vacía para conservar la contraseña actual.'}
+              ayuda={panel === 'crear' ? 'Mínimo 12 caracteres.' : 'Déjala vacía para conservar la contraseña actual.'}
             >
               <input
                 id="usuario-password"
@@ -380,7 +380,7 @@ export default function AdministracionUsuarios() {
                 className="campo"
                 value={formulario.password}
                 onChange={(evento) => setFormulario({ ...formulario, password: evento.target.value })}
-                minLength={6}
+                minLength={12}
                 required={panel === 'crear'}
                 autoComplete="new-password"
               />
