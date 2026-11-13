@@ -3,19 +3,25 @@ import { useEffect, useState } from 'react'
 import { consultarEstado } from '../../api/client.js'
 import Etiqueta from '../ui/Etiqueta.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { etiquetaGuiaRol } from '../../constants/roles.js'
 
 const SECCIONES = [
   { id: 'generar', etiqueta: 'Generar acta', titulo: 'Generar acta corporativa' },
+  { id: 'mis-actas', etiqueta: 'Mis actas', titulo: 'Mis actas' },
+  { id: 'revision', etiqueta: 'Revisión', titulo: 'Revisión de actas' },
+  { id: 'aprobacion', etiqueta: 'Aprobación', titulo: 'Aprobación de actas' },
   { id: 'asistente', etiqueta: 'Asistente IA', titulo: 'Asistente IA de actas' },
   { id: 'biblioteca', etiqueta: 'Biblioteca', titulo: 'Biblioteca de actas' },
-  { id: 'administracion', etiqueta: 'Administración', titulo: 'Administración de actas' },
+  { id: 'administracion', etiqueta: 'Administración de Actas', titulo: 'Administración de actas' },
   { id: 'empresa', etiqueta: 'Empresa', titulo: 'Información de la empresa o sociedad' },
-  { id: 'ayuda', etiqueta: 'Gia', titulo: 'Gia de uso' },
+  { id: 'ayuda', etiqueta: 'Guía de uso', titulo: 'Guía de uso' },
+  { id: 'guia-super-admin', etiqueta: 'Guía de SuperAdministrador', titulo: 'Guía de SuperAdministrador' },
   { id: 'perfil', etiqueta: 'Mi perfil', titulo: 'Mi perfil y funciones disponibles' },
   { id: 'administrador', etiqueta: 'Administrador', titulo: 'Panel de administración' },
-  { id: 'usuarios', etiqueta: 'Administrador de Usuarios', titulo: 'Administrador de Usuarios' },
-  { id: 'seguridad', etiqueta: 'Seguridad de Usuarios', titulo: 'Seguridad de Usuarios' },
-  { id: 'vitacora', etiqueta: 'Vitacora de actas', titulo: 'Vitacora de actas' },
+  { id: 'usuarios', etiqueta: 'Administración de Usuarios', titulo: 'Administración de usuarios' },
+  { id: 'estadisticas', etiqueta: 'Estadísticas', titulo: 'Estadísticas del sistema' },
+  { id: 'seguridad', etiqueta: 'Seguridad', titulo: 'Seguridad' },
+  { id: 'vitacora', etiqueta: 'Bitácora', titulo: 'Bitácora de actas' },
 ]
 
 export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = null, onCerrarSesion = null, seccionesVisibles = null }) {
@@ -29,6 +35,9 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
       .map((id) => SECCIONES.find((item) => item.id === id))
       .filter(Boolean)
     : SECCIONES
+  const seccionesNavConEtiquetas = seccionesNav.map((item) =>
+    item.id === 'ayuda' ? { ...item, etiqueta: etiquetaGuiaRol(usuario?.rol) } : item,
+  )
 
   useEffect(() => {
     let activo = true
@@ -59,7 +68,7 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
 
         {/* Navegación compacta: solo visible en móvil (la lateral la reemplaza en escritorio). */}
         <nav aria-label="Secciones" className="flex flex-wrap items-center gap-1 md:hidden">
-          {seccionesNav.map((item) => (
+          {seccionesNavConEtiquetas.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -76,7 +85,9 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
 
         {/* En escritorio el encabezado muestra el contexto actual + estado. */}
         <p className="hidden text-sm font-semibold text-corporativo-700 md:block">
-          {SECCIONES.find((item) => item.id === seccion)?.titulo || 'PGAC'}
+          {seccion === 'ayuda'
+            ? etiquetaGuiaRol(usuario?.rol)
+            : SECCIONES.find((item) => item.id === seccion)?.titulo || 'PGAC'}
         </p>
 
         <div className="flex items-center gap-2">

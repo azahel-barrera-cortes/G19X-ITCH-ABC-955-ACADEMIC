@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import BarraLateral from './components/layout/BarraLateral.jsx'
 import Encabezado from './components/layout/Encabezado.jsx'
 import AdministracionActas from './pages/AdministracionActas.jsx'
+import AdministracionUsuarios from './pages/AdministracionUsuarios.jsx'
 import Administrador from './pages/Administrador.jsx'
 import AsistenteChat from './components/asistente/AsistenteChat.jsx'
 import Ayuda from './pages/Ayuda.jsx'
+import BandejaActas from './pages/BandejaActas.jsx'
 import BibliotecaActas from './pages/BibliotecaActas.jsx'
 import ControlGeneraActa from './pages/ControlGeneraActa.jsx'
 import GenerarActa from './pages/GenerarActa.jsx'
@@ -18,7 +20,8 @@ import EstadisticasSuperAdmin from './pages/EstadisticasSuperAdmin.jsx'
 import SeguridadSuperAdmin from './pages/SeguridadSuperAdmin.jsx'
 import GuiaSuperAdmin from './pages/GuiaSuperAdmin.jsx'
 import UsuarioInactivo from './pages/UsuarioInactivo.jsx'
-import { obtenerCatalogos } from './api/client.js'
+import Alerta from './components/ui/Alerta.jsx'
+import { mensajeDeError, obtenerActa, obtenerCatalogos } from './api/client.js'
 import { obtenerInfoEmpresa } from './api/auth.js'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { seccionesPermitidas, SECCIONES_SISTEMA } from './constants/roles.js'
@@ -82,6 +85,10 @@ function Aplicacion() {
   const [vistaGenerar, setVistaGenerar] = useState('panel')
   const [plantillaTipo, setPlantillaTipo] = useState(null)
   const [actaEnEdicion, setActaEnEdicion] = useState(null)
+  const [cambiosActaIniciales, setCambiosActaIniciales] = useState(null)
+  const [cargandoActaEdicion, setCargandoActaEdicion] = useState(false)
+  const [errorActaEdicion, setErrorActaEdicion] = useState(null)
+  const [versionActaInicial, setVersionActaInicial] = useState(null)
   const [catalogos, setCatalogos] = useState(null)
   const [infoEmpresa, setInfoEmpresa] = useState(null)
 
@@ -165,12 +172,13 @@ function Aplicacion() {
 
     const seccionPermitida =
       seccionesVisibles.includes(seccion) ||
-      ((esSuperAdmin || esAdministrador) && SECCIONES_SUPERADMIN_IDS.includes(seccion))
+      (seccion === 'generar' && Boolean(actaEnEdicion)) ||
+      (esSuperAdmin && SECCIONES_SUPERADMIN_IDS.includes(seccion))
     if (autenticado && seccion !== 'perfil' && !seccionPermitida) {
       setSeccion('perfil')
       setVistaGenerar('panel')
     }
-  }, [autenticado, seccion, seccionesVisibles, esSuperAdmin])
+  }, [actaEnEdicion, autenticado, seccion, seccionesVisibles, esSuperAdmin])
 
   // Mantiene la URL (`#/seccion`) y el sessionStorage sincronizados con la
   // sección actual para que al refrescar la página el usuario se quede en
@@ -202,17 +210,65 @@ function Aplicacion() {
     }
   }, [])
 
-  const editarActa = useCallback((acta) => {
+  const editarActa = useCallback(async (acta) => {
+    setCargandoActaEdicion(true)
+    setErrorActaEdicion(null)
+    try {
+      const datosCompletos = await obtenerActa(acta.id)
+      const datosAsistente = datosCompletos.datos_asistente || {}
+      const generadaConAsistente = Boolean(
+        Object.keys(datosAsistente).length ||
+        datosCompletos.observaciones?.includes('Borrador creado con acompañamiento del asistente.'),
+      )
+      setActaEnEdicion(datosCompletos)
+      setCambiosActaIniciales(null)
+      setPlantillaTipo(null)
+      setVistaGenerar(generadaConAsistente ? 'ia' : 'formulario')
+      setSeccion('generar')
+    } catch (fallo) {
+      setErrorActaEdicion(await mensajeDeError(fallo))
+    } finally {
+      setCargandoActaEdicion(false)
+    }
+  }, [])
+  const editarDesdeAsistente = useCallback((actaId) => {
+    editarActa({ id: actaId })
+  }, [editarActa])
+
+  const editarDesdeBandeja = useCallback((acta) => {
     setActaEnEdicion(acta)
+    setCambiosActaIniciales(null)
     setPlantillaTipo(null)
-    setVistaGenerar('formulario')
+    setVistaGenerar(Object.keys(acta.datos_asistente || {}).length ? 'ia' : 'formulario')
     setSeccion('generar')
   }, [])
 
-  const cerrarEdicion = useCallback(() => setActaEnEdicion(null), [])
+  const aplicarCambiosAsistidos = useCallback(({ cambios }) => {
+    setCambiosActaIniciales(cambios || {})
+    setVistaGenerar('formulario')
+  }, [])
+
+  const cerrarEdicion = useCallback((actaGuardadaId = null) => {
+    setActaEnEdicion(null)
+    setCambiosActaIniciales(null)
+    setVistaGenerar('panel')
+    setSeccion(usuario?.rol === 'capturista' ? 'mis-actas' : 'administracion')
+    setErrorActaEdicion(null)
+    if (actaGuardadaId) setVersionActaInicial(actaGuardadaId)
+  }, [usuario?.rol])
+
+  const irAMisActas = useCallback(() => {
+    setActaEnEdicion(null)
+    setCambiosActaIniciales(null)
+    setVistaGenerar('panel')
+    setSeccion('mis-actas')
+  }, [])
+
+  const limpiarVersionActaInicial = useCallback(() => setVersionActaInicial(null), [])
 
   const volverAlPanel = useCallback(() => {
     setActaEnEdicion(null)
+    setCambiosActaIniciales(null)
     setPlantillaTipo(null)
     setVistaGenerar('panel')
   }, [])
@@ -227,6 +283,7 @@ function Aplicacion() {
 
   const abrirFormulario = useCallback((tipo = null) => {
     setActaEnEdicion(null)
+    setCambiosActaIniciales(null)
     setPlantillaTipo(tipo)
     setVistaGenerar('formulario')
     setSeccion('generar')
@@ -271,6 +328,7 @@ function Aplicacion() {
         onCerrarSesion={manejarCerrarSesion}
         seccionesVisibles={seccionesVisibles}
         esSuperAdmin={esSuperAdmin}
+        rol={usuario?.rol}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -283,6 +341,14 @@ function Aplicacion() {
         />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6">
+          {cargandoActaEdicion ? (
+            <Alerta tono="info">Cargando el acta completa para editarla…</Alerta>
+          ) : null}
+          {errorActaEdicion ? (
+            <Alerta tono="error" titulo="No se pudo abrir el acta">
+              {errorActaEdicion}
+            </Alerta>
+          ) : null}
           {seccion === 'generar' && (vistaGenerar === 'panel' && !actaEnEdicion) ? (
             <ControlGeneraActa
               onGenerarNueva={() => abrirFormulario(null)}
@@ -291,25 +357,51 @@ function Aplicacion() {
             />
           ) : null}
           {seccion === 'generar' && (vistaGenerar !== 'panel' || actaEnEdicion) ? (
-            vistaGenerar === 'ia' && !actaEnEdicion ? (
-              <GenerarActaConIA infoEmpresa={infoEmpresa} onVolver={volverAlPanel} />
+            vistaGenerar === 'ia' ? (
+              <GenerarActaConIA
+                key={actaEnEdicion ? 'edicion-ia-' + actaEnEdicion.id : 'generar-ia'}
+                infoEmpresa={infoEmpresa}
+                actaInicial={actaEnEdicion}
+                onVolver={actaEnEdicion ? () => cerrarEdicion() : volverAlPanel}
+                onEditarActa={editarDesdeAsistente}
+                onIrAMisActas={irAMisActas}
+                onAplicarCambiosEdicion={aplicarCambiosAsistidos}
+              />
             ) : (
               <GenerarActa
                 key={actaEnEdicion ? 'edicion-' + actaEnEdicion.id : 'plantilla-' + (plantillaTipo || 'nueva')}
                 actaInicial={actaEnEdicion}
+                cambiosIniciales={cambiosActaIniciales}
                 plantillaTipo={plantillaTipo}
                 infoEmpresa={infoEmpresa}
                 onVolver={volverAlPanel}
                 onCerrarEdicion={cerrarEdicion}
+                onSolicitudEnviada={irAMisActas}
               />
             )
           ) : null}
-          {seccion === 'asistente' ? <AsistenteChat modo="pagina" /> : null}
-          {seccion === 'biblioteca' ? (
-            <BibliotecaActas catalogos={catalogos} onEditar={editarActa} />
+          {seccion === 'asistente' ? (
+            <AsistenteChat
+              modo="pagina"
+              onEditarActa={editarDesdeAsistente}
+              onIrAMisActas={irAMisActas}
+            />
           ) : null}
-          {seccion === 'administracion' ? <AdministracionActas onEditar={editarActa} /> : null}
-          {seccion === 'ayuda' ? <Ayuda catalogos={catalogos} /> : null}
+          {seccion === 'biblioteca' ? (
+            <BibliotecaActas catalogos={catalogos} />
+          ) : null}
+          {seccion === 'mis-actas' ? (
+            <BandejaActas modo="capturista" onEditar={editarDesdeBandeja} />
+          ) : null}
+          {seccion === 'revision' ? <BandejaActas modo="revisor" /> : null}
+          {seccion === 'aprobacion' ? <BandejaActas modo="abogado" /> : null}
+          {seccion === 'administracion' ? (
+            <AdministracionActas
+              versionActaInicial={versionActaInicial}
+              onVersionActaInicialMostrada={limpiarVersionActaInicial}
+            />
+          ) : null}
+          {seccion === 'ayuda' ? <Ayuda catalogos={catalogos} rol={usuario?.rol} /> : null}
           {seccion === 'empresa' ? (
             <InformacionEmpresa
               infoGuardada={infoEmpresa}
@@ -319,7 +411,8 @@ function Aplicacion() {
           ) : null}
           {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
           {seccion === 'administrador' ? <Administrador /> : null}
-          {seccion === 'usuarios' && <UsuariosSuperAdmin />}
+          {seccion === 'usuarios' &&
+            (esAdministrador ? <AdministracionUsuarios /> : <UsuariosSuperAdmin />)}
           {seccion === 'vitacora' && <VitacoraSuperAdmin />}
           {seccion === 'estadisticas' && <EstadisticasSuperAdmin />}
           {seccion === 'seguridad' && <SeguridadSuperAdmin />}

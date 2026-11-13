@@ -68,7 +68,19 @@ def registrar_usuario(
     total_usuarios = db.query(Usuario).count()
     if total_usuarios == 0:
         datos.rol = "SuperAdministrador"
-    elif not (solicitante and solicitante.rol in ("SuperAdministrador", "Administrador")):
+    elif solicitante and solicitante.rol == "Administrador":
+        roles_empresa = ("capturista", "revisor", "abogado_responsable")
+        if datos.rol not in roles_empresa:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El Administrador solo puede crear capturistas, revisores o abogados responsables.",
+            )
+        if not solicitante.codigo_empresa:
+            solicitante.codigo_empresa = generar_codigo_empresa(db)
+            db.commit()
+            db.refresh(solicitante)
+        datos.codigo_empresa = solicitante.codigo_empresa
+    elif not (solicitante and solicitante.rol == "SuperAdministrador"):
         roles_publicos = ("capturista", "revisor", "abogado_responsable")
         if datos.rol not in roles_publicos:
             raise HTTPException(
@@ -87,6 +99,19 @@ def registrar_usuario(
                 detail="El código de empresa no existe o no está activo.",
             )
     usuario = crear_usuario(db, datos)
+    if solicitante and solicitante.rol in ("SuperAdministrador", "Administrador"):
+        registrar_bitacora(
+            db,
+            usuario=solicitante,
+            accion="crear",
+            entidad="usuarios",
+            entidad_id=usuario.id,
+            datos_despues={
+                "email": usuario.email,
+                "nombre_completo": usuario.nombre_completo,
+                "rol": usuario.rol,
+            },
+        )
     return usuario_desde_respuesta(usuario)
 
 
@@ -324,14 +349,29 @@ def confirmar_reset_password(
 @router.get(
     "/users",
     response_model=List[UsuarioRespuesta],
-    summary="Listar usuarios (solo SuperAdministrador).",
+    summary="Listar usuarios del sistema o de la empresa del Administrador.",
 )
 def listar_usuarios(
-    _super_admin: RequiereSuperAdministrador,
+    usuario_actual: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> List[UsuarioRespuesta]:
-    """Devuelve todos los usuarios registrados al SuperAdministrador."""
-    usuarios = db.query(Usuario).order_by(Usuario.email).all()
+    """SuperAdministrador ve todos los usuarios; Administrador, solo su empresa."""
+    consulta = db.query(Usuario)
+    if usuario_actual.rol == "Administrador":
+        if not usuario_actual.codigo_empresa:
+            usuario_actual.codigo_empresa = generar_codigo_empresa(db)
+            db.commit()
+            db.refresh(usuario_actual)
+        consulta = consulta.filter(
+            Usuario.empresa_codigo == usuario_actual.codigo_empresa,
+            Usuario.rol.in_(("capturista", "revisor", "abogado_responsable")),
+        )
+    elif usuario_actual.rol != "SuperAdministrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere el rol 'Administrador' o 'SuperAdministrador'.",
+        )
+    usuarios = consulta.order_by(Usuario.email).all()
     return [usuario_desde_respuesta(u) for u in usuarios]
 
 
@@ -343,25 +383,58 @@ def listar_usuarios(
 def actualizar_usuario(
     user_id: int,
     cambios: UsuarioActualizar,
-    _super_admin: RequiereSuperAdministrador,
+    usuario_actual: UsuarioActual,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> UsuarioRespuesta:
-    """Actualiza un usuario existente; solo el SuperAdministrador puede hacerlo."""
+    """Actualiza un usuario globalmente o dentro de la empresa del Administrador."""
     usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
     if not usuario:
         raise DatosActaInvalidosError(
             "Usuario no encontrado.",
             detalle=f"No existe un usuario con el identificador {user_id}.",
         )
+    es_super_admin = usuario_actual.rol == "SuperAdministrador"
+    if not es_super_admin:
+        if usuario_actual.rol != "Administrador":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Se requiere el rol 'Administrador' o 'SuperAdministrador'.",
+            )
+        if (
+            not usuario_actual.codigo_empresa
+            or usuario.empresa_codigo != usuario_actual.codigo_empresa
+            or usuario.rol not in ("capturista", "revisor", "abogado_responsable")
+        ):
+            raise DatosActaInvalidosError(
+                "Usuario no encontrado.",
+                detalle=f"No existe un usuario con el identificador {user_id}.",
+            )
+        if cambios.rol is not None and cambios.rol not in (
+            "capturista",
+            "revisor",
+            "abogado_responsable",
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El Administrador solo puede asignar capturista, revisor o abogado_responsable.",
+            )
+
+    datos_antes = {
+        "email": usuario.email,
+        "nombre_completo": usuario.nombre_completo,
+        "rol": usuario.rol,
+        "activo": usuario.activo,
+    }
     if cambios.nombre_completo is not None:
         usuario.nombre_completo = cambios.nombre_completo
     if cambios.rol is not None:
-        if usuario.id == _super_admin.id and cambios.rol != "SuperAdministrador":
+        if usuario.id == usuario_actual.id and cambios.rol != "SuperAdministrador":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="No puedes cambiar el rol del SuperAdministrador actual.",
             )
-        if cambios.rol == "SuperAdministrador" and usuario.id != _super_admin.id:
+        if cambios.rol == "SuperAdministrador" and usuario.id != usuario_actual.id:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="El rol SuperAdministrador pertenece únicamente al usuario actual.",
@@ -382,6 +455,21 @@ def actualizar_usuario(
         usuario.password_hash = security.hash_password(cambios.password)
     db.commit()
     db.refresh(usuario)
+    registrar_bitacora(
+        db,
+        usuario=usuario_actual,
+        accion="actualizar",
+        entidad="usuarios",
+        entidad_id=usuario.id,
+        datos_antes=datos_antes,
+        datos_despues={
+            "email": usuario.email,
+            "nombre_completo": usuario.nombre_completo,
+            "rol": usuario.rol,
+            "activo": usuario.activo,
+        },
+        request=request,
+    )
     return usuario_desde_respuesta(usuario)
 
 

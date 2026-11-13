@@ -5,6 +5,8 @@
  * encuentre rápido qué busca. En pantallas pequeñas la barra se oculta y la
  * navegación pasa a una fila horizontal sobre el contenido (ver `App.jsx`).
  */
+import { etiquetaGuiaRol } from '../../constants/roles.js'
+
 const SECCIONES = [
   {
     id: 'generar',
@@ -20,11 +22,44 @@ const SECCIONES = [
   {
     id: 'asistente',
     etiqueta: 'Asistente IA',
-    descripcion: 'Chat de actas: redacta, valida y aprueba',
+    descripcion: 'Chat de actas: redacta y crea guiado',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-13.2 8L3 21l1.1-4.4A9 9 0 1121 12z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'mis-actas',
+    etiqueta: 'Mis actas',
+    descripcion: 'Seguimiento de revisiones y correcciones',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14v16H5z" />
+        <path strokeLinecap="round" d="M8 9h8M8 13h8M8 17h5" />
+      </svg>
+    ),
+  },
+  {
+    id: 'revision',
+    etiqueta: 'Revisión de actas',
+    descripcion: 'Borradores pendientes de revisión',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path strokeLinecap="round" d="m15.5 15.5 5 5M8 10.5h5M10.5 8v5" />
+      </svg>
+    ),
+  },
+  {
+    id: 'aprobacion',
+    etiqueta: 'Aprobación de actas',
+    descripcion: 'Visto bueno legal y PDF final',
+    icono: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" />
+        <path strokeLinecap="round" d="M4 20h16" />
       </svg>
     ),
   },
@@ -40,7 +75,7 @@ const SECCIONES = [
   },
   {
     id: 'ayuda',
-    etiqueta: 'Gia de uso',
+    etiqueta: 'Guía de uso',
     descripcion: 'Flujo, API y notas legales',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -53,7 +88,7 @@ const SECCIONES = [
   {
     id: 'biblioteca',
     etiqueta: 'Biblioteca de actas',
-    descripcion: 'Historial, estatus, PDF y edición',
+    descripcion: 'Historial y consulta de actas',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14v16H5z" />
@@ -63,7 +98,7 @@ const SECCIONES = [
   },
   {
     id: 'administracion',
-    etiqueta: 'Administracion de Actas',
+    etiqueta: 'Administración de Actas',
     descripcion: 'Versiones, vigencia y caducidad',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -74,8 +109,8 @@ const SECCIONES = [
   },
   {
     id: 'usuarios',
-    etiqueta: 'Administrador de Usuarios',
-    descripcion: 'Gestion de usuarios del sistema',
+    etiqueta: 'Administración de usuarios',
+    descripcion: 'Usuarios, roles y accesos de la empresa',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 8 4 4 0 010-8z" />
@@ -85,7 +120,7 @@ const SECCIONES = [
   },
   {
     id: 'seguridad',
-    etiqueta: 'Seguridad de Usuarios',
+    etiqueta: 'Seguridad',
     descripcion: 'Seguridad de usuarios y accesos',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -95,8 +130,8 @@ const SECCIONES = [
   },
   {
     id: 'vitacora',
-    etiqueta: 'Vitacora de actas',
-    descripcion: 'Vitacora de acciones del sistema',
+    etiqueta: 'Bitácora',
+    descripcion: 'Bitácora de acciones del sistema',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -122,8 +157,8 @@ const SECCIONES = [
 const SECCIONES_SUPERADMIN = [
   {
     id: 'usuarios',
-    etiqueta: 'Administracion de Usuarios',
-    descripcion: 'Gestion de usuarios del sistema',
+    etiqueta: 'Administración de Usuarios',
+    descripcion: 'Gestión de usuarios del sistema',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 8 4 4 0 010-8z" />
@@ -133,8 +168,8 @@ const SECCIONES_SUPERADMIN = [
   },
   {
     id: 'vitacora',
-    etiqueta: 'Vitacora',
-    descripcion: 'Vitacora de acciones del sistema',
+    etiqueta: 'Bitácora',
+    descripcion: 'Bitácora de acciones del sistema',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -143,8 +178,8 @@ const SECCIONES_SUPERADMIN = [
   },
   {
     id: 'estadisticas',
-    etiqueta: 'Estadisticas',
-    descripcion: 'Estadisticas del sistema',
+    etiqueta: 'Estadísticas',
+    descripcion: 'Estadísticas del sistema',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m0 0v6m0-6h6m-6 0H6" />
@@ -163,8 +198,8 @@ const SECCIONES_SUPERADMIN = [
   },
   {
     id: 'guia-super-admin',
-    etiqueta: 'Gia de super Administrador',
-    descripcion: 'Flujo, API, Notas y seguridad del super administrador',
+    etiqueta: 'Guía de SuperAdministrador',
+    descripcion: 'Guía de uso del sistema',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a4 4 0 000 8h12a4 4 0 000-8h-5a2 2 0 01-2-2z" />
@@ -174,7 +209,7 @@ const SECCIONES_SUPERADMIN = [
   },
 ]
 
-export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null, esSuperAdmin = false }) {
+export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null, esSuperAdmin = false, rol = null }) {
   // Para SuperAdministrador se muestran exclusivamente sus 5 secciones.
   // Esas IDs no están en SECCIONES_SISTEMA, por lo que no se filtran por
   // seccionesVisibles; se muestran tal cual.
@@ -185,6 +220,9 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
         .map((id) => SECCIONES.find((item) => item.id === id))
         .filter(Boolean)
       : SECCIONES)
+  const seccionesConEtiquetas = secciones.map((item) =>
+    item.id === 'ayuda' ? { ...item, etiqueta: etiquetaGuiaRol(rol) } : item,
+  )
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
@@ -202,7 +240,7 @@ export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion
       </div>
 
       <nav aria-label="Secciones" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {secciones.map((item) => {
+        {seccionesConEtiquetas.map((item) => {
           const activa = seccion === item.id
           return (
             <button

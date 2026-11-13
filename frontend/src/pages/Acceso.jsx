@@ -50,14 +50,13 @@ export default function Acceso({ onAccesoExitoso }) {
             Acceso seguro a la gestión de tus actas corporativas
           </h2>
           <p className="text-sm leading-relaxed text-corporativo-100">
-            Redacción asistida por IA, validación de consistencia conforme a la
-            LGSM y exportación a PDF. Las funciones disponibles dentro del
-            sistema dependen del rol asignado a tu cuenta.
+            Captura y redacción asistida por IA con un flujo de revisión por
+            roles. El PDF final se libera después de la aprobación legal.
           </p>
           <ul className="space-y-2 text-xs text-corporativo-200">
-            <li>• Capturista: crea y edita actas, genera el PDF.</li>
-            <li>• Revisor: consulta biblioteca, administración y bitácora.</li>
-            <li>• Abogado responsable: aprueba, valida y cambia estatus.</li>
+            <li>• Capturista: crea actas, corrige observaciones y consulta versiones.</li>
+            <li>• Revisor: revisa borradores, los aprueba o devuelve con observaciones.</li>
+            <li>• Abogado responsable: aprueba de forma final y genera el PDF.</li>
             <li>• Administrador: gestiona usuarios y el repositorio completo.</li>
           </ul>
         </div>

@@ -40,6 +40,15 @@ def cliente() -> Iterator[TestClient]:
         yield cliente_pruebas
 
 
+@pytest.fixture()
+def cliente_anonimo() -> Iterator[TestClient]:
+    """Cliente HTTP independiente sin el encabezado autenticado de otras pruebas."""
+    from app.main import app
+
+    with TestClient(app) as cliente_pruebas:
+        yield cliente_pruebas
+
+
 @pytest.fixture(scope="session")
 def admin_token(cliente: TestClient) -> str:
     """Crea un administrador en la base de datos y devuelve el token de acceso."""
