@@ -57,6 +57,7 @@ El sistema debe incluir un asistente de IA basado en chat que guíe al usuario e
 - **Catálogo de tipos de asamblea:** ofrecer tipos de acta para elegir (ordinaria, extraordinaria, aumento de capital, fusión, disolución, etc.).
 - **Acciones rápidas:** validar una acta, cambiar su estatus, consultar versiones, descargar el PDF y restaurar versiones.
 - **Borrador organizable:** generar un texto estructurado del acta que pueda copiarse al formulario manual.
+- **Confirmación de creación:** el asistente puede proponer una creación de acta con `confirmacion_creacion` y `resumen_creacion`, requiriendo validación explícita del usuario antes de persistir el acta.
 - **Endpoint de ayuda:** devolver sugerencias de preguntas válidas y capacidades del asistente.
 
 ### RF-10: Información de la empresa o sociedad
@@ -128,6 +129,15 @@ Endpoints de solo lectura y metadatos (`/api/v1/notaria/actas` y
 `/api/v1/notaria/actas/{id}`) que exponen resúmenes y datos públicos del
  Acta para validación notarial (sin cláusulas completas), requieren rol
  revisor+ y dejan constancia en la bitácora.
+
+### RF-16: Reasignación de actas en cuarentena a empresa (SuperAdministrador)
+El `SuperAdministrador` puede vincular un acta sin empresa asociada (en
+cuarentena) a una empresa activa existente mediante
+`PATCH /administracion/actas/{acta_id}/empresa`. La operación valida que
+la empresa exista, que el acta esté sin empresa, registra el cambio en
+la bitácora con `datos_antes` / `datos_después` y actualiza también las
+entradas de bitácora previas del acta para asignarles el código
+empresarial.
 
 ### RF-16: Redacción en vivo por streaming (SSE)
 El sistema debe ofrecer un endpoint `POST /api/v1/actas/redactar-stream` que transmita la cláusula del primer acuerdo fragmento a fragmento (`inicio` → `fragmento`… → `fin`) mediante `text/event-stream`, permitiendo al frontend mostrar la redacción mientras se genera. Requiere autenticación y rol capturista+.
@@ -214,10 +224,10 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 | Área | Qué queda fuera |
 |------|-----------------|
 | Firma electrónica | Firma electrónica avanzada, hash + sellado de tiempo |
-| Multiempresa | Aislamiento de datos por sociedad/cliente |
+| Multiempresa (pendiente de migraciones) | Aislamiento de datos por sociedad/cliente mediante `empresa_codigo` y filtrado fail-closed en todos los endpoints de actas |
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
-| Vinculación multiempresa completa | El MVP vincula usuarios y datos empresariales mediante código, pero aún no aísla completamente las actas por sociedad |
+| Vinculación multiempresa completa | Los actas cuentan con `empresa_codigo` indexado y el filtrado por tenant está aplicado en endpoints de actas, administración, notaría y expediente. El `SuperAdministrador` puede reasignar actas en cuarentena mediante `PATCH /administracion/actas/{acta_id}/empresa`. Pendiente: migraciones con Alembic para esquema productivo. |
 
 ---
 
@@ -251,7 +261,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
   recomiéndase HTTPS y, a futuro, cookies `HttpOnly`.
 - El despliegue debe configurar SMTP antes de habilitar operativamente la
   recuperación; aún se requiere rate limiting para evitar abuso del endpoint.
-- No hay aislamiento multiempresa: un revisor+ puede consultar todas las
+- El aislamiento multiempresa está implementado mediante `empresa_codigo` con filtrado fail-closed; un usuario sin empresa asociada recibe acceso vacío (404 / lista vacía) en lugar de datos ajenos. Pendiente: migraciones con Alembic para esquema productivo.
 - El asistente conversacional exige rol `abogado_responsable` (o superior)
    para cambiar el estatus de un acta y restaurar versiones anteriores;
    las demás intenciones respetan el RBAC del usuario autenticado.
@@ -272,7 +282,7 @@ Riesgos conocidos (aceptados hasta la versión post-actual):
 ## 8. Hoja de ruta sugerida (post-MVP)
 
 1. Rate limiting y controles de abuso para autenticación y recuperación
-2. Migraciones con Alembic y aislamiento completo por sociedad
+2. Migraciones con Alembic para esquema productivo (el aislamiento por sociedad ya está implementado mediante `empresa_codigo`)
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances)
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo)
 5. Multiusuario/logotipos por sociedad con aislamiento de datos y permisos por empresa

@@ -15,13 +15,14 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 ### Backend (Python + FastAPI)
 | Módulo | Qué incluye |
 |--------|-------------|
-| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión; `Usuario` (email, nombre, rol, password_hash, activo, `codigo_empresa`, hash de `reset_token`, vencimiento y `token_version`) y `BitacoraCambios` (usuario_id, accion, entidad, datos_antes/despues, ip_origen, user_agent) |
+| Modelos | `Acta` con ID, tipo de asamblea, fecha, sociedad, asistentes, orden del día, acuerdos, estatus, versión y `empresa_codigo` (indexado); `Usuario` (email, nombre, rol, password_hash, activo, `codigo_empresa`, `empresa_codigo`, hash de `reset_token`, vencimiento y `token_version`) y `BitacoraCambios` (usuario_id, accion, entidad, `empresa_codigo`, datos_antes/despues, ip_origen, user_agent) |
 | Catálogos jurídicos | 26 tipos de acta y 13 tipos societarios, con requisitos específicos por materia y fundamentos normativos |
 | Plantillas legales parametrizadas | `PlantillaLegal` + `ParametroPlantilla` con validación de parámetros requeridos, valores por defecto, `obtener_parametros_plantilla()`, `parametros_requeridos_por_materia()` y `DatosPlantillaIncompletosError` |
 | IA + degradación | `ai_service.py` con integración a Azure OpenAI / Gemini / OpenAI-compatible (Ollama, Groq, DeepSeek, LM Studio, vLLM); si falla, degrada a plantillas deterministas |
 | ReportLab | `build_acta_pdf(data) -> bytes` con encabezados, márgenes, firmas, numeración de páginas |
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
-| Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad |
+| Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad y endpoint `PATCH /actas/{acta_id}/empresa` para reasignar actas en cuarentena (SuperAdministrador) |
+| Aislamiento por tenant | `tenant_access.py`: `AlcanceEmpresa`, `alcance_empresa()`, `filtrar_por_empresa()` y `obtener_acta_autorizada()` para filtrado fail-closed por `empresa_codigo` en todos los endpoints de actas, administración, notaría y expediente |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
 | Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: semilla inicial de SuperAdministrador vía `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`, registro público vinculado a empresa para capturista/revisor/abogado responsable, JWT HS256, perfil, recuperación de contraseña, `requiere_rol` y dependencias por rol; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
 | Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
@@ -55,7 +56,8 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
   - `test_flujo_creacion.py`: 3
   - `test_pdf_generator.py`: 5
   - `test_plantillas_legales.py`: 17
-  - Total histórico documentado: 85
+- `test_tenant_isolation.py`: 3
+  - Total histórico documentado: 88
 - Build del frontend exitoso (Vite)
 
 ---
@@ -66,7 +68,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 |------|----------------|--------|
 | **Autenticación y roles** | ✅ Entregado (JWT + RBAC + interfaz de acceso separada + perfil por rol + SuperAdministrador inicial por variables de entorno) | Requisito RF-11 de la versión entregada |
 | **Firma electrónica** | Firma electrónica avanzada, hash + sellado de tiempo | Requiere infraestructura adicional y validez legal específica |
-| **Aislamiento multiempresa completo** | Separación estricta de datos por sociedad/cliente | El MVP ya vincula usuarios y configuración empresarial mediante código, pero aún no aplica aislamiento completo de todas las actas |
+| **Aislamiento multiempresa completo** | Separación estricta de datos por sociedad/cliente | ✅ Entregado en esta versión: `empresa_codigo` en modelos, filtrado fail-closed en endpoints y `tenant_access.py`. El `SuperAdministrador` puede reasignar actas en cuarentena mediante `PATCH /administracion/actas/{acta_id}/empresa`. |
 | **Migraciones Alembic** | AUTO_CREATE_TABLES=false + migraciones gestionadas | El MVP crea tablas automáticamente en SQLite |
 | **Plantillas Word/PDF adjuntas** | Poderes, convocatorias, balances como anexos | Solo se genera el acta base |
 | **Rate limiting** | Límites de intentos para login y recuperación | Requiere definir almacenamiento compartido y política por cuenta/IP |

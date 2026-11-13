@@ -9,6 +9,7 @@ disolución, etc.) conforme a la Ley General de Sociedades Mercantiles (México)
 - **ReportLab para el PDF** — renderizado reproducible y ajeno al modelo.
 - **Validación de consistencia** — reglas duras sobre quórum, convocatoria, mayorías, orden del día y fundamentos.
 - **Autenticación y roles (JWT + RBAC)** — interfaz de acceso separada del sistema de actas; capturista, revisor, abogado responsable y Administrador, con bitácora de cambios sobre las operaciones sensibles.
+- **Aislamiento multiempresa (tenant isolation)** — `empresa_codigo` indexado en modelos, filtrado fail-closed por empresa en todos los endpoints y reasignación de actas en cuarentena por el `SuperAdministrador`.
 
 ---
 
@@ -42,7 +43,8 @@ PGAC/
 │       │   ├── pdf_generator.py        build_acta_pdf(data: dict) -> bytes
 │       │   ├── auth_service.py         registro, login y recuperación de contraseña
 │       │   ├── email_service.py        envío de recuperación por SMTP configurable
-│       │   └── acta_service.py         orquestación, folios, CRUD
+│       │   ├── acta_service.py         orquestación, folios, CRUD
+│       │   └── tenant_access.py        alcance por empresa, filtrado fail-closed y autorización de actas
 │       └── api/v1/                 router, deps (RBAC) + endpoints (actas, administración, asistente, auth, bitácora, expediente ZIP, notaría, sistema)
 └── frontend/                   React 18 + Vite + Tailwind CSS
     ├── package.json, vite.config.js, tailwind.config.js, postcss.config.js
@@ -566,8 +568,8 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 - La plataforma incluye **autenticación JWT con roles (RBAC)** y bitácora de
   cambios. La recuperación por correo está implementada mediante SMTP
   configurable; el despliegue debe proporcionar la configuración de correo.
-  La multiempresa y la firma electrónica avanzada requieren completar sus
-  respectivos controles antes de producción.
+  El aislamiento multiempresa está implementado mediante `empresa_codigo` con filtrado fail-closed;
+  la firma electrónica avanzada requiere infraestructura adicional antes de producción.
 - El proyecto cubre la **estructura base** solicitada en `PGAC.md`.
 - El PDF se genera con ReportLab de forma determinista; los márgenes, la
   tipografía y el pie de página se ajustan desde `backend/.env`.
@@ -580,7 +582,7 @@ restringido y publicación de `frontend/dist` tras un proxy con HTTPS.
 2. Migraciones con Alembic y fusión de la tabla `actas` con catálogos de sociedades.
 3. Plantillas en Word/PDF adjuntas y anexos (poderes, convocatorias, balances).
 4. Firma electrónica y control de versiones firmadas (hash + sellado de tiempo).
-5. Completar la revisión de seguridad del registro inicial y los controles multiempresa.
+5. Completar la revisión de seguridad del registro inicial (rate limiting, cookies HttpOnly).
 
 ---
 
