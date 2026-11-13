@@ -20,28 +20,28 @@ TIPOS_GUIA: List[Dict[str, Any]] = [
   "articulos": list(i.get("articulos") or [])} for i in TIPOS_ASAMBLEA]
 CAMPOS_REQUERIDOS: List[Dict[str, str]] = [
  {"clave": "tipo_sociedad", "etiqueta": "tipo de sociedad",
-  "pregunta": "Que tipo de sociedad es? Elige una de las 13 formas societarias soportadas (Ej. Sociedad Anónima de Capital Variable).",
+  "pregunta": "¿Qué tipo de sociedad es? Ej.: Sociedad Anónima de Capital Variable.",
   "ejemplo": "sociedad_anonima_capital_variable"},
  {"clave": "sociedad", "etiqueta": "sociedad (razon social)",
-  "pregunta": "Cual es la razon social completa? Ej. Comercializadora del Norte, S.A. de C.V.",
+  "pregunta": "¿Cuál es la razón social completa? Ej.: Comercializadora del Norte, S.A. de C.V.",
   "ejemplo": "Comercializadora del Norte, S.A. de C.V."},
  {"clave": "fecha", "etiqueta": "fecha (AAAA-MM-DD)",
-  "pregunta": "En que fecha se celebro la asamblea? Dime dia, mes y anio (Ej. 15 de marzo de 2026).",
+  "pregunta": "¿Qué día se celebró la asamblea? Ej.: 15 de marzo de 2026.",
   "ejemplo": "2026-03-15"},
  {"clave": "lugar", "etiqueta": "lugar",
-  "pregunta": "Donde se celebro? (domicilio completo).",
+  "pregunta": "¿En qué lugar se celebró? Incluye el domicilio.",
   "ejemplo": "Av. Reforma 1234, CDMX"},
  {"clave": "presidente", "etiqueta": "presidente",
-  "pregunta": "Quien presidio? (nombre completo).",
+  "pregunta": "¿Quién presidió la asamblea? (nombre completo).",
   "ejemplo": "Ana Maria Ruiz Salazar"},
  {"clave": "secretario", "etiqueta": "secretario",
-  "pregunta": "Quien actuo como secretario? (nombre completo).",
+  "pregunta": "¿Quién actuó como secretario? (nombre completo).",
   "ejemplo": "Carlos Pena Dominguez"},
  {"clave": "asistentes", "etiqueta": "asistentes y acciones",
-  "pregunta": "Dime asistentes con acciones asi: Ana Ruiz 50000, Carlos Pena 20000. Minimo uno.",
+  "pregunta": "Indica asistentes y acciones. Ej.: Ana Ruiz 50000, Carlos Peña 20000.",
   "ejemplo": "Ana Ruiz 50000, Carlos Pena 20000"},
  {"clave": "orden_y_acuerdos", "etiqueta": "orden del dia y acuerdos",
-  "pregunta": "Cuales fueron los puntos y que se acordo? Ej. 1. Aumento de capital en $500,000; 2. Reforma de estatutos.",
+  "pregunta": "¿Qué puntos se trataron y qué se acordó? Puedes enumerarlos.",
   "ejemplo": "Aumento de capital en $500,000"},
 ]
 _SESIONES: Dict[str, Dict[str, Any]] = {}
@@ -87,18 +87,45 @@ def detectar_tipo_sociedad_en_texto(texto: str) -> Optional[str]:
   ):
    return str(it["valor"])
  return None
-def crear_sesion(tipo=None) -> Dict[str, Any]:
+def crear_sesion(
+ tipo=None,
+ *,
+ usuario_id: Optional[int] = None,
+ empresa_codigo: Optional[str] = None,
+) -> Dict[str, Any]:
  sid = uuid.uuid4().hex[:12]
  s = {"sesion_id": sid, "tipo_asamblea": tipo, "datos": {},
       "respuestas": [],
       "etapa": "tipo" if not tipo else "datos",
+   "usuario_id": usuario_id,
+   "empresa_codigo": empresa_codigo,
       "creada_en": datetime.utcnow().isoformat()}
  _SESIONES[sid] = s
  return s
-def obtener_sesion(sid: Optional[str]) -> Optional[Dict[str, Any]]:
- return _SESIONES.get(sid) if sid else None
-def reiniciar_sesion(sid: Optional[str]) -> None:
- if sid and sid in _SESIONES:
+def obtener_sesion(
+ sid: Optional[str],
+ *,
+ usuario_id: Optional[int] = None,
+ empresa_codigo: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+ sesion = _SESIONES.get(sid) if sid else None
+ if sesion is None:
+  return None
+ if usuario_id is not None and (
+  sesion.get("usuario_id") != usuario_id
+  or sesion.get("empresa_codigo") != empresa_codigo
+ ):
+  return None
+ return sesion
+def reiniciar_sesion(
+ sid: Optional[str],
+ *,
+ usuario_id: Optional[int] = None,
+ empresa_codigo: Optional[str] = None,
+) -> None:
+ if obtener_sesion(
+  sid, usuario_id=usuario_id, empresa_codigo=empresa_codigo
+ ) is not None:
   del _SESIONES[sid]
 def siguiente_faltante(sesion: Dict[str, Any]) -> Optional[Dict[str, str]]:
  datos = sesion.get("datos", {})
