@@ -82,6 +82,7 @@ function Aplicacion() {
     }
     return 'perfil'
   })
+  const [asistenteAbierto, setAsistenteAbierto] = useState(() => seccion === 'asistente')
   const [vistaGenerar, setVistaGenerar] = useState('panel')
   const [plantillaTipo, setPlantillaTipo] = useState(null)
   const [actaEnEdicion, setActaEnEdicion] = useState(null)
@@ -196,6 +197,10 @@ function Aplicacion() {
     }
   }, [seccion, autenticado])
 
+  useEffect(() => {
+    setAsistenteAbierto(seccion === 'asistente')
+  }, [seccion])
+
   // Navegación con Atrás / Adelante del navegador entre secciones de la app.
   useEffect(() => {
     const manejarPopstate = () => {
@@ -276,6 +281,7 @@ function Aplicacion() {
   const cambiarSeccion = useCallback(
     (nueva) => {
       setSeccion(nueva)
+      setAsistenteAbierto(nueva === 'asistente')
       if (nueva === 'generar') volverAlPanel()
     },
     [volverAlPanel],
@@ -289,11 +295,6 @@ function Aplicacion() {
     setSeccion('generar')
   }, [])
 
-  const abrirVistaIA = useCallback(() => {
-    setVistaGenerar('ia')
-    setSeccion('generar')
-  }, [])
-
   /** Tras un acceso correcto se abre el panel inicial correspondiente al rol. */
   const manejarAccesoExitoso = useCallback(() => {
     volverAlPanel()
@@ -304,6 +305,7 @@ function Aplicacion() {
   const manejarCerrarSesion = useCallback(async () => {
     await cerrarSesion()
     volverAlPanel()
+    setAsistenteAbierto(false)
     setSeccion('perfil')
     history.replaceState(null, '', '')
     sessionStorage.removeItem(CLAVE_SECCION)
@@ -352,7 +354,7 @@ function Aplicacion() {
           {seccion === 'generar' && (vistaGenerar === 'panel' && !actaEnEdicion) ? (
             <ControlGeneraActa
               onGenerarNueva={() => abrirFormulario(null)}
-              onGenerarConIA={abrirVistaIA}
+              onAbrirAsistente={() => cambiarSeccion('asistente')}
               onUsarPlantilla={(tipo) => abrirFormulario(tipo)}
             />
           ) : null}
@@ -379,13 +381,6 @@ function Aplicacion() {
                 onSolicitudEnviada={irAMisActas}
               />
             )
-          ) : null}
-          {seccion === 'asistente' ? (
-            <AsistenteChat
-              modo="pagina"
-              onEditarActa={editarDesdeAsistente}
-              onIrAMisActas={irAMisActas}
-            />
           ) : null}
           {seccion === 'biblioteca' ? (
             <BibliotecaActas catalogos={catalogos} />
@@ -417,6 +412,13 @@ function Aplicacion() {
           {seccion === 'estadisticas' && <EstadisticasSuperAdmin />}
           {seccion === 'seguridad' && <SeguridadSuperAdmin />}
           {seccion === 'guia-super-admin' && <GuiaSuperAdmin />}
+          <AsistenteChat
+            modo={seccion === 'asistente' ? 'pagina' : 'burbuja'}
+            abierto={asistenteAbierto}
+            onCambiarAbierto={setAsistenteAbierto}
+            onEditarActa={editarDesdeAsistente}
+            onIrAMisActas={irAMisActas}
+          />
         </main>
 
         <footer className="border-t border-slate-200 bg-white">

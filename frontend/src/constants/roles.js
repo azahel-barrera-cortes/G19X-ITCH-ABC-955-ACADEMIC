@@ -92,7 +92,7 @@ export const SECCIONES_SISTEMA = [
     id: 'asistente',
     minimo: 'capturista',
     etiqueta: 'Asistente IA',
-    descripcion: 'Chat de actas: redacta, valida y crea guiado',
+    descripcion: 'Asistente por rol: redacción, validación, estatus y tiempos',
   },
   {
     id: 'perfil',
