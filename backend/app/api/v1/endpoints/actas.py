@@ -50,6 +50,10 @@ from app.schemas.acta import (
 )
 from app.services import acta_service
 from app.services.ai_service import crear_servicio_ia
+from app.services.tenant_access import (
+    alcance_empresa,
+    obtener_acta_autorizada,
+)
 
 router = APIRouter(prefix="/actas", tags=["Actas"])
 
@@ -271,6 +275,12 @@ def crear_acta(
     db: Session = Depends(get_db),
 ) -> ActaRead:
     """Persiste el acta como pendiente de revisión, sin emitir el PDF final."""
+    alcance = alcance_empresa(usuario_actual)
+    if not alcance.global_ and not alcance.codigo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta no está vinculada a una empresa.",
+        )
     solicitud = payload.model_copy(
         update={
             "creado_por": usuario_actual.email,
@@ -278,7 +288,12 @@ def crear_acta(
         }
     )
     borrador = acta_service.redactar(solicitud)
-    modelo = acta_service.crear_acta(db, solicitud, borrador)
+    modelo = acta_service.crear_acta(
+        db,
+        solicitud,
+        borrador,
+        empresa_codigo=alcance.codigo,
+    )
     modelo.estado_flujo = "revision"
     db.commit()
     db.refresh(modelo)
@@ -303,7 +318,7 @@ def crear_acta(
     summary="Listar el historial de actas con filtros",
 )
 def listar_actas(
-    _usuario: RequiereRevisor,
+    usuario_actual: RequiereRevisor,
     sociedad: Optional[str] = Query(None, description="Filtro parcial por razón social"),
     tipo_asamblea: Optional[str] = Query(None, description="Tipo de asamblea"),
     estatus: Optional[str] = Query(None, description="Estatus del ciclo de vida"),
@@ -321,6 +336,7 @@ def listar_actas(
         texto=texto,
         limite=limite,
         desplazamiento=desplazamiento,
+        alcance=alcance_empresa(usuario_actual),
     )
     return [ActaResumen.model_validate(acta) for acta in actas]
 
@@ -338,7 +354,10 @@ def listar_bandeja_actas(
 ) -> List[ActaRead]:
     """Devuelve solo actas propias o pendientes de la etapa del usuario."""
     actas = acta_service.listar_bandeja(
-        db, rol=usuario_actual.rol, email=usuario_actual.email
+        db,
+        rol=usuario_actual.rol,
+        email=usuario_actual.email,
+        alcance=alcance_empresa(usuario_actual),
     )
     return [ActaRead.model_validate(acta) for acta in actas]
 
@@ -350,7 +369,7 @@ def obtener_acta(
     db: Session = Depends(get_db),
 ) -> ActaRead:
     """Devuelve el acta a los revisores o a su Capturista autor."""
-    acta = acta_service.obtener_acta(db, acta_id)
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     if (
         not security.tiene_nivel_minimo(usuario_actual.rol, "revisor")
         and acta.creado_por != usuario_actual.email
@@ -379,7 +398,7 @@ def actualizar_acta(
     configurado; en caso contrario se reutilizan las cláusulas ya guardadas y solo
     se completan con plantillas locales las que falten.
     """
-    datos_antes = acta_service.obtener_acta(db, acta_id)
+    datos_antes = obtener_acta_autorizada(db, acta_id, usuario_actual)
     if usuario_actual.rol != "capturista":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -437,7 +456,7 @@ def decidir_acta(
     db: Session = Depends(get_db),
 ) -> ActaRead:
     """Registra la revisión del Revisor o la decisión final del Abogado."""
-    acta = acta_service.obtener_acta(db, acta_id)
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     estado_anterior = acta.estado_flujo
     try:
         actualizada = acta_service.decidir_flujo(
@@ -484,7 +503,7 @@ def analizar_revision_acta(
             detail="Solo el Revisor o el Abogado Responsable pueden analizar un acta.",
         )
 
-    acta = acta_service.obtener_acta(db, acta_id)
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     if usuario_actual.rol == "revisor" and acta.estado_flujo != "revision":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -532,7 +551,7 @@ def reenviar_acta(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo el Capturista puede reenviar una corrección.",
         )
-    acta = acta_service.obtener_acta(db, acta_id)
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     if acta.creado_por != usuario_actual.email:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -582,7 +601,7 @@ def actualizar_estatus(
             status_code=status.HTTP_409_CONFLICT,
             detail="Las etapas de revisión y aprobación se gestionan desde sus bandejas.",
         )
-    datos_antes = acta_service.obtener_acta(db, acta_id)
+    datos_antes = obtener_acta_autorizada(db, acta_id, usuario_actual)
     if datos_antes.estado_flujo != "aprobada":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -608,7 +627,7 @@ def actualizar_estatus(
     responses={200: {"content": {"application/pdf": {}}}},
 )
 def descargar_pdf(
-    _usuario: RequiereAbogado,
+    usuario_actual: RequiereAbogado,
     acta_id: int,
     incluir_tabla_asistentes: bool = Query(True),
     incluir_hoja_firmas: bool = Query(True),
@@ -616,7 +635,7 @@ def descargar_pdf(
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Regenera el documento desde la base de datos, sin invocar a la IA."""
-    acta = acta_service.obtener_acta(db, acta_id)
+    acta = obtener_acta_autorizada(db, acta_id, usuario_actual)
     if acta.estado_flujo != "aprobada":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -644,7 +663,7 @@ def validar_acta(
     db: Session = Depends(get_db),
 ) -> ValidacionActa:
     """Ejecuta la validación (IA + reglas) y guarda el resultado en el acta."""
-    datos_antes = acta_service.obtener_acta(db, acta_id)
+    datos_antes = obtener_acta_autorizada(db, acta_id, usuario_actual)
     resultado = acta_service.validar_acta_almacenada(db, acta_id)
     registrar_bitacora(
         db,
@@ -668,7 +687,7 @@ def eliminar_acta(
     db: Session = Depends(get_db),
 ) -> ApiMensaje:
     """Borra el acta del historial y confirma el folio eliminado."""
-    datos_antes = acta_service.obtener_acta(db, acta_id)
+    datos_antes = obtener_acta_autorizada(db, acta_id, usuario_actual)
     folio = acta_service.eliminar_acta(db, acta_id)
     registrar_bitacora(
         db,
@@ -677,6 +696,7 @@ def eliminar_acta(
         entidad="actas",
         entidad_id=acta_id,
         datos_antes={"folio": datos_antes.folio, "sociedad": datos_antes.sociedad},
+        empresa_codigo=datos_antes.empresa_codigo,
     )
     return ApiMensaje(mensaje=f"El acta {folio} fue eliminada.", detalle=None)
 
