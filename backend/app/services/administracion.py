@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ActaNoEncontradaError
 from app.models.acta import DIAS_AVISO_CADUCIDAD, Acta, ActaVersion
 from app.models.enums import EstatusActa
+from app.services.tenant_access import AlcanceEmpresa, filtrar_por_empresa
 
 logger = logging.getLogger(__name__)
 
@@ -237,32 +238,44 @@ def fijar_caducidad(
 # ---------------------------------------------------------------------------
 # Visión global del repositorio
 # ---------------------------------------------------------------------------
-def resumen_administracion(db: Session) -> Dict[str, Any]:
+def resumen_administracion(
+    db: Session, alcance: Optional[AlcanceEmpresa] = None
+) -> Dict[str, Any]:
     """Estadísticas globales del repositorio para el panel de administración."""
     por_estatus: Dict[str, int] = {estatus.value: 0 for estatus in EstatusActa}
-    for valor, cantidad in db.execute(
-        select(Acta.estatus, func.count(Acta.id)).group_by(Acta.estatus)
-    ):
+    consulta_estatus = select(Acta.estatus, func.count(Acta.id))
+    if alcance is not None:
+        consulta_estatus = filtrar_por_empresa(
+            consulta_estatus, alcance, Acta.empresa_codigo
+        )
+    for valor, cantidad in db.execute(consulta_estatus.group_by(Acta.estatus)):
         por_estatus[str(getattr(valor, "value", valor))] = int(cantidad)
 
     hoy = date.today()
     por_vencer_hasta = hoy + timedelta(days=DIAS_AVISO_CADUCIDAD)
 
-    con_fecha = db.scalar(
-        select(func.count(Acta.id)).where(Acta.fecha_caducidad.is_not(None))
-    ) or 0
-    vencidas = db.scalar(
-        select(func.count(Acta.id)).where(
-            Acta.fecha_caducidad.is_not(None), Acta.fecha_caducidad < hoy
+    def contar_actas(*condiciones: Any) -> int:
+        consulta = select(func.count(Acta.id)).where(*condiciones)
+        if alcance is not None:
+            consulta = filtrar_por_empresa(consulta, alcance, Acta.empresa_codigo)
+        return int(db.scalar(consulta) or 0)
+
+    con_fecha = contar_actas(Acta.fecha_caducidad.is_not(None))
+    vencidas = contar_actas(
+        Acta.fecha_caducidad.is_not(None), Acta.fecha_caducidad < hoy
+    )
+    por_vencer = contar_actas(
+        Acta.fecha_caducidad >= hoy, Acta.fecha_caducidad <= por_vencer_hasta
+    )
+    total = contar_actas()
+    consulta_versiones = select(func.count(ActaVersion.id)).join(
+        Acta, Acta.id == ActaVersion.acta_id
+    )
+    if alcance is not None:
+        consulta_versiones = filtrar_por_empresa(
+            consulta_versiones, alcance, Acta.empresa_codigo
         )
-    ) or 0
-    por_vencer = db.scalar(
-        select(func.count(Acta.id)).where(
-            Acta.fecha_caducidad >= hoy, Acta.fecha_caducidad <= por_vencer_hasta
-        )
-    ) or 0
-    total = db.scalar(select(func.count(Acta.id))) or 0
-    total_versiones = db.scalar(select(func.count(ActaVersion.id))) or 0
+    total_versiones = int(db.scalar(consulta_versiones) or 0)
 
     return {
         "total_actas": int(total),
@@ -284,6 +297,7 @@ def actas_por_vigencia(
     *,
     estado: Optional[str] = None,
     limite: int = 100,
+    alcance: Optional[AlcanceEmpresa] = None,
 ) -> List[Acta]:
     """Lista actas filtradas por su clasificación de vigencia.
 
@@ -292,6 +306,8 @@ def actas_por_vigencia(
     """
     hoy = date.today()
     consulta = select(Acta)
+    if alcance is not None:
+        consulta = filtrar_por_empresa(consulta, alcance, Acta.empresa_codigo)
 
     if estado == "vencida":
         consulta = consulta.where(

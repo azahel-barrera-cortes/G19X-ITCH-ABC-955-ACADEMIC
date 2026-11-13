@@ -51,6 +51,7 @@ from app.services.administracion import (
     registrar_version,
 )
 from app.services.pdf_generator import build_acta_pdf, nombre_archivo_acta
+from app.services.tenant_access import AlcanceEmpresa, filtrar_por_empresa
 
 logger = logging.getLogger(__name__)
 
@@ -380,11 +381,18 @@ def _volcar_payload(
         modelo.estatus = str(_valor(payload.estatus))
 
 
-def crear_acta(db: Session, payload: ActaBase, borrador: Mapping[str, Any]) -> Acta:
+def crear_acta(
+    db: Session,
+    payload: ActaBase,
+    borrador: Mapping[str, Any],
+    *,
+    empresa_codigo: Optional[str] = None,
+) -> Acta:
     """Inserta el acta con folio consecutivo, reintentando ante colisiones."""
     for intento in range(3):
         modelo = Acta(folio=generar_folio(db, payload.fecha), version=1)
         _volcar_payload(modelo, payload, borrador)
+        modelo.empresa_codigo = empresa_codigo
         modelo.estado_flujo = "revision"
         db.add(modelo)
         try:
@@ -496,9 +504,13 @@ def listar_actas(
     texto: Optional[str] = None,
     limite: int = 50,
     desplazamiento: int = 0,
+    alcance: Optional[AlcanceEmpresa] = None,
 ) -> List[Acta]:
     """Lista actas con filtros opcionales y paginación simple."""
-    consulta = select(Acta).order_by(Acta.fecha.desc(), Acta.id.desc())
+    consulta = select(Acta)
+    if alcance is not None:
+        consulta = filtrar_por_empresa(consulta, alcance, Acta.empresa_codigo)
+    consulta = consulta.order_by(Acta.fecha.desc(), Acta.id.desc())
 
     if sociedad:
         consulta = consulta.where(Acta.sociedad.ilike(f"%{sociedad.strip()}%"))
@@ -715,10 +727,16 @@ def actualizar_estatus(db: Session, acta_id: int, estatus: str) -> Acta:
 
 
 def listar_bandeja(
-    db: Session, *, rol: str, email: str
+    db: Session,
+    *,
+    rol: str,
+    email: str,
+    alcance: Optional[AlcanceEmpresa] = None,
 ) -> List[Acta]:
     """Lista las actas visibles en la bandeja correspondiente al rol."""
     consulta = select(Acta)
+    if alcance is not None:
+        consulta = filtrar_por_empresa(consulta, alcance, Acta.empresa_codigo)
     if rol == "capturista":
         consulta = consulta.where(Acta.creado_por == email)
     elif rol == "revisor":
