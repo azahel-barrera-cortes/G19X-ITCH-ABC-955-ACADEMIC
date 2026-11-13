@@ -69,6 +69,7 @@ _COLUMNAS_NUEVAS = {
         ("fecha_caducidad", "DATE"),
         ("motivo_caducidad", "VARCHAR(300)"),
         ("creado_por", "VARCHAR(150)"),
+        ("empresa_codigo", "VARCHAR(32)"),
         ("tipo_sociedad", "VARCHAR(60)"),
         ("datos_especificos", "JSON"),
         ("datos_asistente", "JSON"),
@@ -95,6 +96,9 @@ _COLUMNAS_NUEVAS = {
         ("firma_electronica", "BOOLEAN DEFAULT 0"),
         ("usar_info_empresa", "BOOLEAN DEFAULT 0"),
     ),
+    "bitacora_cambios": (
+        ("empresa_codigo", "VARCHAR(32)"),
+    ),
 }
 
 
@@ -103,11 +107,14 @@ def _aplicar_migraciones_ligeras() -> None:
     from sqlalchemy import inspect, text
 
     inspector = inspect(engine)
+    requiere_backfill_empresa = False
     with engine.begin() as conexion:
         for tabla, columnas in _COLUMNAS_NUEVAS.items():
             existentes = {columna["name"] for columna in inspector.get_columns(tabla)} if tabla in inspector.get_table_names() else set()
             for nombre, tipo in columnas:
                 if nombre not in existentes:
+                    if tabla == "actas" and nombre == "empresa_codigo":
+                        requiere_backfill_empresa = True
                     conexion.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}"))
                     logger.info("Columna %s.%s agregada por migración ligera", tabla, nombre)
                     if tabla == "actas" and nombre == "estado_flujo":
@@ -119,8 +126,22 @@ def _aplicar_migraciones_ligeras() -> None:
                                 "ELSE 'borrador' END"
                             )
                         )
+        conexion.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_actas_empresa_codigo "
+                "ON actas (empresa_codigo)"
+            )
+        )
+        conexion.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_bitacora_cambios_empresa_codigo "
+                "ON bitacora_cambios (empresa_codigo)"
+            )
+        )
 
     _asignar_codigos_empresa()
+    if requiere_backfill_empresa:
+        _asignar_empresa_a_registros_historicos()
 
 
 def _asignar_codigos_empresa() -> None:
@@ -141,3 +162,46 @@ def _asignar_codigos_empresa() -> None:
             logger.info("Códigos de empresa asignados: %d", len(administradores))
     finally:
         db.close()
+
+
+def _asignar_empresa_a_registros_historicos() -> None:
+    """Backfills only records tied to an exact account; ambiguous rows stay quarantined."""
+    from sqlalchemy import text
+
+    with engine.begin() as conexion:
+        conexion.execute(
+            text(
+                "UPDATE actas SET empresa_codigo = ("
+                "SELECT CASE WHEN usuarios.rol = 'Administrador' "
+                "THEN usuarios.codigo_empresa ELSE usuarios.empresa_codigo END "
+                "FROM usuarios WHERE lower(usuarios.email) = lower(actas.creado_por)"
+                ") WHERE empresa_codigo IS NULL AND creado_por IS NOT NULL AND EXISTS ("
+                "SELECT 1 FROM usuarios WHERE lower(usuarios.email) = lower(actas.creado_por) "
+                "AND CASE WHEN usuarios.rol = 'Administrador' "
+                "THEN usuarios.codigo_empresa ELSE usuarios.empresa_codigo END IS NOT NULL)"
+            )
+        )
+        conexion.execute(
+            text(
+                "UPDATE bitacora_cambios SET empresa_codigo = ("
+                "SELECT actas.empresa_codigo FROM actas "
+                "WHERE bitacora_cambios.entidad = 'actas' "
+                "AND actas.id = bitacora_cambios.entidad_id"
+                ") WHERE empresa_codigo IS NULL AND entidad = 'actas' "
+                "AND EXISTS (SELECT 1 FROM actas WHERE actas.id = bitacora_cambios.entidad_id "
+                "AND actas.empresa_codigo IS NOT NULL)"
+            )
+        )
+        conexion.execute(
+            text(
+                "UPDATE bitacora_cambios SET empresa_codigo = ("
+                "SELECT CASE WHEN usuarios.rol = 'Administrador' "
+                "THEN usuarios.codigo_empresa ELSE usuarios.empresa_codigo END "
+                "FROM usuarios WHERE usuarios.id = bitacora_cambios.usuario_id"
+                ") WHERE empresa_codigo IS NULL AND usuario_id IS NOT NULL "
+                "AND entidad != 'actas' AND EXISTS ("
+                "SELECT 1 FROM usuarios WHERE usuarios.id = bitacora_cambios.usuario_id "
+                "AND CASE WHEN usuarios.rol = 'Administrador' "
+                "THEN usuarios.codigo_empresa ELSE usuarios.empresa_codigo END IS NOT NULL)"
+            )
+        )
