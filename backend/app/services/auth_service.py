@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 import secrets
 import string
 from typing import Optional
@@ -87,44 +88,78 @@ def usuario_desde_respuesta(usuario: Usuario) -> UsuarioRespuesta:
 
 def crear_token_reinicio_password(usuario: Usuario, db: Session) -> str:
     """Crea un token único y temporal para recuperación de contraseña."""
-    import secrets
-
     token = secrets.token_urlsafe(32)
-    usuario.reset_token = token
+    usuario.reset_token = hashlib.sha256(token.encode("utf-8")).hexdigest()
     usuario.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=60)
     db.commit()
     db.refresh(usuario)
     return token
 
 
-def verificar_y_consumir_token(token: str, db: Session) -> Optional[Usuario]:
-    """Verifica que un token de recuperación es válido; lo consume en caso afirmativo."""
-    from app.models.usuario import Usuario
-
-    usuario = db.query(Usuario).filter(Usuario.reset_token == token).first()
-    if not usuario or not usuario.reset_token_expires:
-        return None
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if now > usuario.reset_token_expires:
-        usuario.reset_token = None
-        usuario.reset_token_expires = None
+def invalidar_token_reinicio_password(
+    usuario_id: int, token: str, db: Session
+) -> bool:
+    """Invalida el token solo si sigue siendo el token enviado por correo."""
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    actualizados = (
+        db.query(Usuario)
+        .filter(Usuario.id == usuario_id, Usuario.reset_token == token_hash)
+        .update(
+            {Usuario.reset_token: None, Usuario.reset_token_expires: None},
+            synchronize_session=False,
+        )
+    )
+    if actualizados:
         db.commit()
-        return None
-    # Consumir: el token solo se puede usar una vez.
+    return bool(actualizados)
+
+
+def actualizar_password_usuario(usuario: Usuario, nuevo_password: str) -> None:
+    """Actualiza una contraseña e invalida tokens de recuperación y sesiones."""
+    usuario.password_hash = security.hash_password(nuevo_password)
     usuario.reset_token = None
     usuario.reset_token_expires = None
-    db.commit()
-    return usuario
+    usuario.token_version += 1
 
 
 def actualizar_password_por_token(
     db: Session, token: str, nuevo_password: str
 ) -> Optional[Usuario]:
-    """Actualiza la contraseña de un usuario si el token es válido."""
-    usuario = verificar_y_consumir_token(token, db)
-    if usuario is None:
+    """Actualiza la contraseña y consume el token en una sola operación atómica."""
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+    usuario_id = (
+        db.query(Usuario.id)
+        .filter(
+            Usuario.reset_token == token_hash,
+            Usuario.reset_token_expires > ahora,
+            Usuario.activo.is_(True),
+        )
+        .scalar()
+    )
+    if usuario_id is None:
         return None
-    usuario.password_hash = security.hash_password(nuevo_password)
+
+    actualizados = (
+        db.query(Usuario)
+        .filter(
+            Usuario.id == usuario_id,
+            Usuario.reset_token == token_hash,
+            Usuario.reset_token_expires > ahora,
+            Usuario.activo.is_(True),
+        )
+        .update(
+            {
+                Usuario.password_hash: security.hash_password(nuevo_password),
+                Usuario.token_version: Usuario.token_version + 1,
+                Usuario.reset_token: None,
+                Usuario.reset_token_expires: None,
+            },
+            synchronize_session=False,
+        )
+    )
+    if not actualizados:
+        db.rollback()
+        return None
     db.commit()
-    db.refresh(usuario)
-    return usuario
+    return db.get(Usuario, usuario_id)

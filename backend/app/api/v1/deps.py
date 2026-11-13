@@ -48,6 +48,8 @@ async def obtener_usuario_actual(
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
     if usuario is None:
         raise credenciales_excepcion
+    if payload.get("token_version", 0) != usuario.token_version:
+        raise credenciales_excepcion
     if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

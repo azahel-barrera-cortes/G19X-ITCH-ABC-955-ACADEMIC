@@ -7,11 +7,16 @@ registro público y el login, sin interferir con ``cliente_autenticado``.
 
 from __future__ import annotations
 
+import hashlib
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core import security
 from app.models.usuario import Usuario
+from app.services import email_service
+from app.services.auth_service import crear_token_reinicio_password
 
 ADMIN_EMAIL = "admin@pgac.com"
 ADMIN_PWD = "clave-segura-123"
@@ -323,39 +328,212 @@ def test_sin_token_los_endpoints_protegidos_devuelven_401(cliente_anonimo) -> No
 # ---------------------------------------------------------------------------
 # Recuperación de contraseña
 # ---------------------------------------------------------------------------
-def test_flujo_recuperacion_de_password(cliente_anonimo, cliente_autenticado, sesion) -> None:
-    _crear_usuario(sesion, "olvidadizo@pgac.com", "capturista")
+def test_flujo_recuperacion_de_password(
+    cliente_anonimo, cliente_autenticado, sesion, monkeypatch
+) -> None:
+    email = "olvidadizo@pgac.com"
+    _crear_usuario(sesion, email, "capturista")
+    correos_enviados = []
+    monkeypatch.setattr(email_service, "correo_configurado", lambda: True)
+    monkeypatch.setattr(
+        email_service,
+        "enviar_correo_recuperacion",
+        lambda destinatario, token: correos_enviados.append((destinatario, token)),
+    )
     try:
+        inicio = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "secreto-1"},
+        )
+        token_anterior = inicio.json()["access_token"]
         solicitud = cliente_anonimo.post(
-            "/api/v1/auth/reset-password", json={"email": "olvidadizo@pgac.com"}
+            "/api/v1/auth/reset-password", json={"email": email}
         )
         assert solicitud.status_code == 200, solicitud.text
-        # En modo DEBUG el token viaja en `detalle` para probar el flujo.
-        detalle = solicitud.json().get("detalle") or ""
-        assert detalle.startswith("Token de desarrollo: ")
-        token = detalle.replace("Token de desarrollo: ", "")
+        assert solicitud.json()["detalle"] is None
+        assert correos_enviados[0][0] == email
+        token = correos_enviados[0][1]
+        usuario = sesion.query(Usuario).filter(Usuario.email == email).one()
+        assert usuario.reset_token == hashlib.sha256(token.encode("utf-8")).hexdigest()
 
         confirmacion = cliente_anonimo.post(
             "/api/v1/auth/reset-password/confirm",
             json={"token": token, "nuevo_password": "clave-nueva-9"},
         )
         assert confirmacion.status_code == 200, confirmacion.text
+        assert "access_token" not in confirmacion.json()
+        assert usuario.reset_token is None
+        assert usuario.token_version == 1
+        assert cliente_anonimo.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token_anterior}"},
+        ).status_code == 401
+        assert cliente_anonimo.post(
+            "/api/v1/auth/reset-password/confirm",
+            json={"token": token, "nuevo_password": "clave-nueva-9"},
+        ).status_code == 422
 
         login = cliente_anonimo.post(
             "/api/v1/auth/login",
-            json={"email": "olvidadizo@pgac.com", "password": "clave-nueva-9"},
+            json={"email": email, "password": "clave-nueva-9"},
         )
         assert login.status_code == 200
     finally:
-        _borrar_usuario(sesion, "olvidadizo@pgac.com")
+        _borrar_usuario(sesion, email)
 
 
-def test_reset_password_no_revela_si_el_correo_existe(cliente_anonimo) -> None:
-    respuesta = cliente_anonimo.post(
-        "/api/v1/auth/reset-password", json={"email": "inexistente@pgac.com"}
+def test_reset_password_superadministrador_usa_el_correo_registrado(
+    cliente_anonimo, sesion, monkeypatch
+) -> None:
+    email = "super-reset@pgac.com"
+    _crear_usuario(sesion, email, "SuperAdministrador")
+    destinatarios = []
+    monkeypatch.setattr(email_service, "correo_configurado", lambda: True)
+    monkeypatch.setattr(
+        email_service,
+        "enviar_correo_recuperacion",
+        lambda destinatario, _token: destinatarios.append(destinatario),
     )
-    assert respuesta.status_code == 200
-    assert respuesta.json()["detalle"] is None
+    try:
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/reset-password", json={"email": email}
+        )
+        assert respuesta.status_code == 200
+        assert destinatarios == [email]
+    finally:
+        _borrar_usuario(sesion, email)
+
+
+def test_reset_password_no_revela_si_el_correo_existe(
+    cliente_anonimo, sesion, monkeypatch
+) -> None:
+    email = "registrado-reset@pgac.com"
+    _crear_usuario(sesion, email, "capturista")
+    enviados = []
+    monkeypatch.setattr(email_service, "correo_configurado", lambda: True)
+    monkeypatch.setattr(
+        email_service,
+        "enviar_correo_recuperacion",
+        lambda destinatario, _token: enviados.append(destinatario),
+    )
+    try:
+        registrada = cliente_anonimo.post(
+            "/api/v1/auth/reset-password", json={"email": email}
+        )
+        inexistente = cliente_anonimo.post(
+            "/api/v1/auth/reset-password", json={"email": "inexistente@pgac.com"}
+        )
+        assert registrada.status_code == inexistente.status_code == 200
+        assert registrada.json() == inexistente.json()
+        assert enviados == [email]
+    finally:
+        _borrar_usuario(sesion, email)
+
+
+def test_reset_password_expirado_no_cambia_la_contrasena(
+    cliente_anonimo, sesion, monkeypatch
+) -> None:
+    email = "expirado-reset@pgac.com"
+    usuario = _crear_usuario(sesion, email, "capturista")
+    correos_enviados = []
+    monkeypatch.setattr(email_service, "correo_configurado", lambda: True)
+    monkeypatch.setattr(
+        email_service,
+        "enviar_correo_recuperacion",
+        lambda destinatario, token: correos_enviados.append(token),
+    )
+    try:
+        solicitud = cliente_anonimo.post(
+            "/api/v1/auth/reset-password", json={"email": email}
+        )
+        assert solicitud.status_code == 200
+        usuario.reset_token_expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+        sesion.commit()
+
+        confirmacion = cliente_anonimo.post(
+            "/api/v1/auth/reset-password/confirm",
+            json={"token": correos_enviados[0], "nuevo_password": "clave-nueva-9"},
+        )
+        assert confirmacion.status_code == 422
+        assert security.verify_password("secreto-1", usuario.password_hash)
+    finally:
+        _borrar_usuario(sesion, email)
+
+
+def test_reset_password_sin_configuracion_no_crea_token(
+    cliente_anonimo, sesion, monkeypatch
+) -> None:
+    email = "sin-smtp@pgac.com"
+    usuario = _crear_usuario(sesion, email, "capturista")
+    monkeypatch.setattr(email_service, "correo_configurado", lambda: False)
+    try:
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/reset-password", json={"email": email}
+        )
+        assert respuesta.status_code == 503
+        sesion.refresh(usuario)
+        assert usuario.reset_token is None
+    finally:
+        _borrar_usuario(sesion, email)
+
+
+def test_cambio_password_desde_perfil_invalida_tokens_pendientes_y_sesiones(
+    cliente_anonimo, sesion
+) -> None:
+    email = "cambio-perfil@pgac.com"
+    usuario = _crear_usuario(sesion, email, "capturista")
+    try:
+        crear_token_reinicio_password(usuario, sesion)
+        inicio = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "secreto-1"},
+        )
+        token_anterior = inicio.json()["access_token"]
+        cambio = cliente_anonimo.put(
+            "/api/v1/auth/me",
+            json={"password": "clave-nueva-9"},
+            headers={"Authorization": f"Bearer {token_anterior}"},
+        )
+        assert cambio.status_code == 200, cambio.text
+        sesion.refresh(usuario)
+        assert usuario.reset_token is None
+        assert usuario.reset_token_expires is None
+        assert usuario.token_version == 1
+        assert cliente_anonimo.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token_anterior}"},
+        ).status_code == 401
+
+        nuevo_inicio = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "clave-nueva-9"},
+        )
+        assert nuevo_inicio.status_code == 200
+    finally:
+        _borrar_usuario(sesion, email)
+
+
+def test_reset_password_invalida_token_si_falla_el_envio(
+    cliente_anonimo, sesion, monkeypatch
+) -> None:
+    email = "fallo-smtp@pgac.com"
+    usuario = _crear_usuario(sesion, email, "capturista")
+    monkeypatch.setattr(email_service, "correo_configurado", lambda: True)
+
+    def fallar_envio(_destinatario, _token):
+        raise email_service.ErrorEnvioCorreo("Error SMTP simulado.")
+
+    monkeypatch.setattr(email_service, "enviar_correo_recuperacion", fallar_envio)
+    try:
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/reset-password", json={"email": email}
+        )
+        assert respuesta.status_code == 200
+        sesion.refresh(usuario)
+        assert usuario.reset_token is None
+        assert usuario.reset_token_expires is None
+    finally:
+        _borrar_usuario(sesion, email)
 
 
 def test_token_de_recuperacion_invalido_devuelve_422(cliente_anonimo) -> None:

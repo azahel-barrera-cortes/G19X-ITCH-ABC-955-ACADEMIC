@@ -26,6 +26,9 @@ class Usuario(Base):
     rol: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     # Código que el Administrador de la empresa comparte con sus empleados.
     # Código propio del Administrador para invitar a los miembros de su empresa.
     codigo_empresa: Mapped[Optional[str]] = mapped_column(
@@ -40,7 +43,7 @@ class Usuario(Base):
     firma_electronica: Mapped[bool] = mapped_column(default=False, nullable=False)
     usar_info_empresa: Mapped[bool] = mapped_column(default=False, nullable=False)
 
-    # Token de recuperación de contraseña (válido 1 hora)
+    # Hash del token de recuperación de contraseña (válido 1 hora).
     reset_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     reset_token_expires: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

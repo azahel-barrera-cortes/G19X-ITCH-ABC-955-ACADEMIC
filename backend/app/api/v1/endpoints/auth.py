@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -15,7 +17,6 @@ from app.api.v1.deps import (
     registrar_bitacora,
 )
 from app.core import security
-from app.core.config import settings
 from app.core.exceptions import DatosActaInvalidosError
 from app.models.usuario import Usuario
 from app.schemas.acta import ApiMensaje
@@ -38,9 +39,14 @@ from app.services.auth_service import (
     usuario_desde_respuesta,
     generar_codigo_empresa,
     crear_token_reinicio_password,
+    invalidar_token_reinicio_password,
+    actualizar_password_usuario,
     actualizar_password_por_token,
     obtener_administrador_empresa,
 )
+from app.services import email_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -200,6 +206,7 @@ def login(
             "sub": usuario.email,
             "rol": usuario.rol,
             "usuario_id": usuario.id,
+            "token_version": usuario.token_version,
         }
     )
     registrar_bitacora(
@@ -290,7 +297,7 @@ def actualizar_perfil(
     if cambios.nombre_completo is not None:
         usuario_actual.nombre_completo = cambios.nombre_completo
     if cambios.password is not None:
-        usuario_actual.password_hash = security.hash_password(cambios.password)
+        actualizar_password_usuario(usuario_actual, cambios.password)
     db.commit()
     db.refresh(usuario_actual)
     return usuario_desde_respuesta(usuario_actual)
@@ -305,34 +312,49 @@ def solicitar_reset_password(
     datos: SolicitudResetPassword,
     db: Session = Depends(get_db),
 ) -> ApiMensaje:
-    """Genera un token temporal (1 hora) para recuperar la contraseña.
+    """Envía un token temporal, sin revelar si el correo está registrado."""
+    if not email_service.correo_configurado():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "La recuperación por correo aún no está configurada. "
+                "Contacta al administrador del sistema."
+            ),
+        )
 
-    Por seguridad la respuesta es idéntica exista o no el correo. Mientras no
-    haya servicio de correo configurado, en modo ``DEBUG`` el token se devuelve
-    en ``detalle`` para poder probar el flujo de extremo a extremo.
-    """
     usuario = (
         db.query(Usuario)
         .filter(Usuario.email == datos.email, Usuario.activo.is_(True))
         .first()
     )
-    token = crear_token_reinicio_password(usuario, db) if usuario else None
-    detalle = f"Token de desarrollo: {token}" if (token and settings.debug) else None
+    if usuario:
+        token = crear_token_reinicio_password(usuario, db)
+        try:
+            email_service.enviar_correo_recuperacion(usuario.email, token)
+        except email_service.ErrorEnvioCorreo:
+            logger.exception(
+                "Falló el envío de recuperación para usuario_id=%s", usuario.id
+            )
+            invalidar_token_reinicio_password(usuario.id, token, db)
+
     return ApiMensaje(
-        mensaje="Si el correo está registrado, se generó un token de recuperación.",
-        detalle=detalle,
+        mensaje=(
+            "Si el correo está registrado, recibirás instrucciones para recuperar "
+            "tu contraseña."
+        ),
+        detalle=None,
     )
 
 
 @router.post(
     "/reset-password/confirm",
-    response_model=Token,
+    response_model=ApiMensaje,
     summary="Confirmar recuperación de contraseña con token.",
 )
 def confirmar_reset_password(
     datos: ConfirmarResetPassword,
     db: Session = Depends(get_db),
-) -> Token:
+) -> ApiMensaje:
     """Confirma el cambio de contraseña usando el token de recuperación."""
     usuario = actualizar_password_por_token(db, datos.token, datos.nuevo_password)
     if usuario is None:
@@ -340,10 +362,10 @@ def confirmar_reset_password(
             "El enlace de recuperación no es válido o ha expirado.",
             detalle="El token de recuperación no es válido o ha expirado.",
         )
-    token_nuevo = security.crear_token_acceso(
-        {"sub": usuario.email, "rol": usuario.rol, "usuario_id": usuario.id}
+    return ApiMensaje(
+        mensaje="Contraseña actualizada. Ya puedes iniciar sesión.",
+        detalle=None,
     )
-    return Token(access_token=token_nuevo)
 
 
 @router.get(
@@ -452,7 +474,7 @@ def actualizar_usuario(
     if cambios.activo is not None:
         usuario.activo = cambios.activo
     if cambios.password is not None:
-        usuario.password_hash = security.hash_password(cambios.password)
+        actualizar_password_usuario(usuario, cambios.password)
     db.commit()
     db.refresh(usuario)
     registrar_bitacora(

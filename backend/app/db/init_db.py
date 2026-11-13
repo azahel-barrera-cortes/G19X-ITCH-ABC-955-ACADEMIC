@@ -85,6 +85,7 @@ _COLUMNAS_NUEVAS = {
     "usuarios": (
         ("reset_token", "VARCHAR(128)"),
         ("reset_token_expires", "DATETIME"),
+        ("token_version", "INTEGER NOT NULL DEFAULT 0"),
         ("codigo_empresa", "VARCHAR(32)"),
         ("empresa_codigo", "VARCHAR(32)"),
         ("nombre_sociedad", "VARCHAR(200)"),

@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py  ->  parents[2] == carpeta `backend/`
@@ -91,6 +91,15 @@ class Settings(BaseSettings):
     secret_key: str = CLAVE_DE_EJEMPLO
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 días
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    smtp_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    email_from_address: str = ""
+    email_from_name: str = "PGAC"
 
     # --- Derivados ----------------------------------------------------------
     @model_validator(mode="after")
@@ -105,6 +114,21 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """Orígenes CORS como lista, ignorando entradas vacías."""
         return [origen.strip() for origen in self.cors_origins.split(",") if origen.strip()]
+
+    @property
+    def correo_recuperacion_configurado(self) -> bool:
+        """Indica si el transporte SMTP tiene una configuración utilizable."""
+        return bool(
+            self.smtp_host.strip()
+            and self.email_from_address.strip()
+            and bool(self.smtp_username) == bool(self.smtp_password)
+            and not (self.smtp_starttls and self.smtp_ssl)
+            and (
+                self.smtp_starttls
+                or self.smtp_ssl
+                or self.environment != "production"
+            )
+        )
 
     @property
     def es_sqlite(self) -> bool:
