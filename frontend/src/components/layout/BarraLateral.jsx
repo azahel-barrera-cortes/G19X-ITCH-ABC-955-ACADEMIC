@@ -116,32 +116,12 @@ const SECCIONES = [
     ),
   },
   {
-    id: 'seguridad',
-    etiqueta: 'Seguridad',
-    descripcion: 'Seguridad de usuarios y accesos',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4m8 0h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
     id: 'vitacora',
     etiqueta: 'Bitácora',
     descripcion: 'Bitácora de acciones del sistema',
     icono: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'administrador',
-    etiqueta: 'Administrador',
-    descripcion: 'Panel de administración de la empresa',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4m8 0h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -174,26 +154,6 @@ const SECCIONES_SUPERADMIN = [
     ),
   },
   {
-    id: 'estadisticas',
-    etiqueta: 'Estadísticas',
-    descripcion: 'Estadísticas del sistema',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m0 0v6m0-6h6m-6 0H6" />
-      </svg>
-    ),
-  },
-  {
-    id: 'seguridad',
-    etiqueta: 'Seguridad',
-    descripcion: 'Seguridad de usuarios y accesos',
-    icono: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4m8 0h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
     id: 'guia-super-admin',
     etiqueta: 'Guía de SuperAdministrador',
     descripcion: 'Guía de uso del sistema',
@@ -207,7 +167,7 @@ const SECCIONES_SUPERADMIN = [
 ]
 
 export default function BarraLateral({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null, esSuperAdmin = false, rol = null }) {
-  // Para SuperAdministrador se muestran exclusivamente sus 5 secciones.
+  // Para SuperAdministrador se muestran exclusivamente sus secciones globales.
   // Esas IDs no están en SECCIONES_SISTEMA, por lo que no se filtran por
   // seccionesVisibles; se muestran tal cual.
   const secciones = esSuperAdmin

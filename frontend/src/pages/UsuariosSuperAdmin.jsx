@@ -75,7 +75,6 @@ export default function UsuariosSuperAdmin() {
     listarUsuarios()
       .then((data) => {
         if (montado) {
-          console.log('Usuarios cargados:', data)
           setUsuarios(Array.isArray(data) ? data : [])
         }
       })

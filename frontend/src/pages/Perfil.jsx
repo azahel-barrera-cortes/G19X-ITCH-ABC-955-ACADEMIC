@@ -10,7 +10,7 @@ import InformacionEmpresa from './InformacionEmpresa.jsx'
 
 const ROLES_PERFIL = ROLES
 
-export default function Perfil() {
+export default function Perfil({ onGuardarInfoEmpresa = null }) {
   const { usuario, token, cerrarSesion, actualizarUsuario } = useAuth()
   const [perfil, setPerfil] = useState({ nombre_completo: '', rol: 'capturista' })
   const [password, setPassword] = useState({ actual: '', nueva: '', confirmar: '' })
@@ -253,7 +253,10 @@ export default function Perfil() {
         </div>
 
         <div className="rounded-2xl bg-white/60 p-1">
-          <InformacionEmpresa puedeEditar={usuario.rol === 'Administrador'} />
+          <InformacionEmpresa
+            onGuardar={onGuardarInfoEmpresa}
+            puedeEditar={usuario.rol === 'Administrador'}
+          />
         </div>
       </div>
     </div>

@@ -61,7 +61,7 @@ export default function InformacionEmpresa({
     return () => {
       montado = false
     }
-  }, [token, infoGuardada])
+  }, [token, infoGuardada, onGuardar])
 
   const cargarDesdeLocalStorage = () => {
     try {

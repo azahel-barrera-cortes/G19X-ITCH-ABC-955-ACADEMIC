@@ -19,7 +19,7 @@ export default function GuiaSuperAdmin() {
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
             Instrucciones para gestionar usuarios de todo el sistema y consultar su actividad
-            auditada, además del estado actual de las secciones de Estadísticas y Seguridad.
+            auditada.
           </p>
         </div>
       </header>
@@ -73,14 +73,6 @@ export default function GuiaSuperAdmin() {
           </ol>
           <p className="mt-4 text-xs text-slate-500">
             La bitácora es de consulta; los registros no se editan desde esta pantalla.
-          </p>
-        </GuiaCard>
-
-        <GuiaCard titulo="Estadísticas y Seguridad">
-          <p>
-            Ambas opciones aparecen en el menú, pero sus pantallas actualmente indican
-            «En construcción». Todavía no ofrecen paneles de estadísticas ni controles de
-            configuración de seguridad; no realices cambios de seguridad desde esas secciones.
           </p>
         </GuiaCard>
 

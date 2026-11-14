@@ -41,7 +41,7 @@ export const ROLES = [
   {
     valor: 'SuperAdministrador',
     etiqueta: 'Super Administrador',
-    descripcion: 'Administra usuarios globales, estadísticas, seguridad y bitácora del sistema.',
+    descripcion: 'Administra usuarios globales y consulta la bitácora del sistema.',
   },
 ]
 
@@ -113,28 +113,10 @@ export const SECCIONES_SISTEMA = [
     descripcion: 'Versiones, vigencia y caducidad',
   },
   {
-    id: 'empresa',
-    minimo: 'capturista',
-    etiqueta: 'Información de la empresa o sociedad',
-    descripcion: 'Datos de la sociedad, tipo y logo',
-  },
-  {
     id: 'ayuda',
     minimo: 'capturista',
     etiqueta: 'Guía de uso',
     descripcion: 'Flujo, API y notas legales',
-  },
-  {
-    id: 'administrador',
-    minimo: 'Administrador',
-    etiqueta: 'Administrador',
-    descripcion: 'Panel de administración de la empresa',
-  },
-  {
-    id: 'superadministrador',
-    minimo: 'SuperAdministrador',
-    etiqueta: 'Super Administrador',
-    descripcion: 'Panel global de superadministración del sistema',
   },
 ]
 
@@ -142,8 +124,6 @@ const MENU_POR_ROL = {
   SuperAdministrador: [
     'usuarios',
     'vitacora',
-    'estadisticas',
-    'seguridad',
     'guia-super-admin',
   ],
   Administrador: ['perfil', 'usuarios', 'administracion', 'biblioteca', 'ayuda'],

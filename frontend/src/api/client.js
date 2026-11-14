@@ -337,10 +337,6 @@ export async function chatearAsistente(
 }
 
 /** Capacidades y ejemplos del asistente. */
-export async function obtenerAyudaAsistente() {
-  const { data } = await http.get('/asistente/ayuda')
-  return data
-}
 
 /** Descarga un Blob como archivo en el navegador. */
 export function descargarBlob(blob, nombreArchivo = 'acta.pdf') {

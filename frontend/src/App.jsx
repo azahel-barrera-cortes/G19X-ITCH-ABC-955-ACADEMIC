@@ -3,7 +3,6 @@ import BarraLateral from './components/layout/BarraLateral.jsx'
 import Encabezado from './components/layout/Encabezado.jsx'
 import AdministracionActas from './pages/AdministracionActas.jsx'
 import AdministracionUsuarios from './pages/AdministracionUsuarios.jsx'
-import Administrador from './pages/Administrador.jsx'
 import AsistenteChat from './components/asistente/AsistenteChat.jsx'
 import Ayuda from './pages/Ayuda.jsx'
 import BandejaActas from './pages/BandejaActas.jsx'
@@ -11,13 +10,10 @@ import BibliotecaActas from './pages/BibliotecaActas.jsx'
 import ControlGeneraActa from './pages/ControlGeneraActa.jsx'
 import GenerarActa from './pages/GenerarActa.jsx'
 import GenerarActaConIA from './pages/GenerarActaConIA.jsx'
-import InformacionEmpresa from './pages/InformacionEmpresa.jsx'
 import Acceso from './pages/Acceso.jsx'
 import Perfil from './pages/Perfil.jsx'
 import UsuariosSuperAdmin from './pages/UsuariosSuperAdmin.jsx'
 import VitacoraSuperAdmin from './pages/VitacoraSuperAdmin.jsx'
-import EstadisticasSuperAdmin from './pages/EstadisticasSuperAdmin.jsx'
-import SeguridadSuperAdmin from './pages/SeguridadSuperAdmin.jsx'
 import GuiaSuperAdmin from './pages/GuiaSuperAdmin.jsx'
 import UsuarioInactivo from './pages/UsuarioInactivo.jsx'
 import Alerta from './components/ui/Alerta.jsx'
@@ -33,8 +29,6 @@ const CLAVE_SECCION = 'pgac_seccion'
 const SECCIONES_SUPERADMIN_IDS = [
   'usuarios',
   'vitacora',
-  'estadisticas',
-  'seguridad',
   'guia-super-admin',
 ]
 const SECCIONES_VALIDAS = [
@@ -109,21 +103,6 @@ function Aplicacion() {
   }, [])
 
   useEffect(() => {
-    if (!autenticado || !token) return undefined
-    let activo = true
-    obtenerInfoEmpresa(token)
-      .then((datos) => {
-        if (activo) setInfoEmpresa(datos || null)
-      })
-      .catch(() => {
-        // El valor local solo se usa como respaldo si el endpoint no está disponible.
-      })
-    return () => {
-      activo = false
-    }
-  }, [autenticado, token])
-
-  useEffect(() => {
     if (!autenticado) return undefined
     let activo = true
     obtenerCatalogos()
@@ -144,15 +123,18 @@ function Aplicacion() {
     obtenerInfoEmpresa(token)
       .then((datos) => {
         if (!activo) return
-        setInfoEmpresa(datos)
+        const datosEmpresa = datos || null
+        setInfoEmpresa(datosEmpresa)
         try {
-          localStorage.setItem(CLAVE_INFO_EMPRESA, JSON.stringify(datos))
+          localStorage.setItem(CLAVE_INFO_EMPRESA, JSON.stringify(datosEmpresa))
         } catch {
           /* El backend sigue siendo la fuente de verdad. */
         }
       })
       .catch((fallo) => {
-        console.error('No se pudo cargar la información empresarial:', fallo)
+        if (activo) {
+          console.error('No se pudo cargar la información empresarial:', fallo)
+        }
       })
     return () => {
       activo = false
@@ -337,7 +319,6 @@ function Aplicacion() {
         <Encabezado
           seccion={seccion}
           onCambiarSeccion={cambiarSeccion}
-          onIrAPerfil={cambiarSeccion}
           onCerrarSesion={manejarCerrarSesion}
           seccionesVisibles={seccionesVisibles}
         />
@@ -397,20 +378,10 @@ function Aplicacion() {
             />
           ) : null}
           {seccion === 'ayuda' ? <Ayuda catalogos={catalogos} rol={usuario?.rol} /> : null}
-          {seccion === 'empresa' ? (
-            <InformacionEmpresa
-              infoGuardada={infoEmpresa}
-              onGuardar={setInfoEmpresa}
-              puedeEditar={usuario?.rol === 'Administrador'}
-            />
-          ) : null}
-          {seccion === 'perfil' ? <Perfil onCambiarVista={cambiarSeccion} /> : null}
-          {seccion === 'administrador' ? <Administrador /> : null}
+          {seccion === 'perfil' ? <Perfil onGuardarInfoEmpresa={setInfoEmpresa} /> : null}
           {seccion === 'usuarios' &&
             (esAdministrador ? <AdministracionUsuarios /> : <UsuariosSuperAdmin />)}
           {seccion === 'vitacora' && <VitacoraSuperAdmin />}
-          {seccion === 'estadisticas' && <EstadisticasSuperAdmin />}
-          {seccion === 'seguridad' && <SeguridadSuperAdmin />}
           {seccion === 'guia-super-admin' && <GuiaSuperAdmin />}
           <AsistenteChat
             modo={seccion === 'asistente' ? 'pagina' : 'burbuja'}

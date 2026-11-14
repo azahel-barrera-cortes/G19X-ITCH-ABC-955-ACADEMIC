@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from app.models.enums import MateriaAcuerdo, TipoAsamblea
 
@@ -600,7 +600,7 @@ class _ContextoSeguro(dict):
     """Diccionario de formato tolerante: las claves ausentes se resuelven a texto vacío."""
 
     def __missing__(self, clave: str) -> str:  # pragma: no cover - defensivo
-        return ""
+        return self.get(clave, "")
 
 
 def plantillas_para_prompt() -> List[str]:

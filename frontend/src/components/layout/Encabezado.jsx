@@ -1,6 +1,7 @@
 ﻿/** Encabezado superior: navegación compacta para móvil y estado del backend. */
 import { useEffect, useState } from 'react'
 import { consultarEstado } from '../../api/client.js'
+import Boton from '../ui/Boton.jsx'
 import Etiqueta from '../ui/Etiqueta.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { etiquetaGuiaRol } from '../../constants/roles.js'
@@ -13,18 +14,14 @@ const SECCIONES = [
   { id: 'asistente', etiqueta: 'Asistente IA', titulo: 'Asistente IA de actas' },
   { id: 'biblioteca', etiqueta: 'Biblioteca', titulo: 'Biblioteca de actas' },
   { id: 'administracion', etiqueta: 'Administración de Actas', titulo: 'Administración de actas' },
-  { id: 'empresa', etiqueta: 'Empresa', titulo: 'Información de la empresa o sociedad' },
   { id: 'ayuda', etiqueta: 'Guía de uso', titulo: 'Guía de uso' },
   { id: 'guia-super-admin', etiqueta: 'Guía de SuperAdministrador', titulo: 'Guía de SuperAdministrador' },
   { id: 'perfil', etiqueta: 'Mi perfil', titulo: 'Mi perfil y funciones disponibles' },
-  { id: 'administrador', etiqueta: 'Administrador', titulo: 'Panel de administración' },
   { id: 'usuarios', etiqueta: 'Administración de Usuarios', titulo: 'Administración de usuarios' },
-  { id: 'estadisticas', etiqueta: 'Estadísticas', titulo: 'Estadísticas del sistema' },
-  { id: 'seguridad', etiqueta: 'Seguridad', titulo: 'Seguridad' },
   { id: 'vitacora', etiqueta: 'Bitácora', titulo: 'Bitácora de actas' },
 ]
 
-export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = null, onCerrarSesion = null, seccionesVisibles = null }) {
+export default function Encabezado({ seccion, onCambiarSeccion, onCerrarSesion = null, seccionesVisibles = null }) {
   const { usuario } = useAuth()
   const [estado, setEstado] = useState(null)
   const [error, setError] = useState(false)
@@ -113,7 +110,18 @@ export default function Encabezado({ seccion, onCambiarSeccion, onIrAPerfil = nu
               {usuario?.nombre_completo || usuario?.email}
               {usuario?.rol && <span className="ml-1 text-slate-400">({usuario.rol})</span>}
             </span>
-
+            {onCerrarSesion && (
+              <Boton
+                variante="peligro"
+                tamano="sm"
+                className="shrink-0 md:hidden"
+                onClick={onCerrarSesion}
+                aria-label="Cerrar sesión"
+              >
+                <span className="sm:hidden">Salir</span>
+                <span className="hidden sm:inline">Cerrar sesión</span>
+              </Boton>
+            )}
           </div>
         </div>
       </div>
