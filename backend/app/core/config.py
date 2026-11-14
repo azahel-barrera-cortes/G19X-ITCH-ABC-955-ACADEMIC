@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
-    seed_admin_email: str = "admin@pgac.com"
+    seed_admin_email: str = "super@admin.com"
     seed_admin_password: str = PASSWORD_ADMIN_EJEMPLO
     seed_admin_nombre: str = "Super Administrador del Sistema"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

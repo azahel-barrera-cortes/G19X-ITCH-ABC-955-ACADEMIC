@@ -45,7 +45,7 @@ PGAC/
 │       │   ├── email_service.py        envío de recuperación por SMTP configurable
 │       │   ├── acta_service.py         orquestación, folios, CRUD
 │       │   └── tenant_access.py        alcance por empresa, filtrado fail-closed y autorización de actas
-│       └── api/v1/                 router, deps (RBAC) + endpoints (actas, administración, asistente, auth, bitácora, expediente ZIP, notaría, sistema)
+│       └── api/v1/                 router, deps (RBAC) + endpoints (actas, administración, asistente, auth, bitácora, sistema)
 └── frontend/                   React 18 + Vite + Tailwind CSS
     ├── package.json, vite.config.js, tailwind.config.js, postcss.config.js
     └── src/
@@ -59,7 +59,7 @@ PGAC/
         ├── components/ui/          Boton, Campo, Tarjeta, Etiqueta, Alerta, Stepper…
         ├── components/wizard/      Paso 1-4, editores de asistente y acuerdo
         ├── components/actas/       PanelValidacion, VistaPreviaActa, PanelHistorial
-        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil, ControlGeneraActa (plantillas y modos de creación), GenerarActa, GenerarActaConIA, BibliotecaActas, AdministracionActas, InformacionEmpresa, Administrador, UsuariosSuperAdmin, VitacoraSuperAdmin, EstadisticasSuperAdmin, SeguridadSuperAdmin, GuiaSuperAdmin, UsuarioInactivo, Ayuda
+        └── pages/                  Acceso (login/registro/recuperar, interfaz separada), Perfil (incluye información empresarial), ControlGeneraActa (plantillas y modos de creación), GenerarActa, GenerarActaConIA, BibliotecaActas, AdministracionActas, UsuariosSuperAdmin, VitacoraSuperAdmin, GuiaSuperAdmin, UsuarioInactivo, Ayuda
 ```
 
 ### Separación de responsabilidades (requisito del PGAC)
@@ -114,8 +114,8 @@ El acceso al rol `SuperAdministrador` se realiza desde el formulario normal de
 inicio de sesión usando el correo y la contraseña definidos en `backend/.env`:
 
 ```dotenv
-SEED_ADMIN_EMAIL=admin@pgac.com
-SEED_ADMIN_PASSWORD=Admin123!seguro
+SEED_ADMIN_EMAIL=super@admin.com
+SEED_ADMIN_PASSWORD=replace-with-a-unique-secret
 ```
 
 Estos son únicamente los valores por defecto de desarrollo documentados en
@@ -147,8 +147,8 @@ datos está vacía. Si ya existe un usuario con ese correo, el script
 | `SECRET_KEY` | *(cambiar)* | Clave de firma de los JWT. **Obligatorio cambiarla en producción** |
 | `ALGORITHM` | `HS256` | Algoritmo de firma de los JWT |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Vigencia del token de acceso (7 días) |
-| `SEED_ADMIN_EMAIL` | `admin@pgac.com` | Correo del SuperAdministrador inicial |
-| `SEED_ADMIN_PASSWORD` | `Admin123!seguro` | Contraseña inicial del SuperAdministrador |
+| `SEED_ADMIN_EMAIL` | `super@admin.com` | Correo del SuperAdministrador inicial |
+| `SEED_ADMIN_PASSWORD` | *(definir en `.env`; no publicar)* | Contraseña inicial del SuperAdministrador |
 
 ## 4. Puesta en marcha del frontend
 
@@ -219,27 +219,27 @@ rol, y el backend valida cada petición (sin token → **401**; rol insuficiente
 | **Revisor** | Mi perfil | Perfil, Revisión de Actas, Biblioteca de Actas, Guía de Revisor | Revisar borradores, consultar el historial y aprobarlos para el Abogado o devolverlos al Capturista |
 | **Abogado responsable** | Mi perfil | Perfil, Aprobación de Actas, Biblioteca de Actas, Guía de Abogado | Aprobar o devolver actas; descargar el PDF final tras la aprobación |
 | **Administrador** | Mi perfil | Perfil, Administración de Usuarios, Administración de Actas, Biblioteca de Actas, Guía de Administrador | Administrar usuarios de la empresa y consultar el repositorio y sus versiones |
-| **SuperAdministrador** | UsuariosSuperAdmin | Administración de Usuarios, Bitácora, Estadísticas, Seguridad, Guía de SuperAdministrador | Administrar usuarios globales, revisar estadísticas, seguridad y bitácora |
+| **SuperAdministrador** | UsuariosSuperAdmin | Administración de Usuarios, Bitácora, Guía de SuperAdministrador | Administrar usuarios y accesos globales; consultar la bitácora |
 
 > El código empresarial se genera automáticamente para cada usuario con rol
 > `Administrador`. El registro público permite seleccionar `capturista`,
 > `revisor` o `abogado_responsable` y exige un código válido para vincular la
 > cuenta con la empresa; la información empresarial se hereda automáticamente.
-> El `SuperAdministrador` administra usuarios, roles, activación, seguridad,
-> estadísticas y bitácora global.
+> El `SuperAdministrador` administra usuarios, roles y accesos globales, y
+> consulta la bitácora del sistema.
 
 ## 5. Endpoints de la API
 
 **Autenticación y roles (RBAC).** Los endpoints de actas, administración,
-asistente, bitácora, expediente y notaría exigen el encabezado
+asistente y bitácora exigen el encabezado
 `Authorization: Bearer <JWT>` (se obtiene en `POST /api/v1/auth/login`); sin
 token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 `capturista` (1) < `revisor` (2) < `abogado_responsable` (3) < `Administrador` (4) < `SuperAdministrador` (5).
 
 | Rol | Permisos sobre la API |
 |---|---|
-| `capturista` | Redactar (IA y SSE), crear y editar actas, generar PDF, usar el asistente, exportar expediente ZIP |
-| `revisor` | Lo anterior + listar y consultar actas, descargar PDF guardado, administración (resumen, vigencia, versiones), bitácora y API de notaría |
+| `capturista` | Redactar (IA y SSE), crear y editar actas, generar PDF y usar el asistente |
+| `revisor` | Lo anterior + listar y consultar actas, descargar PDF guardado, administración (resumen, vigencia, versiones) y bitácora |
 | `abogado_responsable` | Lo anterior + cambiar estatus y revalidar actas |
 | `Administrador` | Acceso total + eliminar actas y gestionar usuarios (capturista, revisor, abogado_responsable) |
 | `SuperAdministrador` | Acceso absoluto a todo el sistema, incluido el panel global de superadministración |
@@ -276,9 +276,6 @@ token responden **401** y con rol insuficiente **403**. Niveles crecientes:
 | `GET` | `/api/v1/auth/me/codigo-empresa` | Consulta o genera el código empresarial del Administrador autenticado |
 | `GET` | `/api/v1/bitacora` | Bitácora de cambios con filtros `accion` y `entidad` (revisor+) |
 | `GET` | `/api/v1/bitacora/{id}` | Entrada concreta de la bitácora (revisor+) |
-| `GET` | `/api/v1/expediente/{id}/zip` | Expediente ZIP: PDF del acta + `metadatos.json` (capturista+) |
-| `GET` | `/api/v1/notaria/actas` | Listado de actas para integración notarial (revisor+) |
-| `GET` | `/api/v1/notaria/actas/{id}` | Metadatos públicos del acta para validación notarial (revisor+) |
 
 La recuperación de contraseña está disponible para todas las cuentas activas,
 incluido el `SuperAdministrador`, usando el correo registrado. El backend envía
@@ -356,7 +353,7 @@ para ser portables entre PostgreSQL y SQLite.
 |---|---|
 | `id` (PK) | Identificador autoincremental |
 | `usuario_id` (FK) | Quién realizó la acción (NULL si la cuenta fue eliminada) |
-| `accion` | `crear`, `actualizar`, `eliminar`, `cambiar_estatus`, `validar`, `restaurar_version`, `fijar_caducidad`, `exportar_zip`, etc. |
+| `accion` | `crear`, `actualizar`, `eliminar`, `cambiar_estatus`, `validar`, `restaurar_version`, `fijar_caducidad`, etc. |
 | `entidad`, `entidad_id` | Recurso afectado (p. ej. `actas`, `42`) |
 | `datos_antes`, `datos_despues` | Retrato JSON anterior/después del cambio |
 | `ip_origen`, `user_agent` | Contexto de la petición |
@@ -529,8 +526,8 @@ PGAC usa control de acceso basado en roles con privilegios crecientes:
 
 | Rol | Nivel | Qué puede hacer | Qué NO puede hacer |
 |-----|-------|-----------------|-------------------|
-| `capturista` | 1 | Generar actas, usar asistente IA, consultar propia empresa, ver expediente ZIP, cambiar propia contraseña | Eliminar actas, ver bitácora, administración, gestionar usuarios |
-| `revisor` | 2 | Todo de capturista + listar/eliminar actas, ver bitácora, administración de actas (versiones, vigencia, caducidad), expediente ZIP, integración notarial | Gestionar usuarios, cambiar roles, activar/desactivar cuentas |
+| `capturista` | 1 | Generar actas, usar asistente IA, consultar propia empresa, cambiar propia contraseña | Eliminar actas, ver bitácora, administración, gestionar usuarios |
+| `revisor` | 2 | Todo de capturista + listar/eliminar actas, ver bitácora y administración de actas (versiones, vigencia, caducidad) | Gestionar usuarios, cambiar roles, activar/desactivar cuentas |
 | `abogado_responsable` | 3 | Todo de revisor + cambiar estatus de actas, restaurar versiones, validar actas | Gestionar usuarios, administración global |
 | `Administrador` | 4 | Todo de abogado_responsable + gestionar información de empresa, ver código empresarial | Crear SuperAdministradores, eliminar cuentas críticas |
 | `SuperAdministrador` | 5 | Todo del sistema: gestionar usuarios, cambiar roles, activar/desactivar/eliminar cuentas, reasignar actas en cuarentena, ver bitácora global, estadísticas | Ninguna restricción (acceso absoluto) |
@@ -585,8 +582,6 @@ Resultado: puntaje (0–100) + lista de hallazgos clasificados como crítico / a
 - **Estatus:** borrador → revisión → aprobada → firmada → archivada (transiciones controladas por rol).
 - **Restaurar versión:** se puede restaurar una versión anterior emitiendo una versión nueva (el historial queda intacto).
 - **Caducidad:** se puede fijar, ampliar o eliminar la fecha de caducidad con motivo registrado.
-- **Exportar ZIP:** `GET /api/v1/expediente/{id}/zip` genera PDF + `metadatos.json`.
-
 ---
 
 ## 11. Uso del asistente IA
