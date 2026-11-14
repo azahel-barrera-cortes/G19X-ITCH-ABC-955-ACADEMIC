@@ -12,8 +12,6 @@ from app.api.v1.endpoints import (
     asistente,
     auth,
     bitacora,
-    expediente,
-    notaria,
     sistema,
 )
 
@@ -26,7 +24,5 @@ api_router.include_router(auth.router)
 api_router.include_router(bitacora.router)
 api_router.include_router(asistente.router)
 api_router.include_router(actas.router)
-api_router.include_router(expediente.router)
-api_router.include_router(notaria.router)
 
 __all__ = ["api_router"]

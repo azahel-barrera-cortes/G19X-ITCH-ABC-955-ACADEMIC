@@ -81,8 +81,6 @@ def test_actas_y_datos_relacionados_quedan_aislados_por_empresa(
         version_paths = (
             f"/api/v1/administracion/versiones/{acta_a['id']}",
             f"/api/v1/administracion/versiones/{acta_a['id']}/1",
-            f"/api/v1/notaria/actas/{acta_a['id']}",
-            f"/api/v1/expediente/{acta_a['id']}/zip",
         )
         for path in version_paths:
             assert cliente_anonimo.get(path, headers=headers_b).status_code == 404
