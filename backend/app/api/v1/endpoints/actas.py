@@ -57,6 +57,12 @@ from app.services.tenant_access import (
 
 router = APIRouter(prefix="/actas", tags=["Actas"])
 
+
+def _generado_con_ia(solicitado: bool, proveedor: Any) -> bool:
+    proveedor_valor = getattr(proveedor, "value", proveedor)
+    return solicitado and str(proveedor_valor) != "plantillas"
+
+
 ENCABEZADOS_EXPUESTOS = [
     "Content-Disposition",
     "X-Acta-Folio",
@@ -230,6 +236,9 @@ def generar_pdf(
         )
     datos_antes = None
     pdf, metadatos = acta_service.generar_pdf(payload, db)
+    generado_con_ia = _generado_con_ia(
+        payload.generar_clausulas, metadatos["proveedor_ia"]
+    )
     if metadatos["guardada"]:
         registrar_bitacora(
             db,
@@ -243,17 +252,19 @@ def generar_pdf(
                 "version": metadatos["version"],
                 "estatus": metadatos.get("estatus") or "desconocido",
                 "proveedor_ia": metadatos["proveedor_ia"],
+                "generado_con_ia": generado_con_ia,
             },
         )
     else:
         registrar_bitacora(
             db,
             usuario=usuario_actual,
-            accion="generar_con_ia",
+            accion="generar_con_ia" if generado_con_ia else "generar_con_plantillas",
             entidad="actas",
             datos_despues={
                 "folio": metadatos["folio"],
                 "proveedor_ia": metadatos["proveedor_ia"],
+                "generado_con_ia": generado_con_ia,
                 "guardada": False,
             },
         )
@@ -307,6 +318,10 @@ def crear_acta(
             "folio": modelo.folio,
             "sociedad": modelo.sociedad,
             "estado_flujo": modelo.estado_flujo,
+            "proveedor_ia": modelo.proveedor_ia,
+            "generado_con_ia": _generado_con_ia(
+                payload.generar_clausulas, modelo.proveedor_ia
+            ),
         },
     )
     return ActaRead.model_validate(modelo)
@@ -439,6 +454,10 @@ def actualizar_acta(
             "sociedad": modelo.sociedad,
             "estatus": modelo.estatus,
             "version": modelo.version,
+            "proveedor_ia": modelo.proveedor_ia,
+            "generado_con_ia": _generado_con_ia(
+                payload.regenerar_con_ia, modelo.proveedor_ia
+            ),
         },
     )
     return ActaRead.model_validate(modelo)

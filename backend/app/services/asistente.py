@@ -562,7 +562,23 @@ def _cerrar_y_generar(db, sesion, autor):
                 "acta": _dato_acta(acta),
                 "control_acta": control, "acta_id": control["acta_id"],
                 "folio": control["folio"], "texto_organizado": texto_org,
-                "acciones": [{"etiqueta": "Ver actas", "accion": "ir_mis_actas"}]}
+                "acciones": [{"etiqueta": "Ver actas", "accion": "ir_mis_actas"}],
+                "_evento_auditoria": {
+                    "accion": "crear",
+                    "entidad": "actas",
+                    "entidad_id": acta.id,
+                    "datos_despues": {
+                        "folio": acta.folio,
+                        "sociedad": acta.sociedad,
+                        "estado_flujo": acta.estado_flujo,
+                        "version": acta.version,
+                        "proveedor_ia": acta.proveedor_ia,
+                        "generado_con_ia": bool(
+                            solicitud.generar_clausulas
+                            and acta.proveedor_ia != "plantillas"
+                        ),
+                    },
+                }}
     except Exception as exc:
         logger.exception("Fallo generar acta desde asistente")
         falt = siguiente_faltante(sesion)
@@ -1132,7 +1148,13 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                 resp += " Sugerencia: " + h.sugerencia
         return {"respuesta": resp, "intencion": "validar", "tema_valido": True,
                 "acta": _dato_acta(acta), "validacion": val.model_dump(mode="json"),
-                "acciones": [{"etiqueta": "Versiones", "accion": "versiones", "acta_id": acta.id}]}
+                "acciones": [{"etiqueta": "Versiones", "accion": "versiones", "acta_id": acta.id}],
+                "_evento_auditoria": {
+                    "accion": "validar",
+                    "entidad": "actas",
+                    "entidad_id": acta.id,
+                    "datos_despues": {"puntaje_validacion": val.puntaje},
+                }}
     if inten == "aprobar":
         if not (
             usuario is not None
@@ -1214,7 +1236,17 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
         return {"respuesta": ("Listo: %s ahora esta en %s (version %s)."
                               % (acta2.folio, destino, acta2.version)),
                 "intencion": "aprobar", "tema_valido": True, "acta": _dato_acta(acta2),
-                "acciones": [{"etiqueta": "Validar", "accion": "validar", "acta_id": acta2.id}]}
+                "acciones": [{"etiqueta": "Validar", "accion": "validar", "acta_id": acta2.id}],
+                "_evento_auditoria": {
+                    "accion": "cambiar_estatus",
+                    "entidad": "actas",
+                    "entidad_id": acta2.id,
+                    "datos_antes": {"estatus": origen},
+                    "datos_despues": {
+                        "estatus": destino,
+                        "version": acta2.version,
+                    },
+                }}
     if inten == "versiones":
         hist = administracion.listar_versiones(db, acta.id)
         lin = ["Historial de %s (%s versiones):" % (acta.folio, len(hist))]
@@ -1234,6 +1266,7 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
         if not (usuario is not None and security.tiene_nivel_minimo(usuario.rol, "abogado_responsable")):
             return {"respuesta": "Tu rol no permite restaurar versiones.",
                     "intencion": "restaurar", "tema_valido": True, "acta": dato}
+        version_actual = int(acta.version or 1)
         try:
             acta2 = administracion.restaurar_version(db, acta.id, num)
         except Exception as exc:
@@ -1241,7 +1274,17 @@ def procesar_mensaje(db: Session, mensaje: str, folio: Optional[str] = None,
                     "intencion": "restaurar", "tema_valido": True, "acta": dato}
         return {"respuesta": ("Restaurada la version %s de %s: ahora es la version %s."
                               % (num, acta2.folio, acta2.version)),
-                "intencion": "restaurar", "tema_valido": True, "acta": _dato_acta(acta2)}
+                "intencion": "restaurar", "tema_valido": True, "acta": _dato_acta(acta2),
+                "_evento_auditoria": {
+                    "accion": "restaurar_version",
+                    "entidad": "actas",
+                    "entidad_id": acta2.id,
+                    "datos_antes": {"version": version_actual},
+                    "datos_despues": {
+                        "version_restaurada": num,
+                        "version": acta2.version,
+                    },
+                }}
     out = _redactar_libre(texto)
     out["tema_valido"] = True
     out["acta"] = dato

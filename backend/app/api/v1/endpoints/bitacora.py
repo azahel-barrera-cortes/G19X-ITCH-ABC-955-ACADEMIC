@@ -27,8 +27,9 @@ def listar_bitacora(
     entidad: Optional[str] = Query(None, description="Filtrar por entidad (actas, usuarios)"),
     limite: int = Query(100, ge=1, le=500),
     desplazamiento: int = Query(0, ge=0),
+    cursor_id: Optional[int] = Query(None, ge=1, description="Continuar con eventos anteriores"),
 ) -> List[BitacoraCambiosRespuesta]:
-    """Lista las entradas de la bitácora con filtros opcionales."""
+    """Lista eventos recientes o continúa desde un identificador anterior."""
     consulta = db.query(BitacoraCambios)
     consulta = filtrar_por_empresa(
         consulta, alcance_empresa(usuario_actual), BitacoraCambios.empresa_codigo
@@ -37,8 +38,10 @@ def listar_bitacora(
         consulta = consulta.filter(BitacoraCambios.accion == accion)
     if entidad:
         consulta = consulta.filter(BitacoraCambios.entidad == entidad)
+    if cursor_id is not None:
+        consulta = consulta.filter(BitacoraCambios.id < cursor_id)
     resultados = (
-        consulta.order_by(BitacoraCambios.created_at.desc())
+        consulta.order_by(BitacoraCambios.id.desc())
         .offset(desplazamiento)
         .limit(limite)
         .all()

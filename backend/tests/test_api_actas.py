@@ -8,6 +8,8 @@ from typing import Any, Dict
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
+from app.models.usuario import BitacoraCambios
+
 
 def test_health_reporta_servicio_y_base_de_datos(cliente: TestClient) -> None:
     respuesta = cliente.get("/health")
@@ -15,6 +17,13 @@ def test_health_reporta_servicio_y_base_de_datos(cliente: TestClient) -> None:
     cuerpo = respuesta.json()
     assert cuerpo["base_de_datos"] == "disponible"
     assert cuerpo["proveedor_ia"] == "plantillas"
+
+
+def test_endpoints_sin_uso_de_notaria_y_expediente_no_estan_publicados(
+    cliente: TestClient,
+) -> None:
+    assert cliente.get("/api/v1/notaria/actas").status_code == 404
+    assert cliente.get("/api/v1/expediente/1/zip").status_code == 404
 
 
 def test_catalogos_del_formulario(cliente: TestClient) -> None:
@@ -392,3 +401,26 @@ def test_formulario_invalido_devuelve_422_con_detalle(
     cuerpo = respuesta.json()
     assert "no son válidos" in cuerpo["detail"]
     assert cuerpo["errores"]
+
+
+def test_creacion_acta_registra_si_se_genero_con_ia(
+    cliente_autenticado: TestClient,
+    payload_acta: Dict[str, Any],
+    sesion: Any,
+) -> None:
+    respuesta = cliente_autenticado.post("/api/v1/actas", json=payload_acta)
+    assert respuesta.status_code == 201, respuesta.text
+
+    evento = (
+        sesion.query(BitacoraCambios)
+        .filter(
+            BitacoraCambios.entidad == "actas",
+            BitacoraCambios.entidad_id == respuesta.json()["id"],
+            BitacoraCambios.accion == "crear",
+        )
+        .order_by(BitacoraCambios.id.desc())
+        .first()
+    )
+    assert evento is not None
+    assert evento.datos_despues["folio"] == respuesta.json()["folio"]
+    assert evento.datos_despues["generado_con_ia"] is False

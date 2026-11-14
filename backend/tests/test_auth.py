@@ -15,7 +15,7 @@ from passlib.context import CryptContext
 from fastapi.testclient import TestClient
 
 from app.core import security
-from app.models.usuario import Usuario
+from app.models.usuario import BitacoraCambios, Usuario
 from app.services import email_service
 from app.services.auth_service import crear_token_reinicio_password
 
@@ -566,6 +566,32 @@ def test_reset_password_expirado_no_cambia_la_contrasena(
         _borrar_usuario(sesion, email)
 
 
+def test_reset_password_exitoso_se_registra_en_bitacora(cliente_anonimo, sesion) -> None:
+    email = "reset-auditado@pgac.com"
+    usuario = _crear_usuario(sesion, email, "capturista")
+    token = crear_token_reinicio_password(usuario, sesion)
+    try:
+        respuesta = cliente_anonimo.post(
+            "/api/v1/auth/reset-password/confirm",
+            json={"token": token, "nuevo_password": "clave-nueva-9"},
+        )
+        assert respuesta.status_code == 200, respuesta.text
+
+        evento = (
+            sesion.query(BitacoraCambios)
+            .filter(
+                BitacoraCambios.usuario_id == usuario.id,
+                BitacoraCambios.accion == "cambiar_password",
+            )
+            .order_by(BitacoraCambios.id.desc())
+            .first()
+        )
+        assert evento is not None
+        assert evento.datos_despues["password_actualizada"] is True
+    finally:
+        _borrar_usuario(sesion, email)
+
+
 def test_reset_password_sin_configuracion_no_crea_token(
     cliente_anonimo, sesion, monkeypatch
 ) -> None:
@@ -615,7 +641,135 @@ def test_cambio_password_desde_perfil_invalida_tokens_pendientes_y_sesiones(
             json={"email": email, "password": "clave-nueva-9"},
         )
         assert nuevo_inicio.status_code == 200
+        evento = (
+            sesion.query(BitacoraCambios)
+            .filter(
+                BitacoraCambios.usuario_id == usuario.id,
+                BitacoraCambios.accion == "actualizar",
+                BitacoraCambios.entidad == "usuarios",
+            )
+            .order_by(BitacoraCambios.id.desc())
+            .first()
+        )
+        assert evento is not None
+        assert evento.datos_despues["password_actualizada"] is True
     finally:
+        _borrar_usuario(sesion, email)
+
+
+def test_eliminar_usuario_conserva_bitacora_y_es_visible_globalmente(
+    cliente_anonimo, sesion
+) -> None:
+    email_super = "super-elimina@pgac.com"
+    email_eliminar = "usuario-eliminar@pgac.com"
+    super_usuario = _crear_usuario(sesion, email_super, "SuperAdministrador")
+    usuario = _crear_usuario(sesion, email_eliminar, "capturista")
+    usuario_id = usuario.id
+    usuario.empresa_codigo = "PGAC-EMPRESA-AUDITORIA"
+    sesion.add(
+        BitacoraCambios(
+            usuario_id=usuario.id,
+            empresa_codigo=usuario.empresa_codigo,
+            accion="crear",
+            entidad="actas",
+            entidad_id=123,
+            datos_despues={"folio": "PGAC-123"},
+        )
+    )
+    sesion.commit()
+    sesion.refresh(usuario)
+    evento_anterior = (
+        sesion.query(BitacoraCambios)
+        .filter(BitacoraCambios.usuario_id == usuario.id)
+        .first()
+    )
+    evento_anterior_id = evento_anterior.id
+
+    try:
+        inicio = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email_super, "password": "secreto-1"},
+        )
+        cabeceras = {"Authorization": f"Bearer {inicio.json()['access_token']}"}
+        respuesta = cliente_anonimo.delete(
+            f"/api/v1/auth/users/{usuario_id}", headers=cabeceras
+        )
+        assert respuesta.status_code == 200, respuesta.text
+
+        sesion.expire_all()
+        evento_anterior = sesion.get(BitacoraCambios, evento_anterior_id)
+        assert evento_anterior is not None
+        assert evento_anterior.usuario_id is None
+
+        eventos_visibles = cliente_anonimo.get(
+            "/api/v1/bitacora?limite=500", headers=cabeceras
+        )
+        assert eventos_visibles.status_code == 200, eventos_visibles.text
+        eventos = eventos_visibles.json()
+        assert any(evento["id"] == evento_anterior_id for evento in eventos)
+        assert any(
+            evento["accion"] == "eliminar"
+            and evento["entidad"] == "usuarios"
+            and evento["entidad_id"] == usuario_id
+            for evento in eventos
+        )
+    finally:
+        sesion.query(BitacoraCambios).filter(
+            BitacoraCambios.id == evento_anterior_id
+        ).delete(synchronize_session=False)
+        sesion.query(BitacoraCambios).filter(
+            BitacoraCambios.entidad == "usuarios",
+            BitacoraCambios.entidad_id == usuario_id,
+        ).delete(synchronize_session=False)
+        sesion.query(BitacoraCambios).filter(
+            BitacoraCambios.usuario_id == super_usuario.id
+        ).delete(synchronize_session=False)
+        sesion.commit()
+        _borrar_usuario(sesion, email_eliminar)
+        _borrar_usuario(sesion, email_super)
+
+
+def test_bitacora_cursor_devuelve_eventos_anteriores(cliente_anonimo, sesion) -> None:
+    email = "super-cursor@pgac.com"
+    super_usuario = _crear_usuario(sesion, email, "SuperAdministrador")
+    eventos = [
+        BitacoraCambios(
+            usuario_id=super_usuario.id,
+            accion="validar",
+            entidad="actas",
+            entidad_id=identificador,
+            datos_despues={"folio": f"PGAC-CURSOR-{identificador}"},
+        )
+        for identificador in (1, 2, 3)
+    ]
+    sesion.add_all(eventos)
+    sesion.commit()
+    ids_eventos = [evento.id for evento in eventos]
+
+    try:
+        inicio = cliente_anonimo.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "secreto-1"},
+        )
+        cabeceras = {"Authorization": f"Bearer {inicio.json()['access_token']}"}
+        recientes = cliente_anonimo.get(
+            "/api/v1/bitacora?accion=validar&limite=2", headers=cabeceras
+        )
+        assert recientes.status_code == 200, recientes.text
+        ids_recientes = [evento["id"] for evento in recientes.json()]
+        assert ids_recientes == sorted(ids_eventos, reverse=True)[0:2]
+
+        anteriores = cliente_anonimo.get(
+            f"/api/v1/bitacora?accion=validar&limite=2&cursor_id={ids_recientes[-1]}",
+            headers=cabeceras,
+        )
+        assert anteriores.status_code == 200, anteriores.text
+        assert anteriores.json()[0]["id"] == ids_eventos[0]
+    finally:
+        sesion.query(BitacoraCambios).filter(
+            BitacoraCambios.usuario_id == super_usuario.id
+        ).delete(synchronize_session=False)
+        sesion.commit()
         _borrar_usuario(sesion, email)
 
 

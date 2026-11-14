@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import UsuarioActual, get_db
+from app.api.v1.deps import UsuarioActual, get_db, registrar_bitacora
 from app.db.session import get_db
 from app.services.auth_service import obtener_administrador_empresa
 from app.services import asistente as motor
@@ -73,6 +73,7 @@ class AsistenteChatResponse(BaseModel):
 @router.post("/chat", response_model=AsistenteChatResponse, summary="Conversar con el asistente")
 def chatear(
     payload: AsistenteChatRequest,
+    request: Request,
     _usuario: UsuarioActual,
     db: Session = Depends(get_db),
 ) -> AsistenteChatResponse:
@@ -97,6 +98,14 @@ def chatear(
         db, payload.mensaje, payload.folio, payload.acta_id,
         payload.sesion_id, usuario=_usuario, empresa=empresa, modo=payload.modo,
     )
+    evento_auditoria = resultado.pop("_evento_auditoria", None)
+    if evento_auditoria:
+        registrar_bitacora(
+            db,
+            usuario=_usuario,
+            request=request,
+            **evento_auditoria,
+        )
     return AsistenteChatResponse(**resultado)
 
 

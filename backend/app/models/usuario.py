@@ -60,7 +60,7 @@ class Usuario(Base):
 
     # Relación con la bitácora de cambios.
     bitacora: Mapped[list["BitacoraCambios"]] = relationship(
-        back_populates="usuario", cascade="all, delete-orphan"
+        back_populates="usuario"
     )
 
     def __repr__(self) -> str:  # pragma: no cover

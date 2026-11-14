@@ -60,6 +60,7 @@ router = APIRouter(prefix="/auth", tags=["Autenticación"])
 def registrar_usuario(
     datos: UsuarioCrear,
     solicitante: UsuarioOpcional,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> UsuarioRespuesta:
     """Crea un nuevo usuario aplicando reglas de rol seguras:
@@ -105,19 +106,21 @@ def registrar_usuario(
                 detail="El código de empresa no existe o no está activo.",
             )
     usuario = crear_usuario(db, datos)
-    if solicitante and solicitante.rol in ("SuperAdministrador", "Administrador"):
-        registrar_bitacora(
-            db,
-            usuario=solicitante,
-            accion="crear",
-            entidad="usuarios",
-            entidad_id=usuario.id,
-            datos_despues={
-                "email": usuario.email,
-                "nombre_completo": usuario.nombre_completo,
-                "rol": usuario.rol,
-            },
-        )
+    registrar_bitacora(
+        db,
+        usuario=solicitante,
+        accion="crear",
+        entidad="usuarios",
+        entidad_id=usuario.id,
+        datos_despues={
+            "email": usuario.email,
+            "nombre_completo": usuario.nombre_completo,
+            "rol": usuario.rol,
+            "registrado_por": "usuario autenticado" if solicitante else "autoregistro",
+        },
+        request=request,
+        empresa_codigo=usuario.empresa_codigo or usuario.codigo_empresa,
+    )
     return usuario_desde_respuesta(usuario)
 
 
@@ -159,6 +162,7 @@ def informacion_empresa(
 def actualizar_informacion_empresa(
     cambios: InformacionEmpresaActualizar,
     usuario_actual: UsuarioActual,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> InformacionEmpresa:
     if usuario_actual.rol != "Administrador":
@@ -166,10 +170,27 @@ def actualizar_informacion_empresa(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo el Administrador puede modificar la información empresarial.",
         )
+    datos_antes = {}
+    datos_despues = {}
     for campo, valor in cambios.model_dump().items():
+        anterior = getattr(usuario_actual, campo)
+        if anterior != valor:
+            datos_antes[campo] = bool(anterior) if campo == "logo_empresa" else anterior
+            datos_despues[campo] = bool(valor) if campo == "logo_empresa" else valor
         setattr(usuario_actual, campo, valor)
     db.commit()
     db.refresh(usuario_actual)
+    if datos_despues:
+        registrar_bitacora(
+            db,
+            usuario=usuario_actual,
+            accion="actualizar",
+            entidad="empresas",
+            datos_antes=datos_antes,
+            datos_despues=datos_despues,
+            request=request,
+            empresa_codigo=usuario_actual.codigo_empresa,
+        )
     return InformacionEmpresa.model_validate(usuario_actual)
 
 
@@ -291,15 +312,36 @@ def logout(
 def actualizar_perfil(
     usuario_actual: UsuarioActual,
     cambios: PerfilActualizar,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> UsuarioRespuesta:
     """Actualiza los datos del usuario autenticado."""
+    nombre_anterior = usuario_actual.nombre_completo
+    nombre_cambiado = (
+        cambios.nombre_completo is not None
+        and cambios.nombre_completo != nombre_anterior
+    )
+    password_actualizada = cambios.password is not None
     if cambios.nombre_completo is not None:
         usuario_actual.nombre_completo = cambios.nombre_completo
-    if cambios.password is not None:
+    if password_actualizada:
         actualizar_password_usuario(usuario_actual, cambios.password)
     db.commit()
     db.refresh(usuario_actual)
+    if nombre_cambiado or password_actualizada:
+        registrar_bitacora(
+            db,
+            usuario=usuario_actual,
+            accion="actualizar",
+            entidad="usuarios",
+            entidad_id=usuario_actual.id,
+            datos_antes={"nombre_completo": nombre_anterior},
+            datos_despues={
+                "nombre_completo": usuario_actual.nombre_completo,
+                "password_actualizada": password_actualizada,
+            },
+            request=request,
+        )
     return usuario_desde_respuesta(usuario_actual)
 
 
@@ -353,6 +395,7 @@ def solicitar_reset_password(
 )
 def confirmar_reset_password(
     datos: ConfirmarResetPassword,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ApiMensaje:
     """Confirma el cambio de contraseña usando el token de recuperación."""
@@ -362,6 +405,15 @@ def confirmar_reset_password(
             "El enlace de recuperación no es válido o ha expirado.",
             detalle="El token de recuperación no es válido o ha expirado.",
         )
+    registrar_bitacora(
+        db,
+        usuario=usuario,
+        accion="cambiar_password",
+        entidad="usuarios",
+        entidad_id=usuario.id,
+        datos_despues={"password_actualizada": True},
+        request=request,
+    )
     return ApiMensaje(
         mensaje="Contraseña actualizada. Ya puedes iniciar sesión.",
         detalle=None,
@@ -375,6 +427,7 @@ def confirmar_reset_password(
 )
 def listar_usuarios(
     usuario_actual: UsuarioActual,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> List[UsuarioRespuesta]:
     """SuperAdministrador ve todos los usuarios; Administrador, solo su empresa."""
@@ -384,6 +437,15 @@ def listar_usuarios(
             usuario_actual.codigo_empresa = generar_codigo_empresa(db)
             db.commit()
             db.refresh(usuario_actual)
+            registrar_bitacora(
+                db,
+                usuario=usuario_actual,
+                accion="crear_codigo_empresa",
+                entidad="empresas",
+                datos_despues={"codigo_empresa": usuario_actual.codigo_empresa},
+                request=request,
+                empresa_codigo=usuario_actual.codigo_empresa,
+            )
         consulta = consulta.filter(
             Usuario.empresa_codigo == usuario_actual.codigo_empresa,
             Usuario.rol.in_(("capturista", "revisor", "abogado_responsable")),
@@ -477,21 +539,30 @@ def actualizar_usuario(
         actualizar_password_usuario(usuario, cambios.password)
     db.commit()
     db.refresh(usuario)
-    registrar_bitacora(
-        db,
-        usuario=usuario_actual,
-        accion="actualizar",
-        entidad="usuarios",
-        entidad_id=usuario.id,
-        datos_antes=datos_antes,
-        datos_despues={
-            "email": usuario.email,
-            "nombre_completo": usuario.nombre_completo,
-            "rol": usuario.rol,
-            "activo": usuario.activo,
-        },
-        request=request,
-    )
+    datos_despues = {
+        "email": usuario.email,
+        "nombre_completo": usuario.nombre_completo,
+        "rol": usuario.rol,
+        "activo": usuario.activo,
+        "password_actualizada": cambios.password is not None,
+    }
+    datos_actualizados = {
+        clave: valor
+        for clave, valor in datos_despues.items()
+        if clave != "password_actualizada"
+    }
+    if datos_antes != datos_actualizados or cambios.password is not None:
+        registrar_bitacora(
+            db,
+            usuario=usuario_actual,
+            accion="actualizar",
+            entidad="usuarios",
+            entidad_id=usuario.id,
+            datos_antes=datos_antes,
+            datos_despues=datos_despues,
+            request=request,
+            empresa_codigo=usuario.empresa_codigo or usuario.codigo_empresa,
+        )
     return usuario_desde_respuesta(usuario)
 
 
@@ -503,6 +574,7 @@ def actualizar_usuario(
 def eliminar_usuario(
     user_id: int,
     _super_admin: RequiereSuperAdministrador,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ApiMensaje:
     """Elimina un usuario, excepto al SuperAdministrador de la sesión actual."""
@@ -517,6 +589,23 @@ def eliminar_usuario(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="No puedes eliminar tu propio usuario.",
         )
+    datos_antes = {
+        "email": usuario.email,
+        "nombre_completo": usuario.nombre_completo,
+        "rol": usuario.rol,
+    }
+    empresa_codigo = usuario.empresa_codigo or usuario.codigo_empresa
     db.delete(usuario)
     db.commit()
+    registrar_bitacora(
+        db,
+        usuario=_super_admin,
+        accion="eliminar",
+        entidad="usuarios",
+        entidad_id=user_id,
+        datos_antes=datos_antes,
+        datos_despues={"eliminado": True},
+        request=request,
+        empresa_codigo=empresa_codigo,
+    )
     return ApiMensaje(mensaje="Usuario eliminado correctamente.")
