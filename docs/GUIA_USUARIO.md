@@ -55,9 +55,9 @@ permisos también se comprueban en el servidor.
 |---|---|---|
 | **Capturista** | Crear actas desde **Generar acta** o **Asistente IA**; consultar el avance en **Mis actas**; atender observaciones y enviar versiones corregidas. | No decide la revisión ni la aprobación legal y no descarga el PDF final antes de la aprobación del Abogado Responsable. |
 | **Revisor** | Atender **Revisión de actas**; consultar versiones; analizar consistencia; devolver con observaciones o marcar el acta como revisada para enviarla al Abogado. Puede consultar la **Biblioteca de actas**. | No realiza la aprobación legal final. La aprobación y descarga del PDF final corresponden al Abogado Responsable. |
-| **Abogado Responsable** | Atender **Aprobación de actas**; revisar el documento, versiones y análisis; aprobarlo finalmente o devolverlo con observaciones. Después de aprobar, puede descargar el PDF final desde su bandeja o la Biblioteca. | La aprobación es una decisión profesional humana. El sistema no firma el documento ni lo protocoliza. |
+| **Abogado Responsable** | Atender **Aprobación de actas**; revisar el documento, versiones y análisis; aprobarlo finalmente o devolverlo con observaciones. Después de aprobar, puede descargar el PDF final desde su bandeja o la Biblioteca. | La aprobación es una decisión profesional humana. |
 | **Administrador** | Administrar usuarios de su empresa y sus roles operativos; mantener la información empresarial del perfil; consultar la Biblioteca y gestionar información de actas, versiones y caducidad. | Su administración es de ámbito empresarial. No sustituye las decisiones de revisión del Revisor ni la aprobación del Abogado. El SuperAdministrador gestiona el sistema globalmente. |
-| **SuperAdministrador** | Administrar usuarios, roles y accesos globales; consultar la Bitácora y supervisar cuentas de todo el sistema. | Las secciones **Estadísticas** y **Seguridad** actualmente indican «En construcción» y no ofrecen controles operativos. |
+| **SuperAdministrador** | Administrar usuarios, roles y accesos globales; consultar la Bitácora y supervisar cuentas de todo el sistema. | Su alcance es global y no sustituye el flujo de revisión legal de actas. |
 
 ### Ruta usual de revisión
 
@@ -169,13 +169,9 @@ campos restantes en el formulario antes de enviarlo.
 5. **No se incorporan documentos fuente automáticamente.** Introduce y
    verifica los datos con base en el acta constitutiva, estatutos, libros,
    poderes, convocatorias y demás fuentes aplicables.
-6. **No hay firma electrónica ni protocolización en PGAC.** La descarga del
-   PDF no implica que las partes hayan firmado o que el documento se haya
-   formalizado ante fedatario.
-7. **La disponibilidad de algunas funciones depende de la configuración.**
-   La recuperación de contraseña requiere correo configurado y las secciones
-   globales de Estadísticas y Seguridad aún están en construcción.
-8. **Las acciones administrativas pueden ser irreversibles.** Antes de
+6. **La recuperación de contraseña depende de la configuración del correo.**
+   Requiere que el servidor SMTP esté configurado.
+7. **Las acciones administrativas pueden ser irreversibles.** Antes de
    eliminar un acta, restaurar una versión o cambiar su caducidad, confirma el
    expediente y el motivo. Restaurar una versión crea una versión nueva; no
    borra el historial.

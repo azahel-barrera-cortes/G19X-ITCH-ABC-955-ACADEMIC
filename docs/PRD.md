@@ -114,23 +114,12 @@ El sistema debe exigir autenticación para toda operación del dominio:
 ### RF-13: Bitácora de cambios (auditoría)
 El sistema debe registrar automáticamente quién realizó cada acción sensible
 (crear, actualizar, eliminar, cambiar estatus, validar, restaurar versión,
-fijar caducidad, exportar ZIP y consultas de integración) con: usuario,
+fijar caducidad y cambios de acceso o perfil) con: usuario,
 rol, IP, user-agent y retrato `datos_antes` / `datos_después`. La bitácora se
 puede listar y consultar con filtros `accion` y `entidad`, mediante
 `GET /api/v1/bitacora` y `GET /api/v1/bitacora/{id}` (revisor+).
 
-### RF-14: Exportación a expediente ZIP
-Generar `GET /api/v1/expediente/{acta_id}/zip` con el PDF del acta y un
-`metadatos.json` (folio, sociedad, estatus, quién exportó y cuándo), y
-registrar la operación en la bitácora. Disponible para capturista+.
-
-### RF-15: API de integración para notarías
-Endpoints de solo lectura y metadatos (`/api/v1/notaria/actas` y
-`/api/v1/notaria/actas/{id}`) que exponen resúmenes y datos públicos del
- Acta para validación notarial (sin cláusulas completas), requieren rol
- revisor+ y dejan constancia en la bitácora.
-
-### RF-16: Reasignación de actas en cuarentena a empresa (SuperAdministrador)
+### RF-14: Reasignación de actas en cuarentena a empresa (SuperAdministrador)
 El `SuperAdministrador` puede vincular un acta sin empresa asociada (en
 cuarentena) a una empresa activa existente mediante
 `PATCH /administracion/actas/{acta_id}/empresa`. La operación valida que
@@ -139,17 +128,17 @@ la bitácora con `datos_antes` / `datos_después` y actualiza también las
 entradas de bitácora previas del acta para asignarles el código
 empresarial.
 
-### RF-16: Redacción en vivo por streaming (SSE)
+### RF-15: Redacción en vivo por streaming (SSE)
 El sistema debe ofrecer un endpoint `POST /api/v1/actas/redactar-stream` que transmita la cláusula del primer acuerdo fragmento a fragmento (`inicio` → `fragmento`… → `fin`) mediante `text/event-stream`, permitiendo al frontend mostrar la redacción mientras se genera. Requiere autenticación y rol capturista+.
 
-### RF-17: Navegación y paneles por rol
+### RF-16: Navegación y paneles por rol
 La interfaz debe mostrar únicamente las secciones permitidas por el rol y conservar
 la sección activa mediante hash y `sessionStorage`:
 - El panel **Generar acta** ofrece plantillas frecuentes, formulario manual y modo IA.
 - El **Administrador** dispone de paneles de perfil, información empresarial,
-  usuarios y seguridad.
-- El **SuperAdministrador** dispone de gestión global de usuarios, bitácora,
-  estadísticas, seguridad y guía operativa.
+  usuarios e historial de actas.
+- El **SuperAdministrador** dispone de gestión global de usuarios, bitácora y
+  guía operativa. Estadísticas y Seguridad no aparecen en su menú.
 - Las restricciones visuales deben estar respaldadas por el RBAC del backend.
 
 ---
@@ -190,7 +179,7 @@ El backend persiste la información en tres tablas principales (portables entre 
 |-------|-------------|
 | `id` (PK) | Autoincremental |
 | `usuario_id` (FK) | Quién realizó la acción |
-| `accion` | `crear`, `actualizar`, `eliminar`, `cambiar_estatus`, `validar`, `restaurar_version`, `fijar_caducidad`, `exportar_zip`, etc. |
+| `accion` | `crear`, `actualizar`, `eliminar`, `cambiar_estatus`, `validar`, `restaurar_version`, `fijar_caducidad`, etc. |
 | `entidad`, `entidad_id` | Recurso afectado (p. ej. `actas`, `42`) |
 | `datos_antes`, `datos_despues` | Retrato JSON del cambio |
 | `ip_origen`, `user_agent` | Contexto de la petición |
@@ -216,9 +205,9 @@ Los catálogos (`tipo_asamblea`, `estatus`) se almacenan como `VARCHAR + CHECK` 
 ## 5. Alcance del MVP vs. Post-MVP
 
 ### ✅ Entra en el MVP (ver `docs/MVP.md`) y en la versión entregada
-RF-01 a RF-10 (MVP original) más RF-11 a RF-17 de esta versión:
+RF-01 a RF-10 (MVP original) más RF-11 a RF-16 de esta versión:
 autenticación con roles (JWT + RBAC), interfaz de acceso separada y perfil por
-rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vivo por streaming (SSE).
+rol, bitácora de cambios y redacción en vivo por streaming (SSE).
 
 ### ❌ Queda fuera (post-escimiento actual)
 | Área | Qué queda fuera |
@@ -226,7 +215,7 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 | Multiempresa (pendiente de migraciones) | Aislamiento de datos por sociedad/cliente mediante `empresa_codigo` y filtrado fail-closed en todos los endpoints de actas |
 | Migraciones Alembic | `AUTO_CREATE_TABLES=false` + migraciones gestionadas |
 | Plantillas Word/PDF adjuntas | Poderes, convocatorias, balances como anexos |
-| Vinculación multiempresa completa | Los actas cuentan con `empresa_codigo` indexado y el filtrado por tenant está aplicado en endpoints de actas, administración, notaría y expediente. El `SuperAdministrador` puede reasignar actas en cuarentena mediante `PATCH /administracion/actas/{acta_id}/empresa`. Pendiente: migraciones con Alembic para esquema productivo. |
+| Vinculación multiempresa completa | Los actas cuentan con `empresa_codigo` indexado y el filtrado por tenant está aplicado en endpoints de actas y administración. El `SuperAdministrador` puede reasignar actas en cuarentena mediante `PATCH /administracion/actas/{acta_id}/empresa`. Pendiente: migraciones con Alembic para esquema productivo. |
 
 ---
 
@@ -235,8 +224,8 @@ rol, bitácora de cambios, expediente ZIP, API para notarías y redacción en vi
 La plataforma implementa autenticación JWT con control de acceso por roles
 (RBAC) y bitácora de cambios:
 
-- Todas las operaciones sensibles (actas, administración, asistente, bitácora,
-  expediente, notaría) requieren `Authorization: Bearer <JWT>`; sin token
+- Todas las operaciones sensibles (actas, administración, asistente y bitácora)
+  requieren `Authorization: Bearer <JWT>`; sin token
   responden 401 y con rol insuficiente 403.
 - El registro público permite `capturista`, `revisor` o `abogado_responsable`
   mediante un código de empresa válido y vincula la información empresarial. El SuperAdministrador inicial se crea

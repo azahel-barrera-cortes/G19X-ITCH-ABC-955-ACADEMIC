@@ -22,13 +22,11 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | ReportLab | `build_acta_pdf(data) -> bytes` con encabezados, márgenes, firmas, numeración de páginas |
 | Orquestación | `acta_service.py`: folios, CRUD de actas, composición de cláusulas |
 | Administración | `administracion.py`: resumen del repositorio, clasificación por vigencia, historial de versiones con restauración, gestión de caducidad y endpoint `PATCH /actas/{acta_id}/empresa` para reasignar actas en cuarentena (SuperAdministrador) |
-| Aislamiento por tenant | `tenant_access.py`: `AlcanceEmpresa`, `alcance_empresa()`, `filtrar_por_empresa()` y `obtener_acta_autorizada()` para filtrado fail-closed por `empresa_codigo` en todos los endpoints de actas, administración, notaría y expediente |
+| Aislamiento por tenant | `tenant_access.py`: `AlcanceEmpresa`, `alcance_empresa()`, `filtrar_por_empresa()` y `obtener_acta_autorizada()` para filtrado fail-closed por `empresa_codigo` en endpoints de actas y administración |
 | Asistente IA | `asistente.py`: chat conversacional para creación guiada, validación, consulta de estatus y versiones (`/api/v1/asistente/chat`, `/api/v1/asistente/ayuda`) |
 | Auth y RBAC | `auth_service.py`, `security.py`, `deps.py`: semilla inicial de SuperAdministrador vía `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`, registro público vinculado a empresa para capturista/revisor/abogado responsable, JWT HS256, perfil, recuperación de contraseña, contraseñas nuevas de al menos 12 caracteres, hash bcrypt_sha256 y actualización de hashes bcrypt heredados al iniciar sesión, `requiere_rol` y dependencias por rol; generación y persistencia de `codigo_empresa` para cada `Administrador`, administración de usuarios reservada al `SuperAdministrador` y bloqueo de cuentas inactivas |
-| Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): quién modificó qué, cuándo, con antes/después |
-| Expediente | `GET /api/v1/expediente/{id}/zip`: PDF + `metadatos.json` (capturista+) |
-| Notaría | `GET /api/v1/notaria/actas*` (revisor+): metadatos para integración notarial |
-| Endpoints | `GET /health`, catálogos, `redactar`, `redactar-stream`, `generar-pdf`, CRUD de actas, `estatus`, `pdf`, `validar`, `bitacora`, `expediente/zip`, `notaria/actas*`, `administracion/*`, `asistente/chat*`, `auth/*`; el PDF devuelve encabezados de trazabilidad `X-Acta-Folio`, `X-Acta-Id`, `X-Acta-Version`, `X-Acta-Paginas`, `X-Acta-Guardada`, `X-IA-Proveedor`, `X-IA-Advertencias`, `X-Validacion-Puntaje` |
+| Bitácora | `BitacoraCambios` + `GET /api/v1/bitacora` (revisor+): acciones auditadas con actor, fecha, entidad y datos antes/después. SuperAdministrador consulta globalmente; otros roles quedan limitados a su empresa. |
+| Endpoints | `GET /health`, catálogos, `redactar`, `redactar-stream`, `generar-pdf`, CRUD de actas, `estatus`, `pdf`, `validar`, `bitacora`, `administracion/*`, `asistente/chat*`, `auth/*`; el PDF devuelve encabezados de trazabilidad `X-Acta-Folio`, `X-Acta-Id`, `X-Acta-Version`, `X-Acta-Paginas`, `X-Acta-Guardada`, `X-IA-Proveedor`, `X-IA-Advertencias`, `X-Validacion-Puntaje` |
 | Variables de entorno | `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`, `AZURE_OPENAI_*`, `GEMINI_API_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `SMTP_SSL`, `SMTP_TIMEOUT_SECONDS`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `MARGEN_CM`, `PIE_CONFIDENCIALIDAD`, `CORS_ORIGINS`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NOMBRE` |
 
 ### Frontend (React 18 + Vite + Tailwind)
@@ -44,22 +42,37 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 | Autenticación | Login, registro, perfil, cambio y recuperación de contraseña por SMTP, control de cuentas inactivas y administración global de usuarios. La recuperación es igual para todos los roles, incluidos SuperAdministrador; token hash de un solo uso, expiración de 60 minutos, respuestas que no enumeran cuentas y revocación de sesiones previas |
 | Administración global | `UsuariosSuperAdmin.jsx`, `VitacoraSuperAdmin.jsx` y `UsuarioInactivo.jsx`: gestión de usuarios, bitácora para SuperAdministrador y pantalla de bloqueo para cuentas inactivas |
 | Catálogos | Tipos de asamblea, mayorías, caracteres de asistente, estatus |
-| Navegación y administración | Menú filtrado por rol, rutas con hash persistidas, panel de generación con plantillas frecuentes, panel de Administrador (perfil, empresa, usuarios y seguridad) y panel global del SuperAdministrador (usuarios, bitácora, estadísticas, seguridad y guía) |
+| Navegación y administración | Menú filtrado por rol, rutas con hash persistidas, panel de generación con plantillas frecuentes, perfil con información empresarial, administración de usuarios y panel global del SuperAdministrador (usuarios, bitácora y guía) |
 
+### Bitácora: alcance y filtros
+
+- Registra las acciones de negocio exitosas instrumentadas: cambios de actas,
+  creación y administración de usuarios, cambios de perfil y empresa, cambios
+  de contraseña e inicio/cierre de sesión. La bitácora conserva eventos de
+  usuarios eliminados.
+- El filtro **Generación con IA** incluye tanto las generaciones no persistidas
+  como las actas guardadas cuyo proveedor fue realmente IA; las plantillas de
+  respaldo no se clasifican como IA.
+- El SuperAdministrador puede consultar eventos de todas las empresas. Los
+  demás usuarios con permiso de bitácora solo ven los de su empresa. La vista
+  consulta lotes y permite cargar eventos anteriores con un cursor.
+- No registra cada lectura/consulta del sistema ni intentos fallidos de acceso
+  o recuperación. Es un historial operativo consultable, no un registro
+  inmutable o resistente a alteraciones administrativas.
 ### Pruebas
 - Suite de pruebas automatizadas, con desglose por archivo:
   - `test_administracion.py`: 11
   - `test_ai_service.py`: 23
-  - `test_api_actas.py`: 11
+  - `test_api_actas.py`: 13
   - `test_asistente.py`: 10
-  - `test_auth.py`: 25
-  - `test_config.py`: 4
+  - `test_auth.py`: 28
+  - `test_config.py`: 5
   - `test_email_service.py`: 1
   - `test_flujo_creacion.py`: 7
   - `test_pdf_generator.py`: 5
   - `test_plantillas_legales.py`: 21
   - `test_tenant_isolation.py`: 3
-  - Total actual: 121
+  - Total actual: 127
 - Build del frontend exitoso (Vite)
 
 ---
@@ -81,7 +94,7 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
 - [ ] Se instala y arranca la aplicación: backend con PostgreSQL o SQLite, frontend en Vite.
 - [ ] El SuperAdministrador inicial accede por login con las credenciales de `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`; **sin sesión iniciada solo se muestra la interfaz de acceso**: ninguna sección del sistema de actas visible.
 - [ ] La recuperación envía por SMTP un token de un solo uso y vigencia de 60 minutos; no revela si la cuenta existe y, al cambiar la contraseña, invalida sesiones previas. Esto aplica también al SuperAdministrador.
-- [ ] Tras un acceso correcto se abre **Mi perfil** para usuarios operativos con las funciones permitidas por el rol: capturista (generar actas, asistente y empresa en modo lectura), revisor+ (biblioteca, administración, bitácora y API notarial), abogado responsable+ (estatus y validación) y Administrador (gestión de información de empresa). El SuperAdministrador entra directamente al panel global de superadministración del sistema.
+- [ ] Tras un acceso correcto se abre **Mi perfil** para usuarios operativos con las funciones permitidas por el rol: capturista (generar actas, asistente y empresa en modo lectura), revisor+ (biblioteca, administración y bitácora), abogado responsable+ (estatus y validación) y Administrador (gestión de información de empresa). El SuperAdministrador entra directamente al panel global de superadministración del sistema.
 - [ ] El acta se valida en consistencia (quórum, mayorías, fundamentos legales)
 - [ ] Las actas se pueden listar, editar, cambiar de estatus y eliminar
 - [ ] Se puede consultar el resumen del repositorio, la vigencia de actas, el historial de versiones y la caducidad (administración)
@@ -107,6 +120,8 @@ Permitir a un usuario capturar los datos de una asamblea societaria (datos gener
   producción debe usar STARTTLS o SSL. Sigue pendiente implementar rate limiting.
 - El asistente conversacional exige rol `abogado_responsable` (o superior)
    para cambiar el estatus de un acta y restaurar versiones anteriores.
+- La bitácora refleja las acciones instrumentadas y exitosas; no es una
+  auditoría de cada lectura, de intentos fallidos ni un almacén inmutable.
 - El front-end guarda la sesión (JWT + usuario) en `localStorage`: si se
   evalúa un entorno multi-usuario, migrar a cookies `HttpOnly` + `Secure`.
 
